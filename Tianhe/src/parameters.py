@@ -1,0 +1,1 @@
+fksem="/THL8/home/iggluyf/nqdu/specfem3d-joint/"
