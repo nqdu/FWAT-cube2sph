@@ -6,10 +6,12 @@ from parameters import *
 def run_ls(arg):
     rank,step,nproc_per_src,mod,simu_type = arg 
 
-    cmd=f"mpirun -machinefile slurm.host.{rank} --oversubscribe -np {nproc_per_src}" \
+    cmd=f"mpirun -machinefile slurm.host.{rank} -np {nproc_per_src}" \
         f" {fksem}/bin/xfwat3_linesearch {mod}_step{step} ls {simu_type} > LS.{step}.txt "
     print(cmd,flush=True)
-    os.system(cmd)
+    out = os.system(cmd)
+
+    return out 
 
 def main():
     if len(sys.argv) != 5:
@@ -39,10 +41,13 @@ def main():
         if rank == nodes or i== len(steps)-1:
             # run
             pool = Pool(len(arglist))
-            pool.map(run_ls,arglist)
+            out = pool.map(run_ls,arglist)
             pool.close()
             pool.join()
             
+            for i in range(len(out)):
+                if out[i] !=0:
+                    exit(1)            
             # renew arglist and rank
             rank = 0
             arglist = []

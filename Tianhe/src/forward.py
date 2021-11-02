@@ -11,7 +11,9 @@ def run_fwdadj(arg):
     cmd=f"mpirun -machinefile slurm.host.{rank} -np {nproc_per_src} "\
           f"{fksem}/bin/xfwat0_forward_data {mod} set{setnum} {simu_type} > forward.set{setnum}.txt"
     print(cmd,flush=True)
-    os.system(cmd)
+    out = os.system(cmd)
+
+    return out 
 
 def main():
     if len(sys.argv) != 7:
@@ -39,9 +41,13 @@ def main():
         if rank == nodes or i==sete: # all tasks are in queue
             # run 
             pool = Pool(len(arglist))
-            pool.map(run_fwdadj,arglist)
+            out = pool.map(run_fwdadj,arglist)
             pool.close()
             pool.join()
+
+            for i in range(len(out)):
+                if out[i] !=0:
+                    exit(1)
             
             # renew arglist and rank
             rank = 0
