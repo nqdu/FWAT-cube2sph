@@ -2,7 +2,7 @@
 #SBATCH --nodes=8
 #SBATCH --ntasks-per-node=20
 #SBATCH --job-name FWI
-#SBATCH --output=FWI_%j.txt
+#SBATCH --output=FWI_%j.log
 #SBATCH --partition=TH_HPC3
 
 set -e 
@@ -82,7 +82,7 @@ fi
 
 # go with tele data 
 startidx=$(printf %d `echo $startmod | cut -d'M' -f2`)
-for((ii=$startidx;ii<$iters;ii++));
+for((ii=0;ii<$iters;ii++));
 do  
     echo " "
     echo "==============================="
@@ -90,7 +90,7 @@ do
     echo "==============================="
 
     # change LOCAL_PATH to the model database
-    jj=`printf %02d $ii`
+    jj=$(printf %02d $(echo "$ii$startidx"|bc))
     if [ $jj == "00" ];then
         ./utils/change_par_file.sh LOCAL_PATH ./OUTPUT_FILES/DATABASES_MPI DATA/Par_file
         ./utils/change_par_file.sh LOCAL_PATH ./OUTPUT_FILES/DATABASES_MPI DATA/meshfem3D_files/Mesh_Par_file
@@ -135,10 +135,10 @@ do
     
     # compute misfits for each step size
     cd plots 
-    bash plot_misfit/plt_line_search.multiband.tele.bash M$j 
+    bash plot_misfit/plt_line_search.multiband.tele.bash M$jj 
 
     # next index
-    jnext=$(printf %02d $(echo "$ii+1"|bc))
+    jnext=$(printf %02d $(echo "$ii+1+$startidx"|bc))
 
     # find the min misfit and copy to Model_next
     minval=`awk '{print $2}' M${jj}.mis.avg | sort -n | head -1`
