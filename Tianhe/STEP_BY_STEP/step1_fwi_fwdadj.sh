@@ -4,9 +4,7 @@
 #SBATCH --time=00:59:59
 #SBATCH --job-name FWDADJ
 #SBATCH --output=FWDADJ_%j.txt
-#SBATCH --partition=debug
-#SBATCH --mail-user=nanqiao.du@mail.utoronto.ca
-#SBATCH --mail-type=ALL
+#SBATCH --partition=TH_HPC3
 
 set -e 
 

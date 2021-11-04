@@ -4,9 +4,6 @@
 #SBATCH --time=00:59:59
 #SBATCH --job-name FWI
 #SBATCH --output=FWI_%j.txt
-#SBATCH --partition=debug
-#SBATCH --mail-user=nanqiao.du@mail.utoronto.ca
-#SBATCH --mail-type=ALL
 
 set -e 
 
