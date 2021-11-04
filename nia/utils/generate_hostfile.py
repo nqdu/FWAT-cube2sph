@@ -66,6 +66,7 @@ def main():
         f = open(f"slurm.host.{i}","w")
         f.writelines(hostname[i])
         f.close()
+    
     print(hostname)
 
 main()

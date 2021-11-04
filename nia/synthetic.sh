@@ -2,8 +2,8 @@
 #SBATCH --nodes=4
 #SBATCH --ntasks-per-node=40
 #SBATCH --time=00:59:59
-#SBATCH --job-name FWI
-#SBATCH --output=FWI_%j.txt
+#SBATCH --job-name FORWARD
+#SBATCH --output=FORWARD_%j.txt
 #SBATCH --partition=debug
 #SBATCH --mail-user=nanqiao.du@mail.utoronto.ca
 #SBATCH --mail-type=ALL
@@ -25,14 +25,14 @@ nnodes=4
 ntasks_per_node=40
 
 # FKSEM path
-fksem='/home/l/liuqy/nqdu/specfem3d-joint/'
+fksem='/home/l/liuqy/nqdu/specfem3d/'
 
 ###### Parameters END ################
 ####################################
 
 # LOAD all module
 source activate base
-module load NiaEnv/2018a
+module load NiaEnv/2019b
 module load intel openmpi
 
 echo "========================="
@@ -68,9 +68,9 @@ rm -rf $LOCAL_PATH/*.bin
 ./utils/change_par_file.sh LOCAL_PATH $LOCAL_PATH  DATA/meshfem3D_files/Mesh_Par_file
 cp checkerboard_model_40km/* ${LOCAL_PATH}/ -r 
 echo 'mpirun --oversubscribe -np $NPROC $fksem/bin/xmeshfem3D'
-mpirun --oversubscribe -np $NPROC $fksem/bin/xmeshfem3D
+mpirun -machinefile slurm.host --oversubscribe -np $NPROC $fksem/bin/xmeshfem3D
 echo 'mpirun --oversubscribe -np $NPROC $fksem/bin/xgenerate_databases'
-mpirun --oversubscribe -np $NPROC $fksem/bin/xgenerate_databases
+mpirun -machinefile slurm.host --oversubscribe -np $NPROC $fksem/bin/xgenerate_databases
 
 # run forward simulation
 python src/forward.py M00 $setb $sete $simu_type $NPROC $nodes 
