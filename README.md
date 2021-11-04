@@ -1,5 +1,7 @@
 # Python Scripts to Run FWI 
 
 ## 1. modified source code
- in `src/fullwave_adjoint_tomo/run_fwat0...f90`
+Substitute code of SPECFEM3D with these in `code` folder.
+
+## 2. 
  

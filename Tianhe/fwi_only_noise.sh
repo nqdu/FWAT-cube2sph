@@ -135,7 +135,11 @@ do
     
     # compute misfits for each step size
     cd plots 
-    bash plot_misfit/plt_line_search.multiband.ANAT.bash M$jj 
+    if [ $simu_type == "tele" ]; then 
+        bash plot_misfit/plt_line_search.multiband.tele.bash M$jj
+    else 
+        bash plot_misfit/plt_line_search.multiband.ANAT.bash M$jj
+    fi 
 
     # next index
     jnext=$(printf %02d $(echo "$ii+1+$startidx"|bc))

@@ -1,9 +1,12 @@
 #!/bin/bash
-#SBATCH --nodes=8
-#SBATCH --ntasks-per-node=20
+#SBATCH --nodes=10
+#SBATCH --ntasks-per-node=40
+#SBATCH --time=06:59:59
 #SBATCH --job-name FWI
 #SBATCH --output=FWI_%j.log
-#SBATCH --partition=TH_HPC3
+#SBATCH --partition=compute
+#SBATCH --mail-user=nanqiao.du@mail.utoronto.ca
+#SBATCH --mail-type=ALL
 
 set -e 
 
@@ -11,30 +14,32 @@ set -e
 ###### Parameters ##################
 
 # event sets
-setb=12
-sete=22
+setb=1
+sete=10
 
 # simu_type
-simu_type=tele 
+simu_type=noise
 
 # start model
 startmod=M00
 
 # iterations 
-iters=5
+iters=10
 
 # HPC facilities
-nnodes=8
-ntasks_per_node=20
+nnodes=10
+ntasks_per_node=40
 
 # FKSEM path
-fksem='/THL8/home/iggluyf/nqdu/specfem3d-joint/'
+fksem='/home/l/liuqy/nqdu/specfem3d/'
 
 ###### Parameters END ################
 ####################################
 
 # LOAD all module
 source activate base
+module load NiaEnv/2019b
+module load intel openmpi 
 
 echo "========================="
 echo "FWI begin `date`"
@@ -74,9 +79,9 @@ if [ $startmod == "M00" ]; then
     ./utils/change_par_file.sh LOCAL_PATH $LOCAL_PATH  DATA/meshfem3D_files/Mesh_Par_file
     cp initial_model/* ${LOCAL_PATH}/ -r 
     echo 'mpirun --oversubscribe -np $NPROC $fksem/bin/xmeshfem3D'
-    mpirun -machinefile slurm.host -np $NPROC $fksem/bin/xmeshfem3D
+    mpirun -machinefile slurm.host --oversubscribe -np $NPROC $fksem/bin/xmeshfem3D
     echo 'mpirun --oversubscribe -np $NPROC $fksem/bin/xgenerate_databases'
-    mpirun -machinefile slurm.host -np $NPROC $fksem/bin/xgenerate_databases
+    mpirun -machinefile slurm.host --oversubscribe -np $NPROC $fksem/bin/xgenerate_databases
 
 fi
 
@@ -86,11 +91,11 @@ for((ii=0;ii<$iters;ii++));
 do  
     echo " "
     echo "==============================="
-    echo "Iteration $ii"
+    echo "Iteration $ii `date`"
     echo "==============================="
 
     # change LOCAL_PATH to the model database
-    jj=$(printf %02d $(echo "$ii$startidx"|bc))
+    jj=$(printf %02d $(echo "$ii+$startidx"|bc))
     if [ $jj == "00" ];then
         ./utils/change_par_file.sh LOCAL_PATH ./OUTPUT_FILES/DATABASES_MPI DATA/Par_file
         ./utils/change_par_file.sh LOCAL_PATH ./OUTPUT_FILES/DATABASES_MPI DATA/meshfem3D_files/Mesh_Par_file
@@ -110,8 +115,8 @@ do
         rm -rf optimize/MODEL_M00
         cp -r initial_model optimize/MODEL_M00
     fi 
-    echo "mpirun -machinefile slurm.host -np $NPROC $fksem/bin/xfwat2_postproc_opt M$jj set$setb set$sete true"
-    mpirun -machinefile slurm.host -np $NPROC $fksem/bin/xfwat2_postproc_opt M$jj set$setb set$sete true > POST.txt 
+    echo " mpirun -oversubscribe -np $NPROC $fksem/bin/xfwat2_postproc_opt M$jj set$setb set$sete true "
+    mpirun -oversubscribe -np $NPROC $fksem/bin/xfwat2_postproc_opt M$jj set$setb set$sete true > POST 
     for step in `grep STEP_LENS fwat_params/FWAT.PAR |awk -F: '{print $2}'`;do
         echo "======================================="
         echo  Meshing for model $MODEL step:$step
@@ -120,8 +125,8 @@ do
         ./utils/change_par_file.sh LOCAL_PATH ./optimize/MODEL_M${jj}_step${step} DATA/Par_file
         ./utils/change_par_file.sh LOCAL_PATH ./optimize/MODEL_M${jj}_step${step} DATA/meshfem3D_files/Mesh_Par_file
         ./utils/change_par_file.sh SAVE_MESH_FILES .false. DATA/Par_file       
-        mpirun -machinefile slurm.host -np $NPROC $fksem/bin/xmeshfem3D
-        mpirun -machinefile slurm.host -np $NPROC $fksem/bin/xgenerate_databases
+        mpirun -machinefile slurm.host -oversubscribe -np $NPROC $fksem/bin/xmeshfem3D
+        mpirun -machinefile slurm.host -oversubscribe -np $NPROC $fksem/bin/xgenerate_databases
     done
 
     # linesearch
