@@ -28,8 +28,8 @@ program main
   if(rank == 0) then 
     if(COMMAND_ARGUMENT_COUNT() /= 3) then 
       print *,'Usage :'
-      print*, './runthis LOCAL_PATH parameter out_name'
-      call MPI_Abort(MPI_COMM_WORLD,1)
+      stop './runthis LOCAL_PATH parameter out_name'
+      !call MPI_Abort(MPI_COMM_WORLD,1)
     else 
       call get_command_argument(2,tempfile)
       tempfile = trim(tempfile)
