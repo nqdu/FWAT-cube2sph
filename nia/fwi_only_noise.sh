@@ -94,8 +94,11 @@ do
     echo "Iteration $ii `date`"
     echo "==============================="
 
-    # change LOCAL_PATH to the model database
+    # current and next index
     jj=$(printf %02d $(echo "$ii+$startidx"|bc))
+    jnext=$(printf %02d $(echo "$ii+1+$startidx"|bc))
+
+    # change LOCAL_PATH to the model database
     if [ $jj == "00" ];then
         ./utils/change_par_file.sh LOCAL_PATH ./OUTPUT_FILES/DATABASES_MPI DATA/Par_file
         ./utils/change_par_file.sh LOCAL_PATH ./OUTPUT_FILES/DATABASES_MPI DATA/meshfem3D_files/Mesh_Par_file
@@ -144,13 +147,10 @@ do
         bash plot_misfit/plt_line_search.multiband.tele.bash M$jj
     else 
         bash plot_misfit/plt_line_search.multiband.ANAT.bash M$jj
-    fi 
-
-    # next index
-    jnext=$(printf %02d $(echo "$ii+1+$startidx"|bc))
+    fi
 
     # find the min misfit and copy to Model_next
-    minval=`awk '{print $2}' M${jj}.mis.avg | sort -n | head -1`
+    minval=`tail -n +2 M${jj}.mis.avg| awk '{print $2}' | sort -n | head -1`
     step=`grep $minval M${jj}.mis.avg -n | cut -d: -f2 | awk '{print $1}'`
     cd ../optimize
     cp MODEL_M${jj}_step${step} MODEL_M$jnext -rf 
