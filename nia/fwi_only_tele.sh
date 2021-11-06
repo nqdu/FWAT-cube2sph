@@ -154,7 +154,7 @@ do
     cd ../optimize
     cp MODEL_M${jj}_step${step} MODEL_M$jnext -rf 
     cd ..
-    echo "misfit for iteration $ii : $minval"
+    echo "misfit for iteration $ii with step_size $step : $minval"
 
     # save log file
     mkdir -p LOGS/MODEL_$jj
