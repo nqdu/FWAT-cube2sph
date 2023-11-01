@@ -1,0 +1,123 @@
+#!/bin/bash
+#SBATCH --nodes=4
+#SBATCH --ntasks-per-node=40
+#SBATCH --time=00:12:59
+#SBATCH --job-name step0
+#SBATCH --output=step0.txt 
+#SBATCH --mem=0
+#SBATCH --partition=debug
+
+# script runs mesher,database generation and solver
+# using this example setup
+#
+###################################################
+#module load NiaEnv/2019b
+module load intel openmpi
+
+source activate pygmt
+mkdir -p grdfolder pics 
+
+function plot_profile
+{
+    local isplot=$3
+    local name=$2
+    local inputfile=$1
+
+    awk '{print $4}' input/$inputfile.cords > $inputfile.tmp1 
+    awk '{print $3,$4}' $inputfile > $inputfile.tmp2 
+    paste $inputfile.tmp1 $inputfile.tmp2 > $inputfile 
+    file=$inputfile
+    # convert txt to grd
+    awk '{print $1,$2,$3}' $file|  gmt surface -Ggrdfolder/$file.grd -I128+n/128+n $bounds -Vq
+
+    if $isplot ; then 
+        # makecpt
+        info=`gmt grdinfo grdfolder/$file.grd -C`
+        local vmin=`echo $info| awk '{print $6}'`
+        local vmax=`echo $info| awk '{print $7}'`
+        #vmin=-10
+        #vmax=10
+
+        # plot topo
+        info=`gmt gmtinfo topo.txt -C`
+        xmin=`echo $info | awk '{print $1}'`
+        xmax=`echo $info | awk '{print $2}'`
+        hmin=`echo $info | awk '{print $3}'`
+        hmax=`echo $info | awk '{print $4}'`
+        hmax=`echo "$hmax*1.1" |bc`
+        bounds1=-R$xmin/$xmax/$hmin/$hmax
+
+        #echo $vmin $vmax
+        gmt makecpt -T$vmin/$vmax/50+n -Z -D -Cseis > out.$file.cpt 
+        gmt begin pics/$file jpg 
+
+        gmt basemap $bounds1 $proj1 -Bxaf+l"Longitude,Degree" -Byaf+l"Topo,m" \
+            -BWNeb+t"${name}-${name}1" -Y12c
+        gmt plot topo.txt -W0.5p,black
+
+        gmt basemap $bounds $proj -BWSet -Bxaf+l"Distance,km" -Byaf+l"Depth,km" -Y-6c
+        gmt grdimage grdfolder/$file.grd -Cout.$file.cpt -E200
+        #gmt grdcontour grdfolder/$file.grd -C100
+        gmt colorbar -Cout.$file.cpt -Bxaf
+        gmt end 
+        rm out.$file.cpt 
+    fi
+
+    rm $inputfile.tmp*
+}
+
+# parameters
+NPROC=160
+param=vs
+
+# profile
+lon0=-125; lon1=-119.5
+#lon0=-124.25; lon1=-122
+lat0=44.42; lat1=44.42
+#lat0=45.5; lat1=45.5
+z0=-220
+z1=0.
+dist=5
+nz=101
+mkdir -p profiles
+# get topo 
+# gmt grdcut @earth_relief_03s -R-125/-119.5/44/45  -Gout.grd 
+python src/generate_line.py $lon0 $lon1 $lat0 $lat1 300 profile.txt 
+# awk '{print $1,$2}' profile.txt |gmt grdtrack  -R-125/-119.5/44/45 -Gout.grd > temp.txt  
+# awk '{print $1,$3}' temp.txt >  topo.txt 
+# \rm temp.txt out.grd 
+
+
+for iter in `seq 0 7`;
+do 
+    jj=`printf %02d $iter`
+    echo $jj 
+    for name in A; do 
+        # get profile
+        #gmt project -C$lon0/$lat0 -E$lon1/$lat1 -G$dist -Q > input/$param.iter$jj.prof$name.tmp
+        cp profile.txt input/$param.iter$jj.prof$name.tmp
+        :>input/$param.iter$jj.prof$name.cords
+        for ((i=0;i<$nz;i++));
+        do
+            dep=`printf %g $(echo "scale=4; 1000*($z0 + ($z1 - $z0) / ($nz-1) * $i)"|bc)`
+            awk -v a=$dep '{print $1,$2,a,$3}' input/$param.iter$jj.prof$name.tmp \
+                   >> input/$param.iter$jj.prof$name.cords
+        done
+        rm input/$param.iter$jj.prof$name.tmp
+
+        # get grd file and plot
+        info=`gmt gmtinfo -C input/$param.iter$jj.prof$name.cords`
+        dmax=`echo $info | awk '{print $8}'`
+        bounds=-R0/$dmax/$z0/$z1 
+        proj=-JX12c/6c
+        proj1=-JX12c/1.5c
+        awk '{print $1,$2,$3}' input/$param.iter$jj.prof$name.cords > $param.iter$jj.prof$name.cords
+        mpirun -np $NPROC --oversubscribe ./bin/interp3D ../../optimize/MODEL_M$jj \
+            ../../optimize/MODEL_M$jj $param.iter$jj.prof$name.cords $param \
+            $param.iter$jj.prof$name bin false true
+        rm $param.iter$jj.prof$name.cords
+        plot_profile $param.iter$jj.prof$name $name false
+
+        mv $param.iter$jj.prof$name profiles
+    done 
+done
