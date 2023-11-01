@@ -12,7 +12,7 @@ set -e
 
 # event sets
 setb=1
-sete=10
+sete=10 
 
 # simu_type
 simu_type=noise 
