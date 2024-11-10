@@ -1,0 +1,4 @@
+# measure functions
+## measure.${simu_type}.sh iter evtid run_opt
+run_opt = 1 forward simulation (used for synthetic test)
+run_opt = 2 line search 

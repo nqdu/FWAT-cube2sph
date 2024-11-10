@@ -1,0 +1,105 @@
+#!/bin/bash
+if [[ $# -ne 3 ]]; then 
+    echo "Usage: ./measure_tele.sh iter evtid run_opt(1,2,3)"
+    exit 1
+fi
+
+source module_env
+. parameters.sh
+
+set -e
+
+# get input args
+iter=$1
+evtid=$2
+run_opt=$3
+lsflag=""
+if  [ $run_opt -eq 2 ]; then 
+  lsflag=".ls"
+fi 
+
+# set directory
+current_dir=`pwd`
+mod=M`printf "%02d" $iter`
+rundir=solver/$mod"$lsflag"/$evtid/
+echo "convert synthetic seismograms to sac : evtid=$evtid iter=$iter ..."
+SYN_DIR=$rundir/OUTPUT_FILES 
+
+# rotate seismograms to ENZ
+mpirun -np 4 python  \
+        $MEASURE_LIB/rotate_seismogram.py --fn_matrix="src_rec/rot_$evtid"   \
+       --rotate="XYZ->NEZ" --from_dir="$rundir/OUTPUT_FILES/" --to_dir="$rundir/OUTPUT_FILES/"   \
+       --from_template='${nt}.${sta}.BX${comp}.semd'  \
+       --to_template='${nt}.${sta}.BX${comp}.sem.ascii'
+
+# ascii to sac
+#echo "python $MEASURE_LIB/ascii2sac.py $rundir/DATA/STATIONS_FILTERED $rundir/DATA/CMTSOLUTION $SYN_DIR"
+\rm -f $SYN_DIR/*.sac # clean all sac file
+python $MEASURE_LIB/ascii2sac.py $current_dir/src_rec/STATIONS_${evtid}_globe  \
+      $current_dir/src_rec/FORCE_ORG/FORCESOLUTION_${evtid} $SYN_DIR
+
+
+# run measure and write measure_adj file
+echo " "
+if [ $run_opt -ne 1 ]; then 
+  mpirun -np 8 python $MEASURE_LIB/preprocess_noise.py $iter $evtid $run_opt
+else 
+  mpirun -np 8 python $MEASURE_LIB/preprocess_noise.py $iter $evtid $run_opt
+  exit 0
+fi 
+
+# get filter params
+# measure misifts
+cd $SYN_DIR
+fwat_file=../DATA/FWAT.PAR
+SHORT_P=(`cat $fwat_file |grep 'SHORT_P:' |awk -F: '{print $2}'`)
+LONG_P=(`cat $fwat_file |grep 'LONG_P:' |awk -F: '{print $2}'`)
+NUM_FILTER=`echo ${#SHORT_P[@]}`
+mkdir -p $current_dir/misfits/
+outfile=$current_dir/output_fwat1_log.$mod.$evtid"$lsflag".txt 
+if [ $run_opt == 2 ]; then
+  outfile=$current_dir/output_fwat3_log.$mod.$evtid"$lsflag".txt 
+fi 
+
+# run measure_adj 
+echo " "
+for ((i=0;i<$NUM_FILTER;i++));
+do
+  band=`printf "T%03d_T%03d" ${SHORT_P[$i]} ${LONG_P[$i]}`
+  echo "measure adj for $band ..."
+  cd $band 
+  mkdir -p OUTPUT_FILES
+  \cp ../../DATA/MEASUREMENT.PAR  .
+  $MEASURE_LIB/bin/measure_adj
+  awk -v a=$evtid '{$1=a;$29=$29*1.; print}' window_chi >  $current_dir/misfits/$mod.${evtid}${lsflag}_${band}_noise_window_chi
+  
+  # continue for line search
+  if [ $run_opt == 2 ]; then
+    \rm -rf OUTPUT_FILES
+    cd $current_dir
+    cd $SYN_DIR
+    continue
+
+  fi
+
+  # rotate adjoint source 
+  cd OUTPUT_FILES
+  for f in `ls *iker*.adj |cut -d'.' -f1,2 |sort -n |uniq`;
+  do 
+    newf=`echo $f |awk -F'.' '{new_var=$2"."$1; print new_var}'`
+    baz=`saclst baz f ../$newf.BXZ.sac.obs | awk '{print $2 * 3.1415926535898/180.}'`
+
+    $MEASURE_LIB/bin/rotate_adj_src $baz $f.BXZ.iker07.adj $f.BXT.iker07.adj $f.BXR.iker07.adj $newf.BXE.adj $newf.BXN.adj 
+    \cp $f.BXZ.iker07.adj $newf.BXZ.adj
+  done
+  cd ../..
+
+done
+
+# continue for finish line search
+if [ $run_opt -eq 2 ]; then
+  exit 0;
+fi
+
+cd $current_dir
+bash $MEASURE_LIB/sum_adj_source.sh $iter $evtid
