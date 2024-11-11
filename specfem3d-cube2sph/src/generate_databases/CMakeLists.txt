@@ -1,6 +1,6 @@
 file(GLOB SOURCE CONFIGURE_DEPENDS LIST_DIRECTORIES FALSE "*.c" "*.f90" "*.F90" )
 list(FILTER SOURCE EXCLUDE REGEX "adios.F90")
-list(FILTER SOURCE EXCLUDE REGEX "generate_databases.f90")
+list(FILTER SOURCE EXCLUDE REGEX "^generate_databases.f90")
 
 # library
 add_library(database ${SOURCE})
