@@ -5,5 +5,5 @@ file(GLOB SOURCE CONFIGURE_DEPENDS LIST_DIRECTORIES FALSE "${POST_DIR}/postproce
 add_library(tomo ${SOURCE})
 add_dependencies(tomo shared)
 
-add_executable(xsmooth_sem_sph_pde ${POST_DIR}/smooth_sem_sph_pde.f90)
+add_executable(xsmooth_sem_sph_pde ${POST_DIR}/smooth_sem_sph_pde.F90)
 target_link_libraries(xsmooth_sem_sph_pde tomo solver shared)
