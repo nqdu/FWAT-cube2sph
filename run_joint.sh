@@ -68,8 +68,8 @@ set_fwat3()
 }
 
 # parameters
-iter_start=27
-iter_end=27
+iter_start=35
+iter_end=35
 FIRST_ITER=25
 
 # L-BFGS params
@@ -108,12 +108,12 @@ for iter in `seq $iter_start $iter_end`;do
   sete=`cat src_rec/sources.dat.$simu_type1 |wc -l`
   sete1=`echo "$setb + $sete - 1" |bc`
   set_fwat1 $simu_type1 $NJOBS1 $setb
-  #job_adj1=$(sbatch tmp.fwat1.$simu_type1.sh|cut -d ' ' -f4 )
+  job_adj1=$(sbatch tmp.fwat1.$simu_type1.sh|cut -d ' ' -f4 )
 
   sete=`cat src_rec/sources.dat.$simu_type2 |wc -l`
   sete2=`echo "$setb + $sete - 1" |bc`
   set_fwat1 $simu_type2 $NJOBS2 $setb
-  #job_adj2=$(sbatch tmp.fwat1.$simu_type2.sh|cut -d ' ' -f4 )
+  job_adj2=$(sbatch tmp.fwat1.$simu_type2.sh|cut -d ' ' -f4 )
 
   # run line search
   if [ ${mod} == $mod_lbfgs_start  ]; then 
@@ -158,12 +158,13 @@ EOF
     #\rm tmp.fwat2.cal.sh
   fi
   echo "postprocessing ..."
-  #job_post=$(sbatch --dependency=afterok:${job_adj1},${job_adj2} $fwd | cut -d ' ' -f4)
+  job_post=$(sbatch --dependency=afterok:${job_adj1},${job_adj2} $fwd | cut -d ' ' -f4)
 
   # run line search
   set_fwat3 $simu_type1 $NJOBS1 $setb
   set_fwat3 $simu_type2 $NJOBS2 $setb
-  #job_line=$(sbatch --dependency=afterok:${job_post} tmp.fwat3.$simu_type.sh | cut -d ' ' -f4)
+  job_line1=$(sbatch --dependency=afterok:${job_post} tmp.fwat3.$simu_type1.sh | cut -d ' ' -f4)
+  job_line2=$(sbatch --dependency=afterok:${job_post} tmp.fwat3.$simu_type2.sh | cut -d ' ' -f4)
 
   # generate next model
   echo "generating opt model ..."
@@ -194,7 +195,7 @@ EOF
   \mv tmp.fwat4.cal.sh $fwd 
   #\rm tmp.fwat2.cal.sh
   sed -i "/model=/c\model=${mod}" $fwd
-  #job_step=$(sbatch --dependency=afterok:${job_line} $fwd | cut -d ' ' -f4)
+  job_step=$(sbatch --dependency=afterok:${job_line1},${job_line2} $fwd | cut -d ' ' -f4)
   exit 
 
   # wait job to finish

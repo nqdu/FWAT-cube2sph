@@ -1,6 +1,7 @@
 import numpy as np
 import sys
 from obspy.io.sac import SACTrace
+from scipy.signal import correlate
 
 def main():
     if len(sys.argv) != 4:
@@ -22,7 +23,7 @@ def main():
     # compute adjoint source
     x  = d[:,1] * 1.
     x /= avgamp
-    tmp = np.correlate(x,tr.data,'same') * dt 
+    tmp = correlate(x,tr.data,'same') * dt 
     if np.max(np.abs(tmp)) > 0.:
         x = tmp / np.max(np.abs(tr.data))
 

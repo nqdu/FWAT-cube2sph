@@ -59,8 +59,9 @@ def main():
         f.close()
 
         # allocate space
-        direc_vec = np.zeros((3,nspec,NGLL3),dtype='f4')
-        grad_vec = np.zeros((3,nspec,NGLL3),dtype='f4')
+        nker = len(grad_list)
+        direc_vec = np.zeros((nker,nspec,NGLL3),dtype='f4')
+        grad_vec = np.zeros((nker,nspec,NGLL3),dtype='f4')
 
         # read gradient/direction and compute inner product
         for iker in range(3):
@@ -95,6 +96,7 @@ def main():
         interp_sep = True
     else:
         backtrack = True 
+    print(interp_sep,backtrack)
     if backtrack:
         step_fac *= 0.5
         print("line search failed! please try step_fac = %g" %(step_fac))
@@ -110,7 +112,7 @@ def main():
             alpha = step_fac 
             chimin = chi1 
         
-        if chimin < 0.1 * chi1: chmin = chi1
+        if chimin < 0.1 * chi1: chimin = chi1
     else:
         alpha = step_fac 
         chimin = chi1 

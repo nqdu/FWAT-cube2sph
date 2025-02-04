@@ -1,0 +1,61 @@
+######
+# number of source components
+NSCOMP: 1
+# source components: Z N E
+SCOMPS: Z 
+# number of  receiver compoents
+NRCOMP: 1
+# receiver components: Z R T
+RCOMPS: Z
+# channel code
+CH_CODE: BX
+# number of filter
+NUM_FILTER: 4
+# lower coners of band pass filter
+SHORT_P: 20 15 10 6
+# higher coners of band pass filter
+LONG_P:  35 30 20 15
+# lower phase velocity
+GROUPVEL_MIN: 2.5 2.5 2.5 2.5
+# higher phase velocity
+GROUPVEL_MAX: 4.5 4.5 4.5 4.5
+
+TW_BEFORE: 5
+# ONLY for TeleFWI: time window after direct P
+TW_AFTER: 45
+# ONLY for ANAT: if normalize adjoint sources of diffrent bands
+ADJ_SRC_NORM: .false.
+# ONLY for ANAT: if use near-offset data or not
+USE_NEAR_OFFSET: .true.
+# ONLY for ANAT: if suppress a negative time derivative of data.
+SUPPRESS_EGF: .true.
+# Set it true to save each event kernels, otherwise, it only save a summation
+# of all event kernels in a source set.
+SAVE_OUTPUT_EACH_EVENT: .false.
+
+#
+KERNEL_TAPER: .true.
+TAPER_H_SUPPRESS: 0.0
+TAPER_H_BUFFER: 10000
+TAPER_V_SUPPRESS: 0
+TAPER_V_BUFFER: 10000 
+
+# in meter
+SIGMA_H: 16000
+# in meter
+SIGMA_V: 8000
+# options: SD / CG / LBFGS
+OPT_METHOD: LBFGS
+# options: default/none/z_precond/z2_precond
+PRECOND_TYPE: none
+#
+MAX_SLEN: 0.02
+#
+DO_LS: .true.
+#
+NUM_STEP: 5
+# format: F5.3
+STEP_LENS: 0.010 0.020 0.030 0.040 0.050
+#####
+
+VERBOSE_MODE: .true. 

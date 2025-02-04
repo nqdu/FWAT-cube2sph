@@ -2,7 +2,7 @@ import numpy as np
 import sys 
 from scipy.io import FortranFile 
 from tools import *
-MAX_PER = 0.02
+MAX_PER = 0.01
 
 def main():
     if len(sys.argv) !=5 :

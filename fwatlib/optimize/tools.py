@@ -1,5 +1,5 @@
 class FWAT_MODEL_CONST:
-    def __init__(self,mdtype='iso',use_model_set=1) -> None:
+    def __init__(self,mdtype='iso',use_model_set=2) -> None:
         # iso model by default, we use parameter set vp_vs_rho
         # = 0 kappa_mu_rho
         # = 1  vp_vs_rho

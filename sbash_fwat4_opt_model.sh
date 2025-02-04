@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --nodes=4
 #SBATCH --ntasks=160
-#SBATCH --time=00:35:59
+#SBATCH --time=00:15:59
 #SBATCH --job-name OPT
 #SBATCH --output=OPT_%j.txt
 #SBATCH --partition=compute
@@ -16,7 +16,7 @@ set -e
 source module_env
 
 NPROC=$SLURM_NTASKS
-model=M24
+model=M55
 SIMU_TYPE=tele
 
 # get step_fac/dmax

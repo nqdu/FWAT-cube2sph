@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --nodes=4
 #SBATCH --ntasks=160
-#SBATCH --time=00:25:59
+#SBATCH --time=00:20:59
 #SBATCH --job-name=POST
 #SBATCH --output=POST_%j.txt
 #SBATCH --partition=compute 
@@ -13,11 +13,9 @@ set -e
 source module_env
 
 # input vars
-MODEL=M24
+MODEL=M50
 SOURCE_FILE=./src_rec/sources.dat.tele
 NPROC=`grep ^"NPROC" DATA/Par_file | cut -d'=' -f2`
-
-echo "running fwat2 " > output_fwat2_log_${MODEL}.txt
 
 # parfile changer script
 change_par=$FWATLIB/change_par_file.sh
@@ -36,7 +34,7 @@ fi
 
 # create log file
 filename=output_fwat2_log_${MODEL}.txt
-:> $filename
+echo "running step2 postprocessing ... " > $filename
 
 # sum kernels
 PRECOND=`cat fwat_params/FWAT.PAR |grep '^PRECOND_TYPE' |awk -F: '{print $2}'`

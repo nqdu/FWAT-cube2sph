@@ -62,7 +62,7 @@ def main():
 
     # write synthetic data to SYN dir
     if run_opt == 1:
-        outdir = syndir + '/SYN'
+        outdir = f'fwat_data/{evtname}'
         if myrank == 0: print("Synthetic Observed Data")
         os.makedirs(outdir,exist_ok=True)
         for i in range(myrank,nsta,nprocs):
@@ -80,6 +80,8 @@ def main():
                 
                 # write  to fwat_data/
                 syn_tr.write(outdir + "/" + name )
+        
+        exit(0)
 
     # loop around each band
     nbands = len(Tmin_list)
@@ -112,14 +114,14 @@ def main():
 
                 # new npts/t0 for interpolate
                 t1_inp = t0_syn + (npt_syn - 1) * dt_syn
-                npt1 = int(npt_syn * dt_syn / dt_inp)
-                npt_inp = int((t1_inp - t0_inp) / dt_inp) + 1
+                npt1_inp = int((npt_obs - 1) * dt_obs / dt_inp)
+                npt_cut = int((t1_inp - t0_inp) / dt_inp) + 1
                 
                 # interp obs/syn
                 dat_inp1 = interpolate_syn(obs_tr.data,t0_obs,dt_obs,npt_obs,
-                                        t0_obs + dt_inp,dt_inp,npt1)
+                                        t0_obs + dt_inp,dt_inp,npt1_inp)
                 syn_inp = interpolate_syn(syn_tr.data,t0_syn,dt_syn,npt_syn,
-                                         t0_inp,dt_inp,npt_inp)
+                                         t0_inp,dt_inp,npt_cut)
 
                 # compute time derivative 
                 if pdict['SUPPRESS_EGF'] == '.false.':
@@ -127,8 +129,8 @@ def main():
                     if myrank == 0: print("CCFs => EGFs ...")
                 
                 # cut 
-                dat_inp = interpolate_syn(dat_inp1,t0_obs + dt_inp,dt_inp,npt1,
-                                         t0_inp,dt_inp,npt_inp)
+                dat_inp = interpolate_syn(dat_inp1,t0_obs + dt_inp,dt_inp,npt1_inp,
+                                         t0_inp,dt_inp,npt_cut)
 
                 # preprocess
                 dat_inp = preprocess(dat_inp,dt_inp,freqmin,freqmax)
@@ -139,7 +141,7 @@ def main():
                 win_b = np.floor((dist / vmax_list[ib] - Tmax_list[ib] / 2. + t0_inp) / dt_inp)
                 win_e = np.floor((dist / vmin_list[ib] + Tmax_list[ib] / 2. - t0_inp) / dt_inp)
                 win_b = int(max(win_b,0))
-                win_e = int(min(win_e,npt_inp-1))
+                win_e = int(min(win_e,len(dat_inp)-1))
                 dat_inp *= np.max(np.abs(syn_inp[win_b:win_e])) / np.max(np.abs(dat_inp[win_b:win_e]))
 
                 # write sac for measure adj

@@ -9,7 +9,7 @@ from mpi4py import MPI
 from utils import interpolate_syn,get_fwat_params,get_average_amplitude
 from utils import preprocess,cumtrapz1
 from tele.deconit import time_decon
-from scipy.signal import fftconvolve
+from scipy.signal import convolve,correlate
 
 def compute_ak135_time(evtid,statxt,do_ls = False):
     nsta = statxt.shape[0]
@@ -41,10 +41,21 @@ def compute_ak135_time(evtid,statxt,do_ls = False):
     
     return t_ref
 
+def shift_data(u,dt,t0):
+    u_spec = np.fft.fft(u)
+    freqs = np.fft.fftfreq(len(u),dt)
+
+    # shift in freq domain
+    u_spec *= np.exp(-1j * np.pi * 2 * freqs * t0)
+
+    u_out = np.fft.ifft(u_spec).real 
+
+    return u_out 
+
 def seis_pca(glob_syn,glob_obs,stf_collect,dt_syn,components):
     from tele.pca.libpca import PCA
 
-    nsta = glob_syn.shape[0]
+    nsta,ncomp,nt = glob_syn.shape
     stf = np.zeros((2,glob_syn.shape[2]),'f4')
     temp = PCA(np.float32(stf_collect))
     # temp = np.mean(stf_collect,axis=0)
@@ -53,21 +64,33 @@ def seis_pca(glob_syn,glob_obs,stf_collect,dt_syn,components):
     # = xnew[:,0]
     stf[0,:] = temp
     stf[1,:] = temp * 1.
-    avgamp = np.zeros((2),'f4')
+    avgfact = np.zeros((2),'f4')
+    
+    # compute time shift between syn and obs
+    time_shift = np.zeros((nsta))
+    for i in range(nsta):
+        for ic in range(1):
+            out = dt_syn * convolve(glob_syn[i,ic,:],stf[ic,:],'same')
+            corr = correlate(glob_obs[i,ic,:],out,"full")
+            time_shift[i] = (np.argmax(abs(corr)) - nt + 1) * dt_syn 
+    t0 = np.mean(time_shift)
 
+    # shift stf to remove tshift residulas
+    for i in range(ncomp):
+        stf[i,:] = shift_data(stf[i,:],dt_syn,t0)
+    
     # recover data
-    ncomp = len(components)
-    recp_syn = glob_syn.copy()
+    recp_syn = glob_syn * 0
     for i in range(nsta):
         for ic in range(ncomp):
-            recp_syn[i,ic,:] = dt_syn * fftconvolve(glob_syn[i,ic,:],stf[ic,:],'same')
+            recp_syn[i,ic,:] = dt_syn * convolve(glob_syn[i,ic,:],stf[ic,:],'same')
     
     # calculate amplitude scale factor 
     print('\ncalculate ampl scale factors ...')
     avgarr = np.zeros((nsta),'f4')
     for ic in range(ncomp):
         ch = components[ic]
-        print(f'Initial amp factors: {ch}')
+        print(f'amp factors for comp: {ch}')
         sumamp = 0.
         j = 0
         for i in range(nsta):
@@ -83,7 +106,7 @@ def seis_pca(glob_syn,glob_obs,stf_collect,dt_syn,components):
             print(f"skip ic {ch}")
             continue 
         avgamp0 = sumamp / j 
-        print("Initial average amp: %f" % avgamp0)
+        print("Initial average amp factor: %f" % avgamp0)
         print("selecting amp factors |A - A0| <=0.2")
         sumamp = 0. 
         j = 0
@@ -94,11 +117,11 @@ def seis_pca(glob_syn,glob_obs,stf_collect,dt_syn,components):
         if j == 0 or j <= int(0.1 * nsta):
             print("Error: too little data satisfy |A-A0| <=0.2")
             exit(1)
-        avgamp[ic] = sumamp / j 
-        print("final average amp: %f" %(avgamp[ic]))
+        avgfact[ic] = sumamp / j 
+        print("final average amp factor: %f" %(avgfact[ic]))
 
         # normalize stf
-        stf[ic,:] *= avgamp[ic]
+        stf[ic,:] *= avgfact[ic]
 
     return stf
 
@@ -186,9 +209,10 @@ def main():
                 ch = components[ic]
                 tr = SACTrace.read(f'src_rec/stf_{ch}.sac.{bandname}_{evtid}')
                 stf[ic,:] += tr.data 
+        stf = stf / len(Tmax_list)
         
         # synthetic by using summed stf
-        outdir = syndir + '/SYN/'
+        outdir = f'fwat_data/{evtname}'
         os.makedirs(outdir,exist_ok=True)
         for i in range(myrank,nsta,nprocs):
             for ic in range(ncomp):
@@ -197,11 +221,11 @@ def main():
                 syn_tr = SACTrace.read(syndir + "/" + name )
 
                 # synthetic
-                data = dt_syn * fftconvolve(syn_tr.data,stf[ic,:],'same')
+                data = dt_syn * convolve(syn_tr.data,stf[ic,:],'same')
 
                 # write data to outdir
                 syn_tr.data = data 
-                syn_tr.data = t_inj - tref[i]
+                syn_tr.b = t_inj - tref[i]
                 syn_tr.write(outdir + '/' + name)
         
         #
@@ -340,7 +364,7 @@ def main():
                 sac_head.b = 0.
                 sac_head.t0 = t0
                 sac_head.write(name + ".obs")
-                data = dt_syn * fftconvolve(glob_syn[i,ic,:],stf[ic,:],'same')
+                data = dt_syn * convolve(glob_syn[i,ic,:],stf[ic,:],'same')
                 sac_head.data = data
                 sac_head.write(name + ".syn")
 

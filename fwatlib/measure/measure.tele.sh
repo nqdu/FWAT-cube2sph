@@ -66,6 +66,7 @@ if [ $run_opt -ne 1 ]; then
 else
   echo "synthetic data ..."
   mpirun -np $ncpu python $MEASURE_LIB/preprocess_tele.py $iter $evtid $run_opt
+  exit 0  
 
 fi
 

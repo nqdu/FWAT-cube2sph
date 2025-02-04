@@ -24,7 +24,7 @@ set_fwat1()
   if [[ $simu_type == "noise" ]]; then
     sed -i "/#SBATCH --time=/c\#SBATCH --time=01:30:00" $fwd
   else
-    sed -i "/#SBATCH --time=/c\#SBATCH --time=00:25:00" $fwd
+    sed -i "/#SBATCH --time=/c\#SBATCH --time=00:35:00" $fwd
   fi
 
   # run forward/adjoint simulation
@@ -56,7 +56,7 @@ set_fwat3()
   if [[ $simu_type == "noise" ]]; then
     sed -i "/#SBATCH --time=/c\#SBATCH --time=01:30:00" $fwd
   else
-    sed -i "/#SBATCH --time=/c\#SBATCH --time=00:25:00" $fwd
+    sed -i "/#SBATCH --time=/c\#SBATCH --time=00:35:00" $fwd
   fi
 
   # run forward/adjoint simulation
@@ -64,11 +64,11 @@ set_fwat3()
 }
 
 # parameters
-iter_start=24
-iter_end=24
+iter_start=55
+iter_end=55
 
 # L-BFGS params
-lbfgs_start=24
+lbfgs_start=38
 
 # simu_type
 simu_type=tele
@@ -137,6 +137,8 @@ for iter in `seq $iter_start $iter_end`;do
   job_step=$(sbatch --dependency=afterok:${job_line} $fwd | cut -d ' ' -f4)
 
   # wait job to finish
+  fwd=wait.sh
+  sed -i "/MODEL=/c\MODEL=${mod}" $fwd
   srun --dependency=afterok:${job_step} --partition=compute --nodes=1 --ntasks=1 --time=00:15:02 wait.sh 
   mkdir -p LOG/$mod
   mv *.txt LOG/$mod

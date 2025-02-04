@@ -185,7 +185,7 @@ def time_decon(u,w,dt,freqmax=None):
 
     dobs = uflt * 1.
     src_one = np.zeros((nt))
-    for i in range(2000):
+    for i in range(200):
         if abs(d_error) < minderr: break
 
         #cuw = mycorrelate(dobs,wflt) * dt 
@@ -201,7 +201,7 @@ def time_decon(u,w,dt,freqmax=None):
         #dobs -= myconvolve(src_one,wflt) * dt 
         dobs -= convolve(src_one,wflt,'same') * dt 
 
-        sumsq = np.sum(rf**2) * dt * invpowu 
+        sumsq = np.sum(dobs**2) * dt * invpowu 
         d_error = 100 * (sumsq_i - sumsq)
         sumsq_i = sumsq
 

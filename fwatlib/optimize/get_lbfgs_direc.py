@@ -119,7 +119,8 @@ def get_lbfgs_direc(iter,iter_start):
         return 
 
     # get istore
-    iter_store = iter - 5 
+    max_md_approx = 10
+    iter_store = iter - max_md_approx 
     if iter_store <= iter_start: iter_store = iter_start
 
     # forward 
