@@ -59,7 +59,7 @@ def main():
 
     # write synthetic data to SYN dir
     if run_opt == 1:
-        outdir =  + f'fwat_data/{evtname}/'
+        outdir =  f'fwat_data/{evtname}/'
         if myrank == 0: print("Synthetic Observed Data")
         os.makedirs(outdir,exist_ok=True)
         for i in range(myrank,nsta,nprocs):

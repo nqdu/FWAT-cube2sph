@@ -230,7 +230,7 @@ def main():
                 stf[ic,:] += tr.data 
         
         # synthetic by using summed stf
-        outdir =  + f'fwat_data/{evtname}/'
+        outdir =  f'fwat_data/{evtname}/'
         os.makedirs(outdir,exist_ok=True)
         if myrank == 0: print("Synthetic Observed Data")
         for i in range(myrank,nsta,nprocs):
