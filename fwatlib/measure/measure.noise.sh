@@ -37,7 +37,7 @@ mpirun -np 4 python  \
 \rm -f $SYN_DIR/*.sac # clean all sac file
 python $MEASURE_LIB/ascii2sac.py $current_dir/src_rec/STATIONS_${evtid}_globe  \
       $current_dir/src_rec/FORCE_ORG/FORCESOLUTION_${evtid} $SYN_DIR
-
+\rm -f $SYN_DIR/*.sem.ascii
 
 # run measure and write measure_adj file
 echo " "
@@ -51,9 +51,10 @@ fi
 # get filter params
 # measure misifts
 cd $SYN_DIR
-fwat_file=../DATA/FWAT.PAR
-SHORT_P=(`cat $fwat_file |grep 'SHORT_P:' |awk -F: '{print $2}'`)
-LONG_P=(`cat $fwat_file |grep 'LONG_P:' |awk -F: '{print $2}'`)
+fwat_file=../DATA/FWAT.PAR.yaml
+info=`python $FWATLIB/get_param.py measure/noise/FILTER_BANDS  $fwat_file| sed 's/\[\|]//g' | sed 's/,/ /g'`
+LONG_P=(`echo $info | awk '{for(i=2; i<=NF; i+=2) print $i}'`)
+SHORT_P=(`echo $info | awk '{for(i=1; i<=NF; i+=2) print $i}'`)
 NUM_FILTER=`echo ${#SHORT_P[@]}`
 mkdir -p $current_dir/misfits/
 outfile=$current_dir/output_fwat1_log.$mod.$evtid"$lsflag".txt 
@@ -65,7 +66,7 @@ fi
 echo " "
 for ((i=0;i<$NUM_FILTER;i++));
 do
-  band=`printf "T%03d_T%03d" ${SHORT_P[$i]} ${LONG_P[$i]}`
+  band=`printf "T%03g_T%03g" ${SHORT_P[$i]} ${LONG_P[$i]}`
   echo "measure adj for $band ..."
   cd $band 
   mkdir -p OUTPUT_FILES
@@ -79,8 +80,11 @@ do
     cd $current_dir
     cd $SYN_DIR
     continue
-
   fi
+
+  # convert sac to hdf5
+  python $FWATLIB/measure/sac2h5.py ../seismogram.obs.$band.h5 *.sac.obs
+  python $FWATLIB/measure/sac2h5.py ../seismogram.syn.$band.h5 *.sac.syn
 
   # rotate adjoint source 
   cd OUTPUT_FILES
@@ -102,4 +106,4 @@ if [ $run_opt -eq 2 ]; then
 fi
 
 cd $current_dir
-bash $MEASURE_LIB/sum_adj_source.sh $iter $evtid
+bash $MEASURE_LIB/sum_adj_source.sh $iter $evtid noise

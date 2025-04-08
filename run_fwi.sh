@@ -24,7 +24,7 @@ set_fwat1()
   if [[ $simu_type == "noise" ]]; then
     sed -i "/#SBATCH --time=/c\#SBATCH --time=01:30:00" $fwd
   else
-    sed -i "/#SBATCH --time=/c\#SBATCH --time=00:35:00" $fwd
+    sed -i "/#SBATCH --time=/c\#SBATCH --time=00:25:00" $fwd
   fi
 
   # run forward/adjoint simulation
@@ -56,7 +56,7 @@ set_fwat3()
   if [[ $simu_type == "noise" ]]; then
     sed -i "/#SBATCH --time=/c\#SBATCH --time=01:30:00" $fwd
   else
-    sed -i "/#SBATCH --time=/c\#SBATCH --time=00:35:00" $fwd
+    sed -i "/#SBATCH --time=/c\#SBATCH --time=00:25:00" $fwd
   fi
 
   # run forward/adjoint simulation
@@ -64,15 +64,18 @@ set_fwat3()
 }
 
 # parameters
-iter_start=55
-iter_end=55
-
-# L-BFGS params
-lbfgs_start=38
+iter_start=24
+iter_end=24
 
 # simu_type
 simu_type=tele
 NJOBS=1
+
+
+################### STOP HERE##################
+# L-BFGS params
+. paramters.sh
+lbfgs_start=`python $FWATLIB/get_param.py START_MODEL fwat_params/lbfgs.yaml`
 
 # mkdir 
 mkdir -p misfits optimize solver
@@ -97,7 +100,7 @@ for iter in `seq $iter_start $iter_end`;do
   echo "iteration $iter $mod $mod_lbfgs_start"
 
   # create misfit file 
-  :> plots/$mod.mis
+  :> misfits/$mod.mis
 
   # run RF/tele simulation
   set_fwat1 $simu_type $NJOBS $setb
@@ -106,14 +109,10 @@ for iter in `seq $iter_start $iter_end`;do
 
   # run line search
   if [ ${mod} == $mod_lbfgs_start  ]; then 
-    echo ${mod} > lbfgs.in
-    echo "-1" >> lbfgs.in
+    python $FWATLIB/set_param.py START_MODEL -1 fwat_params/lbfgs.yaml
   else 
-    info=`head -1 lbfgs.in`
-    echo $info > lbfgs.in 
-    echo "1" >> lbfgs.in
+    python $FWATLIB/set_param.py STEP_FAC 1.  fwat_params/lbfgs.yaml
   fi
-  #exit
 
   # run postprocessing
   fwd=sbash_fwat2_postproc_opt.sh 
@@ -137,8 +136,6 @@ for iter in `seq $iter_start $iter_end`;do
   job_step=$(sbatch --dependency=afterok:${job_line} $fwd | cut -d ' ' -f4)
 
   # wait job to finish
-  fwd=wait.sh
-  sed -i "/MODEL=/c\MODEL=${mod}" $fwd
   srun --dependency=afterok:${job_step} --partition=compute --nodes=1 --ntasks=1 --time=00:15:02 wait.sh 
   mkdir -p LOG/$mod
   mv *.txt LOG/$mod

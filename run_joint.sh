@@ -7,10 +7,6 @@ set_fwat1()
   local nevts=`cat src_rec/sources.dat.$simu_type|wc -l`
   local narray=`echo "($nevts + $njobs - 1) / $njobs"|bc`
 
-  if [[ $iter == 0 || $iter == $iter_end ]]; then
-    sed -i "/SHOW_DETAILS:/c\SHOW_DETAILS: .true." fwat_params/FWAT.PAR
-  fi
-
   # substitute 
   cp sbash_fwat1_fwd_measure_adj.sh tmp.fwat1.$simu_type.sh
   \cp DATA/Par_file.$simu_type DATA/Par_file
@@ -23,9 +19,9 @@ set_fwat1()
   sed -i "/#SBATCH --output=/c#SBATCH --output=FWD_ADJ_${simu_type}-%j_set%a.txt" $fwd 
 
   if [[ $simu_type == "noise" ]]; then
-    sed -i "/#SBATCH --time=/c\#SBATCH --time=01:00:00" $fwd
+    sed -i "/#SBATCH --time=/c\#SBATCH --time=00:35:00" $fwd
   else
-    sed -i "/#SBATCH --time=/c\#SBATCH --time=00:25:00" $fwd
+    sed -i "/#SBATCH --time=/c\#SBATCH --time=00:30:00" $fwd
   fi
 
   # run forward/adjoint simulation
@@ -58,7 +54,7 @@ set_fwat3()
   sed -i "/#SBATCH --output=/c#SBATCH --output=LS_${simu_type}-%j_set%a.txt" $fwd 
 
   if [[ $simu_type == "noise" ]]; then
-    sed -i "/#SBATCH --time=/c\#SBATCH --time=01:00:00" $fwd
+    sed -i "/#SBATCH --time=/c\#SBATCH --time=00:29:00" $fwd
   else
     sed -i "/#SBATCH --time=/c\#SBATCH --time=00:25:00" $fwd
   fi
@@ -68,18 +64,22 @@ set_fwat3()
 }
 
 # parameters
-iter_start=35
-iter_end=35
-FIRST_ITER=25
-
-# L-BFGS params
-lbfgs_start=25
+iter_start=4
+iter_end=4
+FIRST_ITER=0
 
 # simu_type
 simu_type1=tele
 simu_type2=noise
-NJOBS1=1
-NJOBS2=4
+NJOBS1=2
+NJOBS2=2
+
+##### STOP HERE ################
+
+# L-BFGS params
+
+. parameters.sh
+lbfgs_start=`python $FWATLIB/get_param.py START_MODEL fwat_params/lbfgs.yaml`
 
 # mkdir 
 mkdir -p misfits optimize solver
@@ -102,7 +102,7 @@ for iter in `seq $iter_start $iter_end`;do
   echo "iteration $iter $mod $mod_lbfgs_start"
 
   # create misfit file 
-  :> plots/$mod.mis
+  :> misfits/$mod.mis
 
   # run RF/tele simulation
   sete=`cat src_rec/sources.dat.$simu_type1 |wc -l`
@@ -117,12 +117,9 @@ for iter in `seq $iter_start $iter_end`;do
 
   # run line search
   if [ ${mod} == $mod_lbfgs_start  ]; then 
-    echo ${mod} > lbfgs.in
-    echo "-1" >> lbfgs.in
+    python $FWATLIB/set_param.py STEP_FAC -1 fwat_params/lbfgs.yaml
   else 
-    info=`head -1 lbfgs.in`
-    echo $info > lbfgs.in 
-    echo "1" >> lbfgs.in
+    python $FWATLIB/set_param.py STEP_FAC 1.  fwat_params/lbfgs.yaml
   fi
   #exit
 
@@ -193,11 +190,9 @@ EOF
   let nline1=nline1+1
   sed -n "${nline1},\$p" $fwd >> tmp.fwat4.cal.sh 
   \mv tmp.fwat4.cal.sh $fwd 
-  #\rm tmp.fwat2.cal.sh
   sed -i "/model=/c\model=${mod}" $fwd
   job_step=$(sbatch --dependency=afterok:${job_line1},${job_line2} $fwd | cut -d ' ' -f4)
-  exit 
-
+  
   # wait job to finish
   srun --dependency=afterok:${job_step} --partition=compute --nodes=1 --ntasks=1 --time=00:15:02 wait.sh 
   mkdir -p LOG/$mod

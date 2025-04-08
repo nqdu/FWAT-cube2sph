@@ -1,18 +1,9 @@
 import numpy as np 
 
-def get_fwat_params(paramfile):
-    pdict = {}
+def read_fwat_params(paramfile="fwat_params/FWAT.PAR.yaml"):
+    import yaml
     with open(paramfile,"r") as f:
-        for line in f :
-            if line[0] == '\n' or line[0] == '#':
-                continue
-            key,val = line.split('\n')[0].split(":")
-            if isinstance(val,str):
-                if '.true.' in val:
-                    val = '.true.'
-                elif '.false.' in val:
-                    val = '.false.'
-            pdict[key] = val
+        pdict = yaml.safe_load(f)
     
     return pdict
 
@@ -108,14 +99,14 @@ def get_average_amplitude(glob_obs,icomp):
     nsta = glob_obs.shape[0]
     avgamp0 = 0.
     for i in range(nsta):
-        avgamp0 += np.max(np.abs(glob_obs[i,icomp,:]))
+        avgamp0 += np.max(np.abs(glob_obs[i,0,:]))
     avgamp0 /= nsta 
     igood =0 
     avgamp = 0. 
     for i in range(nsta):
-        if np.max(np.abs(glob_obs[i,icomp,:])) - avgamp0 < 0.2 * avgamp0:
+        if np.max(np.abs(glob_obs[i,0,:])) - avgamp0 < 0.2 * avgamp0:
             igood += 1 
-            avgamp += np.max(np.abs(glob_obs[i,icomp,:])) 
+            avgamp += np.max(np.abs(glob_obs[i,0,:])) 
     avgamp /= igood 
 
     return avgamp

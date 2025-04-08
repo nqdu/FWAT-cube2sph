@@ -4,6 +4,7 @@ from scipy.io import FortranFile
 import numpy as np 
 from tools import *
 from mpi4py import MPI
+import h5py
 
 def compute_zpred_hess(iter_cur):
 
@@ -83,6 +84,8 @@ def main():
     # open weights_file
     weight = np.ones((nevts))
     if os.path.exists("optimize/weight_kl.txt"):
+        if myrank == 0:
+            print("find weight_kl.txt file, sum weighted kernels ... ")
         weight = np.loadtxt("optimize/weight_kl.txt")
 
     # sum kernels
@@ -92,12 +95,14 @@ def main():
         if myrank == 0: print(f'sum kernel {grad_list[i]}')
         kl = np.float32(0.)
         for ievt in range(nevts):
+            # read kernel from h5
             setname = '/' + srctxt[ievt,0]
-            indir = './solver/M%02d'%(iter_cur) + setname + '/GRADIENT/proc%06d'%(myrank) +  \
-                    "_" + grad_list[i] + '.bin'
-            f = FortranFile(indir,'r')
-            arr = f.read_reals('f4')
-            f.close()
+            filename = './solver/M%02d'%(iter_cur) + setname + '/GRADIENT/' + grad_list[i] + '.h5'
+            fio = h5py.File(filename,"r")
+            arr = fio[str(myrank)][:]
+            fio.close()
+
+            # sum kernel
             kl = kl + arr * weight[ievt]
         
         outname = KERNEL_DIR + "/proc%06d"%myrank + '_' + grad_list[i] + '.bin'
@@ -136,11 +141,11 @@ def main():
         kl = np.float32(0.)
         for ievt in range(nevts):
             setname = '/' + srctxt[ievt,0]
-            indir = './solver/M%02d'%(iter_cur) + setname + '/GRADIENT/proc%06d'%(myrank) +  \
-                    "_hess_kernel" + '.bin'
-            f = FortranFile(indir,'r')
-            arr = f.read_reals('f4')
-            f.close()
+            filename = './solver/M%02d'%(iter_cur) + setname + '/GRADIENT/' + 'hess_kernel.h5'
+
+            fio = h5py.File(filename,'r')
+            arr = fio[str(myrank)][:]
+            fio.close()
                 
             # get hessian norm
             s = np.sum(arr * arr)

@@ -20,3 +20,6 @@ make -f Makefile_ifort
 
 then go to `fwatlib`, run `compile_all.sh`
 
+# python packages required
+see `requirements.txt`
+

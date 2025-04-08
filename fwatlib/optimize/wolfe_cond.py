@@ -3,6 +3,7 @@ import sys
 from scipy.io import FortranFile 
 from tools import * 
 from libgll import get_gll_weights
+import h5py
 
 NGLL = 5
 NGLL3 = NGLL**3
@@ -55,26 +56,25 @@ def main():
         f.read_reals('f4')
         for _ in range(9):
             f.read_reals('f4')
-        jaco = f.read_reals('f4').reshape(nspec,NGLL3)
+        jaco = f.read_reals('f4')[:].reshape(nspec,NGLL3)
         f.close()
 
         # allocate space
-        nker = len(grad_list)
-        direc_vec = np.zeros((nker,nspec,NGLL3),dtype='f4')
-        grad_vec = np.zeros((nker,nspec,NGLL3),dtype='f4')
+        direc_vec = np.zeros((3,nspec,NGLL3),dtype='f4')
+        grad_vec = np.zeros((3,nspec,NGLL3),dtype='f4')
 
         # read gradient/direction and compute inner product
         for iker in range(3):
-            filename = KERNEL_DIR + "/proc%06d"%irank + '_' + grad_list[iker] + ".bin"
-            f = FortranFile(filename)
-            grad_vec[iker,:,:] = f.read_reals('f4').reshape(nspec,NGLL3)
+            filename = KERNEL_DIR + "/" + grad_list[iker] + ".h5"
+            f = h5py.File(filename,"r")
+            grad_vec[iker,:,:] = f[str(irank)][:].reshape(nspec,NGLL3)
             f.close()
 
-            filename = KERNEL_DIR + "/proc%06d"%irank + '_' + direc_list[iker] + ".bin"
-            f = FortranFile(filename)
-            #print(grad.max())
-            direc_vec[iker,:,:] = f.read_reals('f4').reshape(nspec,NGLL3)
+            filename = KERNEL_DIR + "/" + direc_list[iker] + ".h5"
+            f = h5py.File(filename,"r")
+            direc_vec[iker,:,:] = f[str(irank)][:].reshape(nspec,NGLL3)
             f.close()
+
         d1 = np.max(np.abs(direc_vec))
         g1 = np.max(np.abs(grad_vec))
         if d1 == 0. : d1 = 1.
