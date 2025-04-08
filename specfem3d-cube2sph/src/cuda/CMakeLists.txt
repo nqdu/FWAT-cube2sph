@@ -1,3 +1,0 @@
-file(GLOB SOURCE CONFIGURE_DEPENDS LIST_DIRECTORIES FALSE "*.c" )
-
-add_library(cuda ${SOURCE})

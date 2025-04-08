@@ -1,11 +1,10 @@
 from obspy.io.sac import SACTrace
-import obspy 
 import sys 
 import numpy as np
 from mpi4py import MPI
 import os 
 
-from utils import get_fwat_params,interpolate_syn
+from utils import read_fwat_params,interpolate_syn
 from utils import preprocess,dif1,cumtrapz1
 
 
@@ -29,12 +28,11 @@ def main():
     nprocs = comm.Get_size()
 
     # load paramfile as dictionary
-    pdict = get_fwat_params(f'solver/{mdir}/' + f'{evtname}/DATA/FWAT.PAR')
+    pdict = read_fwat_params(f'solver/{mdir}/{evtname}/DATA/FWAT.PAR.yaml')['measure']['noise']
 
     # print log
-    verbose = False
-    if pdict['VERBOSE_MODE'] == '.true.':
-        verbose = True
+    verbose = pdict['VERBOSE_MODE']
+    CCODE = "." + pdict['CH_CODE']
 
     # read station coordinates
     stationfile = f'solver/{mdir}/' + f'{evtname}/DATA/STATIONS_FILTERED'
@@ -43,50 +41,53 @@ def main():
     
     # synthetic parameters
     syndir = f'solver/{mdir}/' + f'{evtname}/OUTPUT_FILES/'
-    name = statxt[0,1] + "." + statxt[0,0] + ".BXZ.sac"
+    name = statxt[0,1] + "." + statxt[0,0] + CCODE + "Z.sac"
     syn_z_hd = SACTrace.read(syndir + name,headonly=True)
     npt_syn = syn_z_hd.npts
     dt_syn = syn_z_hd.delta
     t0_syn = syn_z_hd.b
 
     # get frequency band/ group velocity
-    Tmin_list = list(map(lambda x:float(x),pdict['SHORT_P'].split()))
-    Tmax_list = list(map(lambda x:float(x),pdict['LONG_P'].split()))
-    vmin_list = list(map(lambda x:float(x),pdict['GROUPVEL_MIN'].split()))
-    vmax_list = list(map(lambda x:float(x),pdict['GROUPVEL_MAX'].split()))
-    assert(len(Tmin_list) == len(Tmax_list) and len(vmin_list) == len(vmax_list))
+    Tmin_list = [x[0] for x in pdict['FILTER_BANDS']]
+    Tmax_list = [x[1] for x in pdict['FILTER_BANDS']]
+    vmin_list = [x[0] for x in pdict['GROUPVEL_WIN']]
+    vmax_list = [x[1] for x in pdict['GROUPVEL_WIN']]
 
     # get components
-    ncomp = int(pdict['NRCOMP'])
-    components = pdict['RCOMPS'].split()
+    ncomp = len(pdict['COMPS'])
+    components = pdict['COMPS']
 
     # write synthetic data to SYN dir
     if run_opt == 1:
-        outdir = syndir + '/SYN'
+        outdir =  + f'fwat_data/{evtname}/'
         if myrank == 0: print("Synthetic Observed Data")
         os.makedirs(outdir,exist_ok=True)
         for i in range(myrank,nsta,nprocs):
             for icomp in range(ncomp):
                 ch = components[icomp]
             
-                name = statxt[i,1] + "." + statxt[i,0] + ".BX" + ch + ".sac"
+                name = statxt[i,1] + "." + statxt[i,0] + CCODE + ch + ".sac"
                 syn_tr = SACTrace.read(syndir + "/" + name )
 
                 # EGF or CCF
-                if pdict['SUPPRESS_EGF'] == '.false.':
+                if pdict['USE_EGF'] == False:
+                    if myrank == 0: print("EGF => CCF ...")
                     data = syn_tr.data 
                     data1 = -cumtrapz1(data,syn_tr.delta)
                     syn_tr.data = data1 
                 
                 # write  to fwat_data/
                 syn_tr.write(outdir + "/" + name )
+        
+        comm.Barrier()
+        return 0
 
     # loop around each band
     nbands = len(Tmin_list)
     for ib in range(nbands):
         freqmin = 1. / Tmax_list[ib]
         freqmax = 1. / Tmin_list[ib]
-        bandname = 'T%03d_T%03d' %(Tmin_list[ib],Tmax_list[ib])
+        bandname = 'T%03g_T%03g' %(Tmin_list[ib],Tmax_list[ib])
         if myrank == 0 and run_opt != 1:
             print(f"preprocessing for band {bandname} ...")
 
@@ -101,7 +102,7 @@ def main():
         for i in range(myrank,nsta,nprocs):
             for icomp in range(ncomp):
                 ch = components[icomp]
-                name = statxt[i,1] + "." + statxt[i,0] + ".BX" + ch + ".sac"
+                name = statxt[i,1] + "." + statxt[i,0] + CCODE + ch + ".sac"
                 obs_tr = SACTrace.read(f'fwat_data/{evtid}/' + name )
                 syn_tr = SACTrace.read(syndir + "/" + name )
 
@@ -112,23 +113,23 @@ def main():
 
                 # new npts/t0 for interpolate
                 t1_inp = t0_syn + (npt_syn - 1) * dt_syn
-                npt1 = int(npt_syn * dt_syn / dt_inp)
-                npt_inp = int((t1_inp - t0_inp) / dt_inp) + 1
+                npt1_inp = int((npt_obs - 1) * dt_obs / dt_inp)
+                npt_cut = int((t1_inp - t0_inp) / dt_inp) + 1
                 
                 # interp obs/syn
                 dat_inp1 = interpolate_syn(obs_tr.data,t0_obs,dt_obs,npt_obs,
-                                        t0_obs + dt_inp,dt_inp,npt1)
+                                        t0_obs + dt_inp,dt_inp,npt1_inp)
                 syn_inp = interpolate_syn(syn_tr.data,t0_syn,dt_syn,npt_syn,
-                                         t0_inp,dt_inp,npt_inp)
+                                         t0_inp,dt_inp,npt_cut)
 
                 # compute time derivative 
-                if pdict['SUPPRESS_EGF'] == '.false.':
+                if pdict['USE_EGF'] == False:
                     dat_inp1 = -dif1(dat_inp1,dt_inp)
                     if myrank == 0: print("CCFs => EGFs ...")
                 
                 # cut 
-                dat_inp = interpolate_syn(dat_inp1,t0_obs + dt_inp,dt_inp,npt1,
-                                         t0_inp,dt_inp,npt_inp)
+                dat_inp = interpolate_syn(dat_inp1,t0_obs + dt_inp,dt_inp,npt1_inp,
+                                         t0_inp,dt_inp,npt_cut)
 
                 # preprocess
                 dat_inp = preprocess(dat_inp,dt_inp,freqmin,freqmax)
@@ -139,7 +140,7 @@ def main():
                 win_b = np.floor((dist / vmax_list[ib] - Tmax_list[ib] / 2. + t0_inp) / dt_inp)
                 win_e = np.floor((dist / vmin_list[ib] + Tmax_list[ib] / 2. - t0_inp) / dt_inp)
                 win_b = int(max(win_b,0))
-                win_e = int(min(win_e,npt_inp-1))
+                win_e = int(min(win_e,len(dat_inp)-1))
                 dat_inp *= np.max(np.abs(syn_inp[win_b:win_e])) / np.max(np.abs(dat_inp[win_b:win_e]))
 
                 # write sac for measure adj
@@ -162,7 +163,7 @@ def main():
             for i in range(nsta):
                 for ic in range(ncomp):
                     ch = components[ic]
-                    name = statxt[i,1] + "." + statxt[i,0] + ".BX" + ch + ".sac"
+                    name = statxt[i,1] + "." + statxt[i,0] + CCODE + ch + ".sac"
                     head = SACTrace.read(syndir + f"{bandname}/" + name + '.obs',headonly=True)
                     dist = head.dist
                     tstart = dist / vmax_list[ib] - Tmax_list[ib] * 0.5 

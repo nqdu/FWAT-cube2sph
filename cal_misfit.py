@@ -1,6 +1,7 @@
 import numpy as np 
 from glob import glob 
 import sys 
+import yaml
 
 def compute_misfits(evts:list,files:list):
     # loop every  events
@@ -36,28 +37,19 @@ def main():
     
     # get period band used
     all_bands = []
-    with open(f"fwat_params/FWAT.PAR.{simu_type}","r") as f:
-        lines = f.readlines()
+    with open(f"fwat_params/FWAT.PAR.yaml","r") as f:
+        pdict = yaml.safe_load(f)['measure'][f'{simu_type}']
     if simu_type == 'rf':
         # find F0
-        for line in lines:
-            if line[:3] == 'F0:':
-                break 
-        bands = line.split(":")[-1].split()
+        bands = pdict['GAUSS_F0']
         for i in range(len(bands)):
-            all_bands.append(bands[i])
+            all_bands.append("%03g" % bands[i])
     else:
-        for line in lines:
-            if 'SHORT_P:' in line:
-                break 
-        bands_short = line.split(":")[-1].split()
-        for line in lines:
-            if 'LONG_P:' in line:
-                break 
-        bands_high = line.split(":")[-1].split()
+        bands_short = [x[0] for x in pdict['FILTER_BANDS']]
+        bands_high = [x[1] for x in pdict['FILTER_BANDS']]
 
         for i in range(len(bands_high)):
-            band = "T%03d_T%03d" %(float(bands_short[i]),float(bands_high[i]))
+            band = "T%03g_T%03g" %(float(bands_short[i]),float(bands_high[i]))
             all_bands.append(band)
 
     # now loop to compute misfits 

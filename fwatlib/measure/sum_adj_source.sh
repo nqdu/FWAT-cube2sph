@@ -1,6 +1,6 @@
 
-if [[ $# -ne 2 ]]; then 
-    echo "Usage: ./sum_adj_source iter evtid"
+if [[ $# -ne 3 ]]; then 
+    echo "Usage: ./sum_adj_source iter evtid simu_type"
     exit 1
 fi
 
@@ -13,6 +13,7 @@ set -e
 # get input args
 iter=$1
 evtid=$2
+simu_type=$3
 lsflag=""
 
 # set directory
@@ -23,9 +24,10 @@ SYN_DIR=$rundir/OUTPUT_FILES
 
 # get frequency band
 cd $SYN_DIR
-fwat_file=../DATA/FWAT.PAR
-SHORT_P=(`cat $fwat_file |grep 'SHORT_P:' |awk -F: '{print $2}'`)
-LONG_P=(`cat $fwat_file |grep 'LONG_P:' |awk -F: '{print $2}'`)
+fwat_file=../DATA/FWAT.PAR.yaml
+info=`python $FWATLIB/get_param.py measure/$simu_type/FILTER_BANDS $fwat_file | sed 's/\[\|]//g' | sed 's/,/ /g'`
+LONG_P=(`echo $info | awk '{for(i=2; i<=NF; i+=2) print $i}'`)
+SHORT_P=(`echo $info | awk '{for(i=1; i<=NF; i+=2) print $i}'`)
 NUM_FILTER=`echo ${#SHORT_P[@]}`
 
 echo " "
@@ -33,7 +35,7 @@ echo "computing ascii adjoint source ..."
 cd $current_dir
 rm -rf $rundir/SEM; mkdir -p $rundir/SEM
 cd $rundir/OUTPUT_FILES
-band0=`printf "T%03d_T%03d" ${SHORT_P[0]} ${LONG_P[0]}`
+band0=`printf "T%03g_T%03g" ${SHORT_P[0]} ${LONG_P[0]}`
 filenames=`ls ${band0}/OUTPUT_FILES/ |grep iker | cut -d'.' -f1,2 |sort -n |uniq`
 for f in $filenames
 do 
@@ -42,7 +44,7 @@ do
   do
     for ((i=0;i<$NUM_FILTER;i++));
     do
-      band=`printf "T%03d_T%03d" ${SHORT_P[$i]} ${LONG_P[$i]}`
+      band=`printf "T%03g_T%03g" ${SHORT_P[$i]} ${LONG_P[$i]}`
       if [ $i -eq 0 ]; then 
         awk '{print $1,0.}' ${band0}/OUTPUT_FILES/$newf.BX$c.adj  > temp0
       fi 
@@ -57,6 +59,8 @@ done
 
 cd $current_dir
 # rotate seismograms to xyz
+python $MEASURE_LIB/pack_seismogram.py $rundir/SEM/seismograms.h5 $rundir/SEM/*.adj.ascii
+\rm $rundir/SEM/*.ascii
 echo "--fn_matrix="$current_dir/src_rec/rot_$evtid"   \
        --rotate='XYZ<-NEZ' --from_dir="$rundir/SEM" --to_dir="$rundir/SEM""
 mpirun -np 4 python $MEASURE_LIB/rotate_seismogram.py --fn_matrix="$current_dir/src_rec/rot_$evtid"   \

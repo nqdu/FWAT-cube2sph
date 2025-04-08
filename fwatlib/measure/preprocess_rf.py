@@ -4,7 +4,7 @@ import sys
 import os 
 from mpi4py import MPI
 
-from utils import interpolate_syn,get_fwat_params,get_average_amplitude
+from utils import interpolate_syn,read_fwat_params,get_average_amplitude
 from tele.deconit import deconit,gauss_filter,apply_gaussian
 
 def main():
@@ -17,8 +17,9 @@ def main():
     evtid = sys.argv[2]
     run_opt = int(sys.argv[3])
     evtname = evtid
+    mdir = 'M%02d' %iter
     if run_opt == 2:
-        evtname = evtid + ".ls"
+        mdir = mdir + '.ls'
 
     # initialize mpi
     comm = MPI.COMM_WORLD
@@ -26,12 +27,11 @@ def main():
     nprocs = comm.Get_size()
 
     # load paramfile as dictionary
-    pdict = get_fwat_params('solver/M%02d' %(iter) + f'.{evtname}/DATA/FWAT.PAR')
+    pdict = read_fwat_params(f'solver/{mdir}/{evtname}/DATA/FWAT.PAR.yaml')['measure']['rf']
     
     # print log
-    verbose = False
-    if pdict['VERBOSE_MODE'].split()[0] == '.true.':
-        verbose = True
+    verbose = pdict['VERBOSE_MODE']
+    CCODE = "." + pdict['CH_CODE']
 
     # read fkfile 
     #fktimes = np.loadtxt('solver/M%02d' %(iter) + f'.{evtname}/DATA/FKtimes',dtype=str,ndmin=2)
@@ -42,8 +42,8 @@ def main():
     nsta = statxt.shape[0]
     
     # synthetic parameters
-    syndir = 'solver/M%02d' %(iter) + f'.{evtname}/OUTPUT_FILES/'
-    name = statxt[0,1] + "." + statxt[0,0] + ".BXZ.sac"
+    syndir = f'solver/{mdir}/{evtname}/OUTPUT_FILES/'
+    name = statxt[0,1] + "." + statxt[0,0] + CCODE + "Z.sac"
     syn_z_hd = SACTrace.read(syndir + name,headonly=True)
     npt_syn = syn_z_hd.npts
     dt_syn = syn_z_hd.delta
@@ -51,15 +51,14 @@ def main():
     sac_head = syn_z_hd.copy()
 
     # get time window 
-    win_tb = np.float32(pdict['TW_BEFORE'])
-    win_te = np.float32(pdict['TW_AFTER'])
+    win_tb,win_te = pdict['TIME_WINDOW']
     npt2 = int((win_te + win_tb) / dt_syn)
     if npt2 // 2 * 2 != npt2:
         npt2 += 1
 
     # get filters
-    Flist = list(map(lambda x:float(x),pdict['F0'].split()))
-    tshift = float(pdict['RF_TSHIFT'])
+    Flist = pdict['GAUSS_F0']
+    tshift = float(pdict['TSHIFT'])
 
     # if run_opt == 1, save synthetic data to SYN
     if run_opt == 1:
@@ -69,9 +68,9 @@ def main():
 
         for i in range(myrank,nsta,nprocs):
             # read data
-            name = statxt[i,1] + "." + statxt[i,0] + ".BXZ.sac"
+            name = statxt[i,1] + "." + statxt[i,0] + CCODE + "Z.sac"
             syn_z_tr = SACTrace.read(syndir + "/" + name )
-            name = statxt[i,1] + "." + statxt[i,0] + ".BXR.sac"
+            name = statxt[i,1] + "." + statxt[i,0] + CCODE + "R.sac"
             syn_r_tr = SACTrace.read(syndir + "/" + name )
 
             # tr for saving 
@@ -87,7 +86,7 @@ def main():
                 tr.data = rf 
                 tr.b = -tshift 
                 tr.user4 = Flist[ib]
-                name = statxt[i,1] + "." + statxt[i,0] + f"BXR.{bandname}.rf.sac"
+                name = statxt[i,1] + "." + statxt[i,0] + CCODE + f"R.{bandname}.rf.sac"
                 tr.write(outdir + '/' + name)
         
         return 0
@@ -113,13 +112,13 @@ def main():
         nsta = statxt.shape[0]
         for i in range(myrank,nsta,nprocs):
             # read synthetic data
-            name = statxt[i,1] + "." + statxt[i,0] + ".BXZ.sac"
+            name = statxt[i,1] + "." + statxt[i,0] + CCODE + "Z.sac"
             syn_z_tr = SACTrace.read(syndir + "/" + name )
-            name = statxt[i,1] + "." + statxt[i,0] + ".BXR.sac"
+            name = statxt[i,1] + "." + statxt[i,0] + CCODE +"R.sac"
             syn_r_tr = SACTrace.read(syndir + "/" + name )
 
             # read obs rf
-            name = statxt[i,1] + "." + statxt[i,0] + ".BXR.rf.sac.obs"
+            name = statxt[i,1] + "." + statxt[i,0] + CCODE +"R.rf.sac.obs"
             rf_tr = SACTrace.read(f'fwat_data/{evtid}/' + name)
             rf_tr.write(syndir + f"{bandname}/" + name)
             
@@ -133,7 +132,7 @@ def main():
             tr.delta = dt_syn
             tr.b = -tshift 
             tr.user4 = Flist[ib]
-            name = statxt[i,1] + "." + statxt[i,0] + ".BXR.rf.sac.syn"
+            name = statxt[i,1] + "." + statxt[i,0] + CCODE + "R.rf.sac.syn"
             tr.write(syndir + f"{bandname}/" + name)
 
             # save data to global
@@ -204,10 +203,10 @@ def main():
             d = np.zeros((npt_syn,2))
             d[:,0] = np.arange(npt_syn) * dt_syn - tshift
             d[:,1] = adj_r * 1.
-            name = statxt[i,1] + "." + statxt[i,0] + ".BXR.adj"
+            name = statxt[i,1] + "." + statxt[i,0] + CCODE +"R.adj"
             np.savetxt(syndir + f"{bandname}/OUTPUT_FILES/" + name,d)
             d[:,1] = adj_z * 1.
-            name = statxt[i,1] + "." + statxt[i,0] + ".BXZ.adj"
+            name = statxt[i,1] + "." + statxt[i,0] + CCODE + "Z.adj"
             np.savetxt(syndir + f"{bandname}/OUTPUT_FILES/" + name,d)
 
         # write measure_adj window
@@ -219,7 +218,7 @@ def main():
                 # time window
                 tstart = -tshift 
                 tend = -tshift + (npt_syn - 1) * dt_syn
-                name = statxt[i,1] + "." + statxt[i,0] + ".BXR" + ".sac"
+                name = statxt[i,1] + "." + statxt[i,0] + CCODE +"R" + ".sac"
                 f.write("%s\n" %(name + '.obs'))
                 f.write("%s\n" %(name + '.syn'))
                 f.write("1\n")

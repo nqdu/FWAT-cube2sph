@@ -1,0 +1,60 @@
+# FWAT Package parameters
+
+# Measurements block, for computing adjoint source
+measure:
+  # tele seismic
+  tele:
+    COMPS: ['Z','R'] # components used 
+    CH_CODE: BX   # CH_CODE
+    FILTER_BANDS: 
+      - [5.,50.]
+    TIME_WINDOW: [5.,45.] # before and after first arrival
+    VERBOSE_MODE: True
+  
+  # noise 
+  noise:
+    COMPS: ['Z'] # components used 
+    CH_CODE: BX   # CH_CODE
+    FILTER_BANDS:  # filter bands used, in s, [T_min,Tmax]
+      - [20.,40.]
+      - [15.,30.]
+      - [10.,20.]
+      - [5.,15.]
+    GROUPVEL_WIN:   # Time window, determined by group velocity, km/s, [v_min,vmax]
+      - [2.5,4.5]
+      - [2.5,4.5]
+      - [2.5,4.5]
+      - [2.5,4.5]
+    USE_EGF: True   # if False, the input data is Cross-correlation, a negative derivative will be applied
+    ADJ_SRC_NORM: False  # if true, the adjoint source wiil be normalized
+    USE_NEAR_OFFSET: True # if FALSE, reset tstart
+    VERBOSE_MODE: True
+  
+  # receiver function
+  rf:
+    CH_CODE: BX   # CH_CODE
+    FILTER_BANDS: 
+      - [5.,50.]
+    GAUSS_F0:
+      - [1.0]
+    MINDERR: 0.001
+    MAXIT: 150
+    TIME_WINDOW: [5.,25.] # time window, before/after t= 0
+    TSHIFT: 5.
+    VERBOSE_MODE: True
+
+# optimization
+optimize:
+  SMOOTHING: [16000.,8000.]  # gaussian smoothing in horizontal/vertical direction, in m
+  OPT_METHOD: LBFGS  # SD/ LBFGS
+  PRECOND_TYPE: z_precond # default / z_precond /z2_precond
+  MAX_PER: 0.02 # maximum relative perturbation
+
+  # model/kernel type
+  # iso model: 
+    # iso model by default, we use parameter set vp_vs_rho
+    # = 0 kappa_mu_rho
+    # = 1  vp_vs_rho
+    # = 2 vpvs_vs_rho  
+  MODEL_TYPE: iso 
+  KERNEL_SET: 2

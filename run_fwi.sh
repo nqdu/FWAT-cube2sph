@@ -67,12 +67,15 @@ set_fwat3()
 iter_start=24
 iter_end=24
 
-# L-BFGS params
-lbfgs_start=24
-
 # simu_type
 simu_type=tele
 NJOBS=1
+
+
+################### STOP HERE##################
+# L-BFGS params
+. paramters.sh
+lbfgs_start=`python $FWATLIB/get_param.py START_MODEL fwat_params/lbfgs.yaml`
 
 # mkdir 
 mkdir -p misfits optimize solver
@@ -97,7 +100,7 @@ for iter in `seq $iter_start $iter_end`;do
   echo "iteration $iter $mod $mod_lbfgs_start"
 
   # create misfit file 
-  :> plots/$mod.mis
+  :> misfits/$mod.mis
 
   # run RF/tele simulation
   set_fwat1 $simu_type $NJOBS $setb
@@ -106,14 +109,10 @@ for iter in `seq $iter_start $iter_end`;do
 
   # run line search
   if [ ${mod} == $mod_lbfgs_start  ]; then 
-    echo ${mod} > lbfgs.in
-    echo "-1" >> lbfgs.in
+    python $FWATLIB/set_param.py START_MODEL -1 fwat_params/lbfgs.yaml
   else 
-    info=`head -1 lbfgs.in`
-    echo $info > lbfgs.in 
-    echo "1" >> lbfgs.in
+    python $FWATLIB/set_param.py STEP_FAC 1.  fwat_params/lbfgs.yaml
   fi
-  #exit
 
   # run postprocessing
   fwd=sbash_fwat2_postproc_opt.sh 

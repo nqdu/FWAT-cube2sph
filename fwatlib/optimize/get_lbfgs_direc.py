@@ -4,6 +4,8 @@ from scipy.io import FortranFile
 from mpi4py import MPI 
 import os 
 from tools import *
+import h5py
+import yaml
 
 NGLL = 5; NGLL3 = NGLL**3
 
@@ -19,18 +21,19 @@ def get_model_grad(iter,nspec):
     ker_vec = np.zeros((nker,nspec,NGLL3),'f4')
 
     # print log info
-    KERNEL_DIR = './optimize/SUM_KERNELS_M%02d'%(iter)
-    MODEL_DIR = './optimize/MODEL_M%02d'%(iter)
+    KERNEL_DIR = './optimize/SUM_KERNELS_M%02d/'%(iter)
+    MODEL_DIR = './optimize/MODEL_M%02d/'%(iter)
     if myrank == 0: print('reading ',KERNEL_DIR,MODEL_DIR)
 
     # reading model/kernels
     for i in range(nker):
         # read kernel 
-        filename = KERNEL_DIR + "/proc%06d"%myrank + '_' + grad_list[i] + ".bin"
-        f = FortranFile(filename)
-        ker_vec[i,:,:] = f.read_reals('f4').reshape(nspec,NGLL3)
-        f.close()
+        filename = KERNEL_DIR + grad_list[i] + ".h5"
+        fio = h5py.File(filename,"r")
+        ker_vec[i,:,:] = fio[str(myrank)][:].reshape(nspec,NGLL3)
+        fio.close()
 
+        # read model
         filename = MODEL_DIR + "/proc%06d"%myrank + '_' + mod_list[i] + ".bin"
         f = FortranFile(filename)
         mod_vec[i,:,:] = f.read_reals('f4').reshape(nspec,NGLL3)
@@ -66,7 +69,7 @@ def compute_inner_dot(a,b,weights,jaco):
 
     return q_sum * c1 * c2 
 
-def get_lbfgs_direc(iter,iter_start):
+def get_lbfgs_direc(iter:int,paramfile:str):
 
     from libgll import get_gll_weights
 
@@ -106,20 +109,28 @@ def get_lbfgs_direc(iter,iter_start):
     _,q_vec = get_model_grad(iter,nspec)
     grad_bak = q_vec.copy()
 
+    # get search direction names
+    direc_list =  get_direc_name_list()
+
+    # load lbfgs parameters
+    with open(paramfile,"r") as f:
+        pdict = yaml.safe_load(f)
+
     # current search direction is -grad
+    iter_start:int = pdict['START_MODEL']
     if iter == iter_start:
         q_vec = np.float32(-q_vec)
-        out_list = get_direc_name_list()
         nker = q_vec.shape[0]
         for i in range(nker):
-            outname =  './/optimize/SUM_KERNELS_M%02d'%(iter) + '/proc%06d'%(myrank) + '_' + out_list[i] + ".bin"
+            outname =  './/optimize/SUM_KERNELS_M%02d'%(iter) + '/proc%06d'%(myrank) + '_' + direc_list[i] + ".bin"
             f = FortranFile(outname,'w')
             f.write_record(q_vec[i,:,:])
             f.close()
         return 
 
     # get istore
-    iter_store = iter - 5 
+    MAX_HIS = pdict['MAX_HISTORY']
+    iter_store = iter - MAX_HIS
     if iter_store <= iter_start: iter_store = iter_start
 
     # forward 
@@ -149,13 +160,13 @@ def get_lbfgs_direc(iter,iter_start):
     grad_diff = grad1 - grad0 
     model_diff = model1 - model0
 
-    # read hess
-    filename = './optimize/SUM_KERNELS_M%02d'%(0)
-    filename += "/proc%06d"%myrank + "_hess_kernel.bin"
+    # read hess from hdf5
+    filename = './optimize/SUM_KERNELS_M%02d'%(iter)
+    filename += "/hess_kernel.h5"
     if myrank == 0: print(f"reading hess from {filename}")
-    f = FortranFile(filename)
-    hess = f.read_reals('f4').reshape(nspec,NGLL3)
-    f.close()
+    fio = h5py.File(filename,"r")
+    hess = fio[str(myrank)][:].reshape(nspec,NGLL3)
+    fio.close()
 
     # get hessian max
     hess_max_loc = np.max(np.abs(hess))
@@ -189,14 +200,13 @@ def get_lbfgs_direc(iter,iter_start):
     direc = -r_vec
 
     # get min/max
-    grad_list =  get_gradname_list()
-    for i in range(len(grad_list)):
+    for i in range(len(direc_list)):
         min_vp = np.min(direc[i,...])
         max_vp = np.max(direc[i,...])
         min_all = comm.allreduce(min_vp,MPI.MIN)
         max_all = comm.allreduce(max_vp,MPI.MAX)
         if myrank == 0:
-            print(f"search direction : {grad_list[i]} min/max = %f %f"%(min_all,max_all))
+            print(f"search direction : {direc_list[i]} min/max = %f %f"%(min_all,max_all))
     
     # check the angle between search direction and negative grad
     grad_bak = - grad_bak
@@ -216,29 +226,25 @@ def get_lbfgs_direc(iter,iter_start):
             direc = grad_bak
 
             # write new info 
-            f = open("lbfgs.in","r")
-            lines = f.readlines()
-            f.close()
-            f = open("lbfgs.in","w")
-            f.write("M%02d\n"%(iter))
-            f.write("%s"%lines[1])
-            f.close()
+            pdict['START_MODEL'] = iter
+            with open(paramfile,"w") as f:
+                yaml.safe_dump(f)
+
     comm.barrier()
 
     # save search
-    out_list = get_direc_name_list()
     direc = np.float32(direc)
     nker = direc.shape[0]
     for i in range(nker):
-        outname =  './optimize/SUM_KERNELS_M%02d'%(iter) + '/proc%06d'%(myrank) + '_' + out_list[i] + ".bin"
+        outname =  './optimize/SUM_KERNELS_M%02d'%(iter) + '/proc%06d'%(myrank) + '_' + direc_list[i] + ".bin"
         f = FortranFile(outname,'w')
         f.write_record(direc[i,:,:])
         f.close()
 
 def main():
     if len(sys.argv) !=3 :
-        print("need 2 parameters: iter iter_start")
-        print("example: mpirun -np 160 python get_lbfgs_step_direc.py 0 0")
+        print("need 2 parameters: iter paramfile")
+        print("example: mpirun -np 160 python get_lbfgs_step_direc.py fwat_params/lbfgs.yaml")
         exit(1)
 
     # get mpi info
@@ -247,14 +253,17 @@ def main():
     
     # get input 
     iter = int(sys.argv[1])
-    iter_start = int(sys.argv[2])
+    paramfile = sys.argv[2]
     KERNEL_DIR = './optimize/SUM_KERNELS_M%02d'%(iter)
     if myrank == 0:  
         os.makedirs(KERNEL_DIR,exist_ok=True)
-        print(f"get L-BFGS search direction {iter} {iter_start}")
+        print(f"get L-BFGS search direction for iteration {iter}")
+    
+    # load parameters
 
     # get search direction
-    get_lbfgs_direc(iter,iter_start)
+    get_lbfgs_direc(iter,paramfile)
 
-main()
+if __name__ == "__main__":
+    main()
         

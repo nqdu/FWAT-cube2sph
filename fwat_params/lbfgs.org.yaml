@@ -1,0 +1,3 @@
+START_MODEL: 0   # START MODEL OF lbfgs
+STEP_FAC: -1   # step factor
+MAX_HISTORY: 5 # maximum model used to find search direction

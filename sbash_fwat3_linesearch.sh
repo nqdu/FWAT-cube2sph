@@ -62,13 +62,11 @@ for i in `seq 1 $NJOBS`; do
   
   # copy common parameters
   \cp DATA/Par_file.$simu_type $evtdir/DATA/Par_file
-  \cp fwat_params/FWAT.PAR.$simu_type $evtdir/DATA/FWAT.PAR 
+  \cp fwat_params/FWAT.PAR.yaml $evtdir/DATA/FWAT.PAR.yaml
   \cp fwat_params/MEASUREMENT.PAR.$simu_type $evtdir/DATA/MEASUREMENT.PAR
   \cp OUTPUT_FILES/*.h $evtdir/OUTPUT_FILES
   \rm -rf $evtdir/DATA/meshfem3D_files/*
   ln -s $work_dir/DATA/meshfem3D_files/* $evtdir/DATA/meshfem3D_files/
-  \cp DATA/adepml_stage $evtdir/DATA/
-  \cp DATA/wavefield* $evtdir/DATA/
 
   # model link
   LOCAL_PATH="./DATABASES_MPI"
@@ -110,6 +108,11 @@ for i in `seq 1 $NJOBS`; do
   $change_par APPROXIMATE_HESS_KL .false. $evtdir/DATA/Par_file
   cd $evtdir/
   mpirun -np $NPROC $fksem/bin/xspecfem3D
+
+  # merge all seismograms to one big file
+  echo "packing seismograms ..."
+  python $MEASURE_LIB/pack_seismogram.py OUTPUT_FILES/seismograms.h5 OUTPUT_FILES/*.semd
+  \rm -rf OUTPUT_FILES/*.semd
 
   # run measure
   cd $work_dir

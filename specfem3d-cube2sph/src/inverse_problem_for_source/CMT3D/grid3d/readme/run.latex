@@ -1,3 +1,0 @@
-latex readme.tex
-dvipdf readme.dvi readme.pdf
-#evince readme.pdf &

@@ -55,6 +55,7 @@ for i in `seq 1 $NJOBS`; do
 
   # get evtid
   evtid=`sed -n "$ievt"p $SOURCE_FILE |awk '{print $1}'`
+  echo " "
   echo "copying params for $simu_type evtid = $evtid"  
   evtdir=$work_dir/solver/$mod/$evtid
 
@@ -66,13 +67,11 @@ for i in `seq 1 $NJOBS`; do
   
   # copy common parameters
   \cp DATA/Par_file.$simu_type $evtdir/DATA/Par_file
-  \cp fwat_params/FWAT.PAR.$simu_type $evtdir/DATA/FWAT.PAR 
+  \cp fwat_params/FWAT.PAR.yaml $evtdir/DATA/FWAT.PAR.yaml
   \cp fwat_params/MEASUREMENT.PAR.$simu_type $evtdir/DATA/MEASUREMENT.PAR
   \cp OUTPUT_FILES/*.h $evtdir/OUTPUT_FILES
   \rm -rf $evtdir/DATA/meshfem3D_files/*
   ln -s $work_dir/DATA/meshfem3D_files/* $evtdir/DATA/meshfem3D_files/
-  \cp DATA/adepml_stage $evtdir/DATA/
-  \cp DATA/wavefield* $evtdir/DATA/
 
   # model link
   LOCAL_PATH="./DATABASES_MPI"
@@ -117,12 +116,21 @@ for i in `seq 1 $NJOBS`; do
   $change_par SIMULATION_TYPE 1 $evtdir/DATA/Par_file
   $change_par APPROXIMATE_HESS_KL .false. $evtdir/DATA/Par_file
   cd $evtdir/
+  date
   mpirun -np $NPROC $fksem/bin/xspecfem3D
+  date
+
+  # merge all seismograms to one big file
+  echo "packing seismograms ..."
+  python $MEASURE_LIB/pack_seismogram.py OUTPUT_FILES/seismograms.h5 OUTPUT_FILES/*.semd
+  \rm -rf OUTPUT_FILES/*.semd
 
   # run measure
   echo ""
   cd $work_dir
+  date
   bash $MEASURE_LIB/measure.$simu_type.sh $iter $evtid 3 >> $fwd 
+  date
 
   # adjoint simulation
   $change_par COUPLE_WITH_INJECTION_TECHNIQUE .false. $evtdir/DATA/Par_file
@@ -132,13 +140,23 @@ for i in `seq 1 $NJOBS`; do
   cd $evtdir/
   echo ""
   echo "adjoint simulation ..."
+  date
   mpirun -np $NPROC $fksem/bin/xspecfem3D
+  date
 
   # copy kernels to GRADIENT
+  # and combine them to hdf5
   cd $work_dir
   mkdir -p $evtdir/GRADIENT
   \rm -rf $evtdir/GRADIENT/*
   mv $evtdir/$LOCAL_PATH/*_kernel.bin $evtdir/GRADIENT
+  grad_list=`GET_GRAD_NAME`
+  for grad in $grad_list hess_kernel;
+  do
+    echo "combine $NPROC $grad to hdf5 ..." 
+    python $OPT_LIB/bin2h5.py $evtdir/GRADIENT $grad $NPROC 1
+  done 
+  \rm $evtdir/GRADIENT/*.bin
 
   # delete useless information
   bash $FWATLIB/clean.sh $mod $evtid 

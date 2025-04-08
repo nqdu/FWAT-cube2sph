@@ -6,10 +6,10 @@ import sys
 import os 
 from mpi4py import MPI
 
-from utils import interpolate_syn,get_fwat_params,get_average_amplitude
+from utils import interpolate_syn,read_fwat_params,get_average_amplitude
 from utils import preprocess,cumtrapz1
 from tele.deconit import time_decon
-from scipy.signal import fftconvolve
+from scipy.signal import convolve,correlate
 
 def compute_ak135_time(evtid,statxt,do_ls = False):
     nsta = statxt.shape[0]
@@ -41,10 +41,43 @@ def compute_ak135_time(evtid,statxt,do_ls = False):
     
     return t_ref
 
-def seis_pca(glob_syn,glob_obs,stf_collect,dt_syn,components):
+def shift_data(u,dt,t0):
+    u_spec = np.fft.fft(u)
+    freqs = np.fft.fftfreq(len(u),dt)
+
+    # shift in freq domain
+    u_spec *= np.exp(-1j * np.pi * 2 * freqs * t0)
+
+    u_out = np.fft.ifft(u_spec).real 
+
+    return u_out 
+
+def seis_pca(stf_collect:np.ndarray):
+    _,nt = stf_collect.shape 
+
+    # remove average
+    rec = stf_collect - np.mean(stf_collect,axis=1,keepdims=True)
+
+    # compute eigenvalue/eigenvector
+    _,v = np.linalg.eig(rec @ rec.T / nt)
+
+    # first Principle component is what we need
+    stf = (rec.T @ v[:,0]).real
+    
+    # make sure stf has same polarity as the average one
+    stf_avg = np.mean(stf_collect,axis=0)
+    sig1 = np.sign(stf_avg[np.argmax(abs(stf_avg))])
+    sig2 = np.sign(stf[np.argmax(abs(stf))])
+
+    # rescale
+    stf = stf * sig1 * sig2 
+
+    return stf
+
+def compute_stf(glob_syn,glob_obs,stf_collect,dt_syn,components):
     from tele.pca.libpca import PCA
 
-    nsta = glob_syn.shape[0]
+    nsta,ncomp,nt = glob_syn.shape
     stf = np.zeros((2,glob_syn.shape[2]),'f4')
     temp = PCA(np.float32(stf_collect))
     # temp = np.mean(stf_collect,axis=0)
@@ -54,13 +87,25 @@ def seis_pca(glob_syn,glob_obs,stf_collect,dt_syn,components):
     stf[0,:] = temp
     stf[1,:] = temp * 1.
     avgamp = np.zeros((2),'f4')
+    
+    # compute time shift between syn and obs
+    time_shift = np.zeros((nsta))
+    for i in range(nsta):
+        for ic in range(1):
+            out = dt_syn * convolve(glob_syn[i,ic,:],stf[ic,:],'same')
+            corr = correlate(glob_obs[i,ic,:],out,"full")
+            time_shift[i] = (np.argmax(abs(corr)) - nt + 1) * dt_syn 
+    t0 = np.mean(time_shift)
 
+    # shift stf to remove tshift residulas
+    for i in range(ncomp):
+        stf[i,:] = shift_data(stf[i,:],dt_syn,t0)
+    
     # recover data
-    ncomp = len(components)
     recp_syn = glob_syn.copy()
     for i in range(nsta):
         for ic in range(ncomp):
-            recp_syn[i,ic,:] = dt_syn * fftconvolve(glob_syn[i,ic,:],stf[ic,:],'same')
+            recp_syn[i,ic,:] = dt_syn * convolve(glob_syn[i,ic,:],stf[ic,:],'same')
     
     # calculate amplitude scale factor 
     print('\ncalculate ampl scale factors ...')
@@ -122,12 +167,11 @@ def main():
     nprocs = comm.Get_size()
 
     # load paramfile as dictionary
-    pdict = get_fwat_params(f'solver/{mdir}/{evtname}/DATA/FWAT.PAR')
+    pdict = read_fwat_params(f'solver/{mdir}/{evtname}/DATA/FWAT.PAR.yaml')['measure']['tele']
     
     # print log
-    verbose = False
-    if pdict['VERBOSE_MODE'].split()[0] == '.true.':
-        verbose = True
+    verbose = pdict['VERBOSE_MODE']
+    CCODE = "." + pdict['CH_CODE']
 
     # read injection starttime 
     temp = np.loadtxt('src_rec/injection_time',dtype=str,ndmin=2)
@@ -152,7 +196,7 @@ def main():
     
     # synthetic data parameters
     syndir = f'solver/{mdir}/{evtname}/OUTPUT_FILES/'
-    name = statxt[0,1] + "." + statxt[0,0] + ".BXZ.sac"
+    name = statxt[0,1] + "." + statxt[0,0] + CCODE + "Z.sac"
     syn_z_hd = SACTrace.read(syndir + name,headonly=True)
     npt_syn = syn_z_hd.npts
     dt_syn = syn_z_hd.delta
@@ -160,20 +204,18 @@ def main():
     sac_head = syn_z_hd.copy()
 
     # get time window 
-    win_tb = np.float32(pdict['TW_BEFORE'])
-    win_te = np.float32(pdict['TW_AFTER'])
+    win_tb,win_te = pdict['TIME_WINDOW']
     npt2 = int((win_te + win_tb) / dt_syn)
     if npt2 // 2 * 2 != npt2:
         npt2 += 1
 
     # get frequency band
-    Tmin_list = list(map(lambda x:float(x),pdict['SHORT_P'].split()))
-    Tmax_list = list(map(lambda x:float(x),pdict['LONG_P'].split()))
-    assert(len(Tmin_list) == len(Tmax_list))
+    Tmin_list = [x[0] for x in pdict['FILTER_BANDS']]
+    Tmax_list = [x[1] for x in pdict['FILTER_BANDS']]
 
     # get components
-    ncomp = int(pdict['NRCOMP'])
-    components = pdict['RCOMPS'].split()
+    ncomp = len(pdict['COMPS'])
+    components = pdict['COMPS']
 
     # if run_opt == 1, save synthetic data to SYN
     if run_opt == 1:
@@ -181,38 +223,41 @@ def main():
         stf = np.zeros((ncomp,npt_syn))
         nsta = statxt.shape[0]
         for ib in range(len(Tmax_list)):
-            bandname = 'T%03d_T%03d' %(Tmin_list[ib],Tmax_list[ib])
+            bandname = 'T%03g_T%03g' %(Tmin_list[ib],Tmax_list[ib])
             for ic in range(ncomp):
                 ch = components[ic]
                 tr = SACTrace.read(f'src_rec/stf_{ch}.sac.{bandname}_{evtid}')
                 stf[ic,:] += tr.data 
         
         # synthetic by using summed stf
-        outdir = syndir + '/SYN/'
+        outdir =  + f'fwat_data/{evtname}/'
         os.makedirs(outdir,exist_ok=True)
+        if myrank == 0: print("Synthetic Observed Data")
         for i in range(myrank,nsta,nprocs):
             for ic in range(ncomp):
                 ch = components[ic]
-                name = statxt[i,1] + "." + statxt[i,0] + ".BX" + ch + ".sac"
+                name = statxt[i,1] + "." + statxt[i,0]  + CCODE + ch + ".sac"
                 syn_tr = SACTrace.read(syndir + "/" + name )
 
                 # synthetic
-                data = dt_syn * fftconvolve(syn_tr.data,stf[ic,:],'same')
+                data = dt_syn * convolve(syn_tr.data,stf[ic,:],'same')
 
                 # write data to outdir
                 syn_tr.data = data 
                 syn_tr.data = t_inj - tref[i]
                 syn_tr.write(outdir + '/' + name)
         
-        #
+        # finish here
+        comm.Barrier()
         return 0
+
 
     # now loop every band to estimate the stf 
     nbands = len(Tmin_list)
     for ib in range(nbands):
         freqmin = 1. / Tmax_list[ib]
         freqmax = 1. / Tmin_list[ib]
-        bandname = 'T%03d_T%03d' %(Tmin_list[ib],Tmax_list[ib])
+        bandname = 'T%03g_T%03g' %(Tmin_list[ib],Tmax_list[ib])
         
         # mkdir to save all files
         os.makedirs(syndir + f"{bandname}",exist_ok=True)
@@ -226,7 +271,7 @@ def main():
         # allocate tasks
         for i in range(myrank,nsta,nprocs):
             # check time window
-            name = statxt[i,1] + "." + statxt[i,0] + ".BXZ" + ".sac"
+            name = statxt[i,1] + "." + statxt[i,0]  +  CCODE + "Z.sac"
             head = SACTrace.read(syndir + "/" + name,headonly=True)
             if tref[i] +  win_te > t0_syn + head.npts * head.delta:
                 print("time window exceed data range")
@@ -236,7 +281,7 @@ def main():
             # loop every component
             for ic in range(ncomp):
                 ch = components[ic]
-                name = statxt[i,1] + "." + statxt[i,0] + ".BX" + ch + ".sac"
+                name = statxt[i,1] + "." + statxt[i,0] + CCODE + ch + ".sac"
                 syn_tr = SACTrace.read(syndir + "/" + name )
                 obs_tr = SACTrace.read(f'fwat_data/{evtid}/' + name )
                 
@@ -293,7 +338,7 @@ def main():
                 for ic in range(ncomp):
                     stf[ic,:] = SACTrace.read(stf_names[ic]).data
             else:
-                stf = seis_pca(glob_syn,glob_obs,stf_collect,dt_syn,components)
+                stf = compute_stf(glob_syn,glob_obs,stf_collect,dt_syn,components)
                 for ic in range(ncomp):
                     sac_head.data = stf[ic,:]
                     sac_head.write(stf_names[ic])
@@ -313,7 +358,7 @@ def main():
             for i in range(myrank,nsta,nprocs):
                 for ic in range(ncomp):
                     ch = components[ic]
-                    name = statxt[i,1] + "." + statxt[i,0] + ".BX" + ch + ".sac"
+                    name = statxt[i,1] + "." + statxt[i,0] + CCODE + ch + ".sac"
                     sac_head = SACTrace.read(syndir + "/" + name,headonly=True)
                     name = syndir + f"{bandname}" + "/" +name 
                     sac_head.data = glob_syn[i,ic,:]
@@ -333,14 +378,14 @@ def main():
             t0 = tref[i] - t_inj
             for ic in range(ncomp):
                 ch = components[ic]
-                name = statxt[i,1] + "." + statxt[i,0] + ".BX" + ch + ".sac"
+                name = statxt[i,1] + "." + statxt[i,0] + CCODE + ch + ".sac"
                 sac_head = SACTrace.read(syndir + "/" + name,headonly=True)
                 name = syndir + f"{bandname}" + "/" +name 
                 sac_head.data = glob_obs[i,ic,:]
                 sac_head.b = 0.
                 sac_head.t0 = t0
                 sac_head.write(name + ".obs")
-                data = dt_syn * fftconvolve(glob_syn[i,ic,:],stf[ic,:],'same')
+                data = dt_syn * convolve(glob_syn[i,ic,:],stf[ic,:],'same')
                 sac_head.data = data
                 sac_head.write(name + ".syn")
 
@@ -356,7 +401,7 @@ def main():
 
                 for ic in range(ncomp):
                     ch = components[ic]
-                    name = statxt[i,1] + "." + statxt[i,0] + ".BX" + ch + ".sac"
+                    name = statxt[i,1] + "." + statxt[i,0] + CCODE + ch + ".sac"
                     f.write("%s\n" %(name + '.obs'))
                     f.write("%s\n" %(name + '.syn'))
                     f.write("1\n")

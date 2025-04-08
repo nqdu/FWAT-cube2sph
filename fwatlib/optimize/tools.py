@@ -1,5 +1,5 @@
 class FWAT_MODEL_CONST:
-    def __init__(self,mdtype='iso',use_model_set=1) -> None:
+    def initialize(self,mdtype='iso',use_model_set=2) -> None:
         # iso model by default, we use parameter set vp_vs_rho
         # = 0 kappa_mu_rho
         # = 1  vp_vs_rho
@@ -10,6 +10,19 @@ class FWAT_MODEL_CONST:
         if mdtype != 'iso':
             print(f"not implemented for modeltype = {mdtype}")
             exit(1)
+    
+    def __init__(self,filename='fwat_params/FWAT.PAR.yaml') -> None:
+        # import sys 
+        # import os 
+        # filepath = os.path.realpath(__file__)
+        # print(os.path.basename(os.path.basename(filepath)))
+        # sys.path.append(os.path.dirname(os.path.dirname(filepath)))
+        
+        import yaml
+        with open(filename,"r") as f:
+            pdict = yaml.safe_load(f)['optimize']
+    
+        self.initialize(pdict['MODEL_TYPE'],pdict['KERNEL_SET'])
 
 def convert_md(model,backward=False):
     '''
@@ -53,8 +66,8 @@ def convert_kernel(md,md_kl):
 
         return md1_kl
 
-def get_gradname_list(smooth=False):
-    p = FWAT_MODEL_CONST()
+def get_gradname_list(filename='fwat_params/FWAT.PAR.yaml',smooth=False):
+    p = FWAT_MODEL_CONST(filename)
 
     if p.MODEL_TYPE == 'iso':
         grad_list = ['alpha_kernel','beta_kernel','rhop_kernel']
@@ -65,15 +78,15 @@ def get_gradname_list(smooth=False):
     
     return grad_list
 
-def get_model_name_list():
-    p = FWAT_MODEL_CONST()
+def get_model_name_list(filename='fwat_params/FWAT.PAR.yaml'):
+    p = FWAT_MODEL_CONST(filename)
     if p.MODEL_TYPE == 'iso':
         mod_list = ['vp','vs','rho']
     
     return mod_list
 
-def get_direc_name_list():
-    p = FWAT_MODEL_CONST()
+def get_direc_name_list(filename='fwat_params/FWAT.PAR.yaml'):
+    p = FWAT_MODEL_CONST(filename)
     if p.MODEL_TYPE == 'iso':
         direc_list = ['dbulk','dbeta','drho']
         #grad_list = ['alpha_kernel_smooth','beta_kernel_smooth','rhop_kernel_smooth']

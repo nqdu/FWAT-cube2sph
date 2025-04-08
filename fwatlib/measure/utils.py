@@ -1,18 +1,9 @@
 import numpy as np 
 
-def get_fwat_params(paramfile):
-    pdict = {}
+def read_fwat_params(paramfile="fwat_params/FWAT.PAR.yaml"):
+    import yaml
     with open(paramfile,"r") as f:
-        for line in f :
-            if line[0] == '\n' or line[0] == '#':
-                continue
-            key,val = line.split('\n')[0].split(":")
-            if isinstance(val,str):
-                if '.true.' in val:
-                    val = '.true.'
-                elif '.false.' in val:
-                    val = '.false.'
-            pdict[key] = val
+        pdict = yaml.safe_load(f)
     
     return pdict
 

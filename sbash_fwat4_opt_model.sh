@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --nodes=4
 #SBATCH --ntasks=160
-#SBATCH --time=00:35:59
+#SBATCH --time=00:16:59
 #SBATCH --job-name OPT
 #SBATCH --output=OPT_%j.txt
 #SBATCH --partition=compute
@@ -20,7 +20,7 @@ model=M24
 SIMU_TYPE=tele
 
 # get step_fac/dmax
-MIS_FILE=plots/$model.mis
+MIS_FILE=misfits/$model.mis
 step_fac=`tail -1 $MIS_FILE |cut -d'=' -f2 |awk '{print $1}'`
 dmax=`tail -1 $MIS_FILE |cut -d'=' -f2 |awk '{print $2}'`
 
@@ -45,17 +45,22 @@ echo $step_fac_opt
 LSDIR=./optimize/MODEL_${model}_step01
 if [[ `grep "failed" $MIS_FILE |wc -l` == 1 ]]; then  
   echo "resubmit this job by using step_fac = $step_fac_opt" 
-  info=`head -1 lbfgs.in`
-  echo $info > lbfgs.in
-  echo "$step_fac_opt" >> lbfgs.in
-  sbatch  sbash_fwat3_linesearch.sh
+  python $FWATLIB/set_param.py STEP_FAC $step_fac_opt fwat_params/lbfgs.yaml 
+  exit 1
 else 
   chimin=`tail -1 $MIS_FILE |cut -d'=' -f2 |awk '{print $2}'`
   if (( `echo "$step_fac $step_fac_opt" |awk '{print sqrt(($1-$2)^2)  >= 0.001 }'`  )); then 
     step_fac=$step_fac_opt
-    python $OPB_LIB/get_lbfgs_step_fac.py $model $LSDIR $step_fac $NPROC >> $MIS_FILE
-    # remesh
+    python $OPT_LIB/get_lbfgs_step_fac.py $model $LSDIR $step_fac $NPROC >> $MIS_FILE
+
+    # regenerate database
+    LOCAL_PATH=./DATABASES_MPI
+    $change_par LOCAL_PATH $LSDIR DATA/Par_file
+    $change_par LOCAL_PATH $LSDIR  DATA/meshfem3D_files/Mesh_Par_file
+    $change_par SAVE_MESH_FILES .false. DATA/Par_file
+    echo -e ".false.\n.true." > adepml_stage
     mpirun -np $NPROC $fksem/bin/xgenerate_databases
+    \rm adepml_stage
   fi
   
   per=`echo $step_fac $dmax |awk '{printf "%g", $1*$2}'`
