@@ -123,4 +123,6 @@ def main():
     print('step_fac chi_min = %g %g'%(step_fac,chimin))
 
 
-main()
+
+if __name__ == "__main__":
+    main()

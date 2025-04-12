@@ -178,4 +178,6 @@ def main():
         f.write_record(kl)
         f.close()
 
-main()
+
+if __name__ == "__main__":
+    main()
