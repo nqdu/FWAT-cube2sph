@@ -75,12 +75,12 @@ do
   awk -v a=$evtid '{$1=a;$29=$29*1.; print}' window_chi >  $current_dir/misfits/$mod.${evtid}${lsflag}_${band}_noise_window_chi
   
   # continue for line search
-  if [ $run_opt == 2 ]; then
-    \rm -rf OUTPUT_FILES
-    cd $current_dir
-    cd $SYN_DIR
-    continue
-  fi
+  # if [ $run_opt == 2 ]; then
+  #   \rm -rf OUTPUT_FILES
+  #   cd $current_dir
+  #   cd $SYN_DIR
+  #   continue
+  # fi
 
   # convert sac to hdf5
   python $FWATLIB/measure/sac2h5.py ../seismogram.obs.$band.h5 *.sac.obs
@@ -101,9 +101,9 @@ do
 done
 
 # continue for finish line search
-if [ $run_opt -eq 2 ]; then
-  exit 0;
-fi
+# if [ $run_opt -eq 2 ]; then
+#   exit 0;
+# fi
 
 cd $current_dir
-bash $MEASURE_LIB/sum_adj_source.sh $iter $evtid noise
+bash $MEASURE_LIB/sum_adj_source.sh $iter $evtid noise $run_opt

@@ -97,10 +97,10 @@ do
   awk -v a=$evtid -v b=$coef '{$1=a;$29=$29*b; print}' window_chi >  $current_dir/misfits/$mod.${evtid}${lsflag}_${band}_tele_window_chi
 
   # continue for line search
-  if [ $run_opt -eq 2 ]; then
-    \rm -rf OUTPUT_FILES
-    continue
-  fi
+  # if [ $run_opt -eq 2 ]; then
+  #   \rm -rf OUTPUT_FILES
+  #   continue
+  # fi
 
   # convert sac to hdf5
   python $FWATLIB/measure/sac2h5.py ../seismogram.obs.$band.h5 *.sac.obs
@@ -123,9 +123,9 @@ do
 done
 
 # continue for finish line search
-if [ $run_opt -eq 2 ]; then
-  exit 0;
-fi
+# if [ $run_opt -eq 2 ]; then
+#   exit 0;
+# fi
 
 cd $current_dir
-bash $MEASURE_LIB/sum_adj_source.sh $iter $evtid tele
+bash $MEASURE_LIB/sum_adj_source.sh $iter $evtid tele $run_opt

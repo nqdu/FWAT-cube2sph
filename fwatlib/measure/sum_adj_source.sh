@@ -1,6 +1,6 @@
 
-if [[ $# -ne 3 ]]; then 
-    echo "Usage: ./sum_adj_source iter evtid simu_type"
+if [[ $# -ne 3 && $# -ne 4 ]]; then
+    echo "Usage: ./sum_adj_source iter evtid simu_type (run_opt=3)"
     exit 1
 fi
 
@@ -14,7 +14,14 @@ set -e
 iter=$1
 evtid=$2
 simu_type=$3
+run_opt=3
 lsflag=""
+if [[ $# -eq 4 ]]; then
+  run_opt=$4
+  if [ $run_opt -eq 2 ]; then
+    lsflag=".ls"
+  fi
+fi
 
 # set directory
 current_dir=`pwd`

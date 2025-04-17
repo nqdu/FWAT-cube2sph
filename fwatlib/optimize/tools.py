@@ -88,7 +88,7 @@ def get_model_name_list(filename='fwat_params/FWAT.PAR.yaml'):
 def get_direc_name_list(filename='fwat_params/FWAT.PAR.yaml'):
     p = FWAT_MODEL_CONST(filename)
     if p.MODEL_TYPE == 'iso':
-        direc_list = ['dbulk','dbeta','drho']
+        direc_list = ['dalpha','dbeta','drho']
         #grad_list = ['alpha_kernel_smooth','beta_kernel_smooth','rhop_kernel_smooth']
         if p.USE_MODEL_SET == 2:
             direc_list[0] = 'dvpvs'

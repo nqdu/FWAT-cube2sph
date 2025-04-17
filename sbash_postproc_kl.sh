@@ -23,24 +23,29 @@ change_par=$FWATLIB/change_par_file.sh
 iter=`python $FWATLIB/get_param.py iter $FWATPARAM/lbfgs.yaml`
 FLAG=`python $FWATLIB/get_param.py flag $FWATPARAM/lbfgs.yaml`
 MODEL=M`echo "$iter" |awk '{printf "%02d",$1}'`
+PRECOND=`python $FWATLIB/get_param.py optimize/PRECOND_TYPE`
+
 
 # create log file
-filename=output_fwat_post_log_${MODEL}.txt
-:> $filename
-echo "running POST " >> $filename 
+logfile=output_fwat2_post_log_${MODEL}.txt
+:> $logfile
+echo "running POST " >> $logfile 
 
 # sum kernels
-echo "sum kernels ..."
-PRECOND=`python $FWATLIB/get_param.py optimize/PRECOND_TYPE`
-mpirun -np $NPROC python $OPT_LIB/sum_kernel.py  $iter $SOURCE_FILE $PRECOND >> $filename
-kl_list=`GET_GRAD_NAME`
-for param in $kl_list 
-do 
-  echo "\nconverting $param to hdf5 ..."
-  python $OPT_LIB/bin2h5.py optimize/SUM_KERNELS_${MODEL}/ $param $NPROC 1
-  \rm optimize/SUM_KERNELS_${MODEL}/*_${param}.bin
-done
-echo " " 
+if [ $FLAG != "GRAD" ]; then 
+  echo "sum kernels ..."
+  echo "CMD: mpirun -np $NPROC python $OPT_LIB/sum_kernel.py $SOURCE_FILE $iter $PRECOND $MODEL"
+  mpirun -np $NPROC python $OPT_LIB/sum_kernel.py $SOURCE_FILE $iter $PRECOND $MODEL >> $logfile
+
+  kl_list=`GET_GRAD_NAME`
+  for param in $kl_list 
+  do 
+    echo "converting $param to hdf5 ..."
+    python $OPT_LIB/bin2h5.py optimize/SUM_KERNELS_${MODEL}/ $param $NPROC 1
+    \rm optimize/SUM_KERNELS_${MODEL}/*_${param}.bin
+  done
+  echo " " 
+fi 
 
 # set smoothing parameters
 LOCAL_PATH=./DATABASES_MPI
@@ -64,11 +69,14 @@ if [ $PRECOND == "default" ] && [ $MODEL == "M00"  ];then
   done 
   \rm optimize/SUM_KERNELS_${MODEL}/*_${param}.bin
 fi 
-python $OPT_LIB/bin2h5.py optimize/SUM_KERNELS_${MODEL}/ hess_kernel $NPROC 1
-\rm optimize/SUM_KERNELS_${MODEL}/*hess_kernel.bin
+
+if [ $FLAG != "GRAD" ]; then 
+  python $OPT_LIB/bin2h5.py optimize/SUM_KERNELS_${MODEL}/ hess_kernel $NPROC 1
+  \rm optimize/SUM_KERNELS_${MODEL}/*hess_kernel.bin
+fi
 
 # get search direction
-mpirun -np $NPROC python $OPT_LIB/get_lbfgs_direc.py $iter $FWATPARAM/lbfgs.yaml
+mpirun -np $NPROC python $OPT_LIB/get_lbfgs_direc.py $iter $FWATPARAM/lbfgs.yaml 
 echo " "
 
 # smooth search direction
@@ -85,7 +93,7 @@ do
     mv ${name}_smooth.bin $name.bin 
   done
 
-  echo "\nconverting $param to hdf5 ..."
+  echo "converting $param to hdf5 ..."
   python $OPT_LIB/bin2h5.py optimize/SUM_KERNELS_${MODEL}/ $param $NPROC 1
   \rm optimize/SUM_KERNELS_${MODEL}/*_${param}.bin
 done
@@ -93,13 +101,9 @@ done
 # generate new model
 LSDIR=./optimize/MODEL_${MODEL}.ls
 mkdir -p $LSDIR
-step_fac=`python $FWATLIB/get_param.py STEP_FAC fwat_params/lbfgs.yaml`
-MIS_FILE=misfits/$MODEL.mis
 echo " "
-echo "python $OPT_LIB/get_lbfgs_step_fac.py $MODEL $LSDIR $step_fac $NPROC"
-python $OPT_LIB/get_lbfgs_step_fac.py $MODEL $LSDIR $step_fac $NPROC  > $MIS_FILE
-step_fac=`tail -1 $MIS_FILE |cut -d'=' -f2 |awk '{print $1}'`
-dmax=`tail -1 $MIS_FILE |cut -d'=' -f2 |awk '{print $2}'`
+echo "python $OPT_LIB/get_lbfgs_next.py $MODEL $LSDIR $FWATPARAM/FWAT.PAR.yaml $FWATPARAM/lbfgs.yaml  $NPROC"
+python $OPT_LIB/get_lbfgs_next.py $MODEL $LSDIR $FWATPARAM/FWAT.PAR.yaml $FWATPARAM/lbfgs.yaml  $NPROC  >> $logfile
 
 # generate new model database
 $change_par LOCAL_PATH $LSDIR DATA/Par_file
@@ -115,7 +119,8 @@ mpirun -np $NPROC $fksem/bin/xgenerate_databases
 
 # delete 
 \rm adepml_*
-echo " " >> $filename
-echo "******************************************************" >> $filename
-echo " Finished FWAT POST here!!!" >> $filename 
-echo " " >> $filename
+
+echo " " >> $logfile
+echo "******************************************************" >> $logfile
+echo " Finished FWAT POST here!!!" >> $logfile 
+echo " " >> $logfile

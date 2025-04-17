@@ -3,7 +3,7 @@
 #SBATCH --ntasks=160
 #SBATCH --array=21-28%5
 #SBATCH --time=00:35:59
-#SBATCH --job-name FWD_ADJ
+#SBATCH --job-name=FWD_ADJ
 #SBATCH --output=FWD_ADJ-%j_set%a.txt
 #SBATCH --partition=compute
 #SBATCH --mail-type=FAIL
@@ -17,18 +17,22 @@ set -e
 source module_env
 . parameters.sh
 
-#==== Comment out the following if running SEM mesh with new models====#
-MODEL=M00
+#change by outer scripts#
 simu_type=tele
 NJOBS=4
 START_SET=1
-NPROC=$SLURM_NTASKS
+
+#########################################
+# set params
 
 # parfile changer script
 change_par=$FWATLIB/change_par_file.sh
-
+NPROC=$SLURM_NTASKS
 SOURCE_FILE=src_rec/sources.dat.$simu_type
-iter=`echo $MODEL |cut -d"M" -f2 |awk '{printf "%d", $1}'`
+
+iter=`python $FWATLIB/get_param.py iter $FWATPARAM/lbfgs.yaml`
+FLAG=`python $FWATLIB/get_param.py flag $FWATPARAM/lbfgs.yaml`
+MODEL=M`echo "$iter" |awk '{printf "%02d",$1}'`
 nevts=`cat $SOURCE_FILE |wc -l`
 work_dir=`pwd`
 mod=$MODEL
@@ -37,7 +41,6 @@ mod=$MODEL
 fwd=output_fwat1_log.$MODEL.$simu_type.job$SLURM_ARRAY_TASK_ID.txt
 
 # check for LS or INIT
-FLAG=`python $FWATLIB/get_param.py flag $FWATPARAM/lbfgs.yaml`
 run_opt=3
 if [  "$FLAG" == "LS" ]; then 
   run_opt=2
