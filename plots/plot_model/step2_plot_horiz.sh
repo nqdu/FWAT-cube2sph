@@ -1,17 +1,18 @@
 #!/bin/bash
 set -e
-module load gmt-6.0.0 
-
-depth=("dafa" 10 25 50 80 120) #in km
+#module load gcc gmt/6.5.0
+depth=("dafaf" 7.5 22.5) #in km
 
 #for material in hess_kernel;
+
 for material in vs vp rho; 
+#for material in dbeta; 
 do
-  for iter in `seq 35 35`; # model index
+  for iter in `seq 5 5`; # model index
   do
     ii=`printf %02d $iter`
     echo $ii
-    for i in `seq 1 5`; # profile index
+    for i in `seq 1 2`; # profile index
     do
       # get model difference
       prof=B$i
@@ -49,7 +50,9 @@ do
         gmt basemap $bounds $proj -Bxaf -Byaf -BWSen+t"Depth = ${depth[$i]}km"
         
         gmt grdimage $filename -Cout.cpt -E200
-        gmt coast -A200 -W1p,black
+        gmt coast -A20 -W1p,black
+
+        gmt plot station.lst $bounds $proj -St0.5c -Gred
 
         #awk '{print $1,$2/1000}' input/slab.bnd |gmt plot $bounds $proj -W1p,black
         #awk '{print $5,$3}' slab2.txt |gmt plot -W1.0p,black

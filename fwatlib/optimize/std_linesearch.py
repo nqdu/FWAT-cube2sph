@@ -105,14 +105,7 @@ def main():
     # determine current step_fac
     with open("fwat_params/FWAT.PAR.yaml","r") as f:
         params = yaml.safe_load(f)['optimize']
-    step_fac_in_per = params['MAX_PER']
     step_fac = opt['alpha']
-    if opt['iter'] == opt['iter_start']:
-        step_fac = -1
-    d0 = np.max(abs(direc))
-    direc_max = comm.allreduce(d0,MPI.MAX)
-    if step_fac <= 0 or step_fac * direc_max > step_fac_in_per:
-        step_fac = step_fac_in_per / direc_max
 
     # check wolfe conditions
     cond1:bool = fcost1 <= (fcost + m1 * step_fac * q)
@@ -124,6 +117,7 @@ def main():
     if cond1 and cond2: # wolfe condition is satisfied 
         opt['flag'] = 'GRAD'
         opt['iter'] += 1
+        opt['iter_ls'] = 0
 
     elif not cond1:
         opt['alpha_R'] = opt['alpha']

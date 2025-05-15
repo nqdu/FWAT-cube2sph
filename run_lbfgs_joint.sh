@@ -16,6 +16,8 @@ set_fwat1()
   \cp DATA/Par_file.$simu_type DATA/Par_file
   local fwd=tmp.fwat1.$simu_type.sh
   sed -i "/#SBATCH --array=/c\#SBATCH --array=1-$narray%5" $fwd
+  sed -i "/MODEL=/c\MODEL=${mod}" $fwd
+  sed -i "/NJOBS=/c\NJOBS=$njobs" $fwd
   sed -i "/START_SET=/c\START_SET=$start_set" $fwd
   sed -i "/simu_type=/c\simu_type=$simu_type" $fwd
 
@@ -27,46 +29,6 @@ set_fwat1()
 
   # run forward/adjoint simulation
   echo "forward/adjoint $simu_type simulation for new model  ..."
-}
-
-set_fwat2() 
-{
-	:> ./src_rec/sources.dat.joint
-	cat ./src_rec/sources.dat.$simu_type1 > ./src_rec/sources.dat.joint
-	cat ./src_rec/sources.dat.$simu_type2 >> ./src_rec/sources.dat.joint
-	local fwd=tmp.fwat2.sh
-  \cp sbash_postproc_kl.sh  $fwd 
-  sed -i "/SOURCE_FILE=/c\SOURCE_FILE=./src_rec/sources.dat.joint" $fwd
-
-  # save misfit for iter 0
-  if [[ "$iter" == "$FIRST_ITER" ]];then
-    local sete=`cat src_rec/sources.dat.$simu_type1 |wc -l`
-    local sete1=`echo "$setb + $sete - 1" |bc`
-    local sete=`cat src_rec/sources.dat.$simu_type2 |wc -l`
-    local sete2=`echo "$setb + $sete - 1" |bc`
-    cat > tmp.dat << EOF
-:> misfit0.log
-:> optimize/weight_kl.txt
-mis1=\$(python \$MEASURE_LIB/cal_misfit.py $mod $simu_type1 |cut -d' ' -f1)
-mis2=\$(python \$MEASURE_LIB/cal_misfit.py $mod $simu_type2 |cut -d' ' -f1)
-for iset in \$(seq 1 $sete1); do echo "1.0"|bc -l >> optimize/weight_kl.txt; done
-for iset in \$(seq 1 $sete2); do echo "\$mis1 / \$mis2"|bc -l >> optimize/weight_kl.txt; done 
-EOF
-    # substitute a line in $fwd
-    local nline=`grep -n ^PRECOND $fwd |cut -d: -f1`
-    let nline=nline-1
-    sed -n "1,${nline}p" $fwd > tmp.fwat2.cal.sh 
-    echo " " >> tmp.fwat2.cal.sh
-    cat tmp.dat  >> tmp.fwat2.cal.sh
-    echo " " >> tmp.fwat2.cal.sh
-    \rm tmp.dat
-    let nline=nline+1
-    sed -n "${nline},\$p" $fwd >> tmp.fwat2.cal.sh 
-    \mv tmp.fwat2.cal.sh $fwd 
-    #\rm tmp.fwat2.cal.sh
-  fi
-
-  echo "post processing for new model  ..."
 }
 
 #!/bin/bash
@@ -85,6 +47,7 @@ set_fwat3()
   sed -i "/#SBATCH --array=/c\#SBATCH --array=1-$narray%5" $fwd
   sed -i "/#SBATCH --job-name=/c\#SBATCH --job-name=LS" $fwd
   sed -i "/#SBATCH --output=/c\#SBATCH --output=LS-%j_set%a.txt" $fwd
+  sed -i "/MODEL=/c\MODEL=${mod}" $fwd
   sed -i "/NJOBS=/c\NJOBS=$njobs" $fwd
   sed -i "/START_SET=/c\START_SET=$start_set" $fwd
   sed -i "/simu_type=/c\simu_type=$simu_type" $fwd
@@ -100,35 +63,36 @@ set_fwat3()
   echo "forward/adjoint $simu_type simulation for new model  ..."
 }
 
-set_fwat4 () {
-   echo "generating opt model ..."
-  \cp sbash_wolfe.sh tmp.fwat4.sh
-  local fwd=tmp.fwat4.sh
-  local modfirst=M`printf %02d $FIRST_ITER`
-  cat > tmp.dat << EOF
-mis1_0=\$(python \$MEASURE_LIB/cal_misfit.py $modfirst $simu_type1 00 |cut -d' ' -f1)
-mis2_0=\$(python \$MEASURE_LIB/cal_misfit.py $modfirst $simu_type2 00 |cut -d' ' -f1)
-mis1=\$(python \$MEASURE_LIB/cal_misfit.py $mod $simu_type1 00 |cut -d' ' -f1)
-mis2=\$(python \$MEASURE_LIB/cal_misfit.py $mod $simu_type2 00 |cut -d' ' -f1)
-chi=\$(echo "\$mis1/\$mis1_0 + \$mis2 / \$mis2_0" |bc -l)
-mis1=\$(python \$MEASURE_LIB/cal_misfit.py $mod $simu_type1 01 |cut -d' ' -f1)
-mis2=\$(python \$MEASURE_LIB/cal_misfit.py $mod $simu_type2 01 |cut -d' ' -f1)
-chi1=\$(echo "\$mis1/\$mis1_0 + \$mis2 / \$mis2_0" |bc -l)
-chi=\$(printf %f \$chi)
-chi1=\$(printf %f \$chi1)
-EOF
+set_fwat2() 
+{
+  local simu_type1=$1
+  local simu_type2=$2
+	:> ./src_rec/sources.dat.joint
+	cat ./src_rec/sources.dat.$simu_type1 > ./src_rec/sources.dat.joint
+	cat ./src_rec/sources.dat.$simu_type2 >> ./src_rec/sources.dat.joint
+	\cp sbash_postproc_kl.sh   tmp.fwat2.sh 
 
-  # substitute a line in $fwd
-  local nline=`grep -n ^info= $fwd |cut -d: -f1|head -1`
-  local nline1=`grep -n ^chi1= $fwd |cut -d: -f1|head -1`
-  let nline=nline-1
-  sed -n "1,${nline}p" $fwd > tmp.fwat4.cal.sh 
-  cat tmp.dat  >> tmp.fwat4.cal.sh
-  \rm tmp.dat
-  let nline1=nline1+1
-  sed -n "${nline1},\$p" $fwd >> tmp.fwat4.cal.sh 
-  \mv tmp.fwat4.cal.sh $fwd 
-  sed -i "/SIMU_TYPE=/c\SIMU_TYPE=joint" $fwd
+  # save misfit for iter 0
+  if [[ "$iter" == "$FIRST_ITER" ]];then
+    cat > tmp.dat << EOF
+:> misfit0.log
+:> optimize/weight_kl.txt
+mis1=\$(python \$MEASURE_LIB/cal_misfit.py $mod $simu_type1 |cut -d' ' -f1)
+mis2=\$(python \$MEASURE_LIB/cal_misfit.py $mod $simu_type2 |cut -d' ' -f1)
+for iset in \$(seq 1 $sete1); do echo "1.0"|bc -l >> optimize/weight_kl.txt; done
+for iset in \$(seq 1 $sete2); do echo "\$mis1 / \$mis2"|bc -l >> optimize/weight_kl.txt; done 
+EOF
+    # substitute a line in $fwd
+    nline=`grep -n ^PRECOND $fwd |cut -d: -f1`
+    let nline=nline-1
+    sed -n "1,${nline}p" $fwd > tmp.fwat2.cal.sh 
+    cat tmp.dat  >> tmp.fwat2.cal.sh
+    \rm tmp.dat
+    let nline=nline+1
+    sed -n "${nline},\$p" $fwd >> tmp.fwat2.cal.sh 
+    \mv tmp.fwat2.cal.sh $fwd 
+    #\rm tmp.fwat2.cal.sh
+  fi
 }
 
 set -e 
@@ -140,12 +104,6 @@ simu_type1=tele
 simu_type2=noise
 NJOBS1=1
 NJOBS2=2
-
-# initialize set number
-setb=1
-FIRST_ITER=0
-
-########### STOP HERE ###################
 
 # mkdir 
 mkdir -p misfits optimize solver
@@ -159,11 +117,14 @@ job_line=0
 job_wait=0
 
 # set number
-for ii in `seq 1 1`;do 
+# initialize set number
+setb=1
+for ii in `seq 1 2`;do 
 
   # current model
   iter=`python $FWATLIB/get_param.py iter $FWATPARAM/lbfgs.yaml`
   flag=`python $FWATLIB/get_param.py flag $FWATPARAM/lbfgs.yaml`
+  echo $iter 
   mod=M`printf %02d $iter`
   echo "iteration $iter $mod $flag"
 
@@ -182,26 +143,25 @@ for ii in `seq 1 1`;do
     job_adj2=$(sbatch tmp.fwat1.$simu_type2.sh|cut -d ' ' -f4 )
     
     # sum kernels, get search direction, generate trial model 
-    set_fwat2
+    set_fwat2 $simu_type1 $simu_type22
     fwd=tmp.fwat2.sh
-    job_post=$(sbatch --dependency=afterok:${job_adj1},${job_adj2} $fwd | cut -d ' ' -f4)
+    sed -i "/SOURCE_FILE=/c\SOURCE_FILE=./src_rec/sources.dat.joint" $fwd
+    job_post=$(sbatch --dependency=afterok:${job_adj} $fwd | cut -d ' ' -f4)
     
   elif [ $flag == "GRAD"  ];then 
     # get search direction, generate trial model 
-    set_fwat2
-    fwd=tmp.fwat2.sh
+    fwd=sbash_postproc_kl.sh
     job_post=$(sbatch $fwd | cut -d ' ' -f4)
 
   else  # line search
-    set_fwat3 $simu_type1 $NJOBS1 $setb
-    set_fwat3 $simu_type2 $NJOBS2 $setb 
-    job_adj1=$(sbatch tmp.fwat3.$simu_type1.sh|cut -d ' ' -f4 )
-    job_adj2=$(sbatch tmp.fwat3.$simu_type2.sh|cut -d ' ' -f4 )
+    set_fwat3 $simu_type $NJOBS $setb 
+    job_line=$(sbatch tmp.fwat3.$simu_type.sh|cut -d ' ' -f4 )
 
     # check wolfe condition
-    set_fwat4
-    fwd=tmp.fwat4.sh
-    job_post=$(sbatch --dependency=afterok:${job_adj1},${job_adj2} $fwd | cut -d ' ' -f4)
+    fwd=sbash_wolfe.sh
+    sed -i "/SIMU_TYPE=/c\SIMU_TYPE=$simu_type" $fwd
+    sed -i "/SOURCE_FILE=/c\SOURCE_FILE=./src_rec/sources.dat.$simu_type" $fwd
+    job_post=$(sbatch --dependency=afterok:${job_line} $fwd | cut -d ' ' -f4)
   fi
 
   # wait to finish

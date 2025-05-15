@@ -16,7 +16,10 @@ def compute_misfits(evts:list,files:list):
             # select matched events
             idx = d[:,0] == evts[ievt]
             sumn += d[idx,0].shape[0]
-            sumf += np.sum(np.float64(d[idx,1]))
+            sum0 = np.sum(np.float64(d[idx,1]))
+            if np.isnan(sum0):
+                print(f"error in {evts[ievt]} {files[i]}")
+            sumf += sum0
     
     return sumf,sumn
 

@@ -16,12 +16,13 @@ set_fwat1()
   \cp DATA/Par_file.$simu_type DATA/Par_file
   local fwd=tmp.fwat1.$simu_type.sh
   sed -i "/#SBATCH --array=/c\#SBATCH --array=1-$narray%5" $fwd
+  sed -i "/MODEL=/c\MODEL=${mod}" $fwd
   sed -i "/NJOBS=/c\NJOBS=$njobs" $fwd
   sed -i "/START_SET=/c\START_SET=$start_set" $fwd
   sed -i "/simu_type=/c\simu_type=$simu_type" $fwd
 
   if [[ $simu_type == "noise" ]]; then
-    sed -i "/#SBATCH --time=/c\#SBATCH --time=01:00:00" $fwd
+    sed -i "/#SBATCH --time=/c\#SBATCH --time=00:25:00" $fwd
   else
     sed -i "/#SBATCH --time=/c\#SBATCH --time=00:25:00" $fwd
   fi
@@ -46,13 +47,14 @@ set_fwat3()
   sed -i "/#SBATCH --array=/c\#SBATCH --array=1-$narray%5" $fwd
   sed -i "/#SBATCH --job-name=/c\#SBATCH --job-name=LS" $fwd
   sed -i "/#SBATCH --output=/c\#SBATCH --output=LS-%j_set%a.txt" $fwd
+  sed -i "/MODEL=/c\MODEL=${mod}" $fwd
   sed -i "/NJOBS=/c\NJOBS=$njobs" $fwd
   sed -i "/START_SET=/c\START_SET=$start_set" $fwd
   sed -i "/simu_type=/c\simu_type=$simu_type" $fwd
 
 
   if [[ $simu_type == "noise" ]]; then
-    sed -i "/#SBATCH --time=/c\#SBATCH --time=01:00:00" $fwd
+    sed -i "/#SBATCH --time=/c\#SBATCH --time=00:25:00" $fwd
   else
     sed -i "/#SBATCH --time=/c\#SBATCH --time=00:25:00" $fwd
   fi
@@ -65,8 +67,8 @@ set -e
 . parameters.sh
 
 # simu_type
-simu_type=tele
-NJOBS=1
+simu_type=noise
+NJOBS=8
 
 # mkdir 
 mkdir -p misfits optimize solver
@@ -81,18 +83,20 @@ job_wait=0
 # set number
 # initialize set number
 setb=1
-for ii in `seq 1 3`;do 
+date 
+
+for ii in `seq 1 4`;do 
 
   # current model
   iter=`python $FWATLIB/get_param.py iter $FWATPARAM/lbfgs.yaml`
   flag=`python $FWATLIB/get_param.py flag $FWATPARAM/lbfgs.yaml`
-  echo $iter 
   mod=M`printf %02d $iter`
   echo "iteration $iter $mod $flag"
 
 
   # copy first model to MODEL_M00
-  if [[ "$iter" -eq 0 && ! -d "optimize/MODEL_M00" ]]; then
+  #if [[ "$iter" -eq 0 && ! -d "optimize/MODEL_M00" ]]; then
+  if [[ "$iter" -eq 0 ]]; then
     # set model name
     mkdir -p optimize/MODEL_M00
     \cp ./DATABASES_MPI/* optimize/MODEL_M00
@@ -101,29 +105,39 @@ for ii in `seq 1 3`;do
   # check flag type and run 
   if [ $flag == "INIT" ]; then 
     set_fwat1 $simu_type $NJOBS $setb
-    job_adj=$(sbatch tmp.fwat1.$simu_type.sh|cut -d ' ' -f4 )
+    bash tmp.fwat1.$simu_type.sh > FWD_ADJ.$iter.txt
+    #job_adj=$(sbatch tmp.fwat1.$simu_type.sh|cut -d ' ' -f4 )
     
     # sum kernels, get search direction, generate trial model 
     fwd=sbash_postproc_kl.sh
     sed -i "/SOURCE_FILE=/c\SOURCE_FILE=./src_rec/sources.dat.$simu_type" $fwd
-    job_post=$(sbatch --dependency=afterok:${job_adj} $fwd | cut -d ' ' -f4)
+    bash $fwd > POST.$iter.txt 
+    #job_post=$(sbatch --dependency=afterok:${job_adj} $fwd | cut -d ' ' -f4)
     
   elif [ $flag == "GRAD"  ];then 
     # get search direction, generate trial model 
     fwd=sbash_postproc_kl.sh
     sed -i "/SOURCE_FILE=/c\SOURCE_FILE=./src_rec/sources.dat.$simu_type" $fwd
-    job_post=$(sbatch $fwd | cut -d ' ' -f4)
+    echo "Post processing ..."
+    bash $fwd > POST.$iter.txt 
+    #job_post=$(sbatch $fwd | cut -d ' ' -f4)
 
   else  # line search
     set_fwat3 $simu_type $NJOBS $setb 
-    job_line=$(sbatch tmp.fwat3.$simu_type.sh|cut -d ' ' -f4 )
+    bash tmp.fwat3.$simu_type.sh > LS.$iter.txt
+    #job_line=$(sbatch tmp.fwat3.$simu_type.sh|cut -d ' ' -f4 )
 
     # check wolfe condition
     fwd=sbash_wolfe.sh
     sed -i "/SIMU_TYPE=/c\SIMU_TYPE=$simu_type" $fwd
-    job_post=$(sbatch --dependency=afterok:${job_line} $fwd | cut -d ' ' -f4)
+    sed -i "/SOURCE_FILE=/c\SOURCE_FILE=./src_rec/sources.dat.$simu_type" $fwd
+    echo "checking wolfe condition ..."
+    bash $fwd > WOLFE.$iter.txt 
+    #job_post=$(sbatch --dependency=afterok:${job_line} $fwd | cut -d ' ' -f4)
   fi
 
   # wait to finish
-  srun --dependency=afterok:${job_post} --time=00:00:10 --nodes=1 --time=00:00:10 --ntasks=1 --job-name=wait --partition=compute ./wait.sh
+  #srun --dependency=afterok:${job_post} --nodes=1 --time=00:00:10 --ntasks=1 --job-name=wait  ./wait.sh
 done
+
+date 

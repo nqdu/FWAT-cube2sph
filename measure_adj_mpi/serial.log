@@ -1,0 +1,61 @@
+ INPUTS FROM MEASUREMENT.PAR :
+   tt, dtt, nn :  -0.584999979       1.09999999E-02       18200
+   imeas :            7
+   chan : BH        
+   TLONG, TSHORT :    30.0000000       6.00000000    
+   fstart, fend :    3.33333351E-02  0.166666672    
+   RUN_BANDPASS :  F
+   DISPLAY_DETAILS :  F
+   OUTPUT_MEASUREMENT_FILES :  F
+   COMPUTE_ADJOINT_SOURCE :  T
+   TSHIFT_MIN, TSHIFT_MAX :   -4.50000000       4.50000000    
+   DLNA_MIN, DLNA_MAX :   -1.50000000       1.50000000    
+   CC_MIN :   0.800000012    
+   ERROR_TYPE :            1
+   DT_SIGMA_MIN :    1.00000000    
+   DLNA_SIGMA_MIN :   0.500000000    
+   ITAPER :            1
+   WTR, NPI :    1.99999996E-02   2.5000000000000000     
+   DT_FAC :    2.00000000    
+   ERR_FAC :    2.50000000    
+   DT_MAX_SCALE :    3.50000000    
+   NCYCLE_IN_WINDOW :    1.5000000000000000     
+   is_mtm :           1
+  
+ reading in the data and synthetics...
+ SYN/MPM.CI.BHR.semd.sac.m16.T006_T030
+
+ OUTPUT_FILES/MPM.CI.BHR --- 
+
+  Measurement window No.           1  ... 
+      Tlong/Tshort (input) :   30.0000000       6.00000000    
+      Tlong/Tshort (adjusted)  :   30.3407421       6.55360031    
+      period of max data/syn power    :   17.2463169       17.8086967    
+      using this MTM. 
+    Generating adjoint source and chi value for imeas =            7
+      tr_chi =    3.01975571E-02   am_chi =    1.72587093E-02
+ writing adjoint source to file for the full seismogram
+ SYN/MPM.CI.BHT.semd.sac.m16.T006_T030
+
+ OUTPUT_FILES/MPM.CI.BHT --- 
+
+  Measurement window No.           1  ... 
+      Tlong/Tshort (input) :   30.0000000       6.00000000    
+      Tlong/Tshort (adjusted)  :   30.3407421       6.00146532    
+      period of max data/syn power    :   13.4295082       9.75238132    
+      using this MTM. 
+    Generating adjoint source and chi value for imeas =            7
+      tr_chi =    7.14217499E-02   am_chi =    9.23872832E-03
+ writing adjoint source to file for the full seismogram
+ SYN/MPM.CI.BHZ.semd.sac.m16.T006_T030
+
+ OUTPUT_FILES/MPM.CI.BHZ --- 
+
+  Measurement window No.           1  ... 
+      Tlong/Tshort (input) :   30.0000000       6.00000000    
+      Tlong/Tshort (adjusted)  :   25.6000004       6.00146532    
+      period of max data/syn power    :   9.30909061       7.09264088    
+    reverting from MT measurement to CC measurement...
+    Generating adjoint source and chi value for imeas =            5
+      tr_chi =   0.180000007       am_chi =    9.04105306E-02
+ writing adjoint source to file for the full seismogram

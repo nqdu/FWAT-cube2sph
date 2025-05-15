@@ -49,18 +49,12 @@ do
   newf=`echo $f |awk -F'.' '{new_var=$2"."$1; print new_var}'`
   for c in Z N E;
   do
-    for ((i=0;i<$NUM_FILTER;i++));
-    do
-      band=`printf "T%03g_T%03g" ${SHORT_P[$i]} ${LONG_P[$i]}`
-      if [ $i -eq 0 ]; then 
-        awk '{print $1,0.}' ${band0}/OUTPUT_FILES/$newf.BX$c.adj  > temp0
-      fi 
-      paste temp0 ${band}/OUTPUT_FILES/$newf.BX$c.adj |awk '{print $1,$2+$4}' > temp1 
-      cat temp1 > temp0 
-      rm temp1
-    done
+    paste T*_T*/OUTPUT_FILES/$newf.BX$c.adj | awk '{
+  sum = 0;
+  for (i=2; i<=NF; i+=2) sum += $i;
+  print $1, sum
+}' > ../SEM/$newf.BX$c.adj.ascii
 
-    mv temp0 ../SEM/$newf.BX$c.adj.ascii
   done 
 done
 

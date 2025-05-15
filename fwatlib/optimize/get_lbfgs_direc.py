@@ -195,7 +195,7 @@ def get_lbfgs_direc(iter:int,paramfile:str):
     grad_norm = np.sqrt(grad_norm); direc_norm = np.sqrt(direc_norm)
     a = grad_sum / (direc_norm * grad_norm)
     theta = np.arccos(a) * 180 / np.pi 
-
+    if myrank == 0: print(f"theta between search direction/-grad is {theta}")
     if theta <= 92.:
         if myrank == 0: print("The search direction is accepted!")
     else:

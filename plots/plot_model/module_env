@@ -1,0 +1,4 @@
+specfem_dir="${HOME}/src/specfem3d-cube2sph/"
+cub2sph_dir=$specfem_dir/utils/cube2sph/
+module load mpi
+NPROC=4

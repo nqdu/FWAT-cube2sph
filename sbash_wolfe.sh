@@ -1,21 +1,19 @@
 #!/bin/bash
-#SBATCH --nodes=4
-#SBATCH --ntasks=160
+#SBATCH --nodes=1
+#SBATCH --ntasks=8
 #SBATCH --time=00:15:59
 #SBATCH --job-name WOLFE
 #SBATCH --output=WOLFE_%j.txt
-#SBATCH --partition=compute
+#SBATCH --account=def-liuqy
+#SBATCH --mem=12G
 
 set -e 
-
-# change by outer scripts  #####
-SIMU_TYPE=tele
-##### STOP ##################
 
 # load parameters
 . parameters.sh 
 source module_env
-NPROC=$SLURM_NTASKS
+SIMU_TYPE=noise
+NPROC=`grep ^"NPROC" DATA/Par_file.$SIMU_TYPE | cut -d'=' -f2`
 
 # get search direction
 iter=`python $FWATLIB/get_param.py iter $FWATPARAM/lbfgs.yaml`
@@ -75,12 +73,13 @@ if [ "$flag" == "GRAD" ]; then
 
   # misfit file
   for f in `ls misfits/ |grep ls |grep ${MODEL}`; 
-  do
-      a=(`echo $f | awk -F'.ls_' '{print $1,$2,$4}'`)
-      evtid=`echo $f |cut -d'.' -f2`
+  do     
+      a=(`echo $f | awk -F'.ls_' '{print $1,$2}'`)
+      evtid=`echo ${a[0]} |awk -F'.' '{for (i=2; i<=NF; i++)  printf "%s%s", $i, (i<NF?FS:ORS)}'`
       newf=M$inext.${evtid}_${a[1]}
       echo $f "=>" $newf
       mv misfits/$f misfits/$newf
+
   done
 
   # save LOGS

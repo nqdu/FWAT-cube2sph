@@ -1,10 +1,11 @@
 #!/bin/bash
-#SBATCH --nodes=4
-#SBATCH --ntasks=160
+#SBATCH --nodes=1
+#SBATCH --ntasks=8
 #SBATCH --time=00:20:59
 #SBATCH --job-name=POST
 #SBATCH --output=POST_%j.txt
-#SBATCH --partition=compute 
+#SBATCH --account=def-liuqy
+#SBATCH --mem=12G
 
 set -e 
 # include file
@@ -13,7 +14,7 @@ set -e
 source module_env
 
 # input vars
-SOURCE_FILE=./src_rec/sources.dat.tele
+SOURCE_FILE=./src_rec/sources.dat.noise
 NPROC=`grep ^"NPROC" DATA/Par_file | cut -d'=' -f2`
 
 # parfile changer script

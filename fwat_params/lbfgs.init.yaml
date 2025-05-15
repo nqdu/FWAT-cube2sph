@@ -25,7 +25,8 @@ FACTOR: 10 # Bracketting parameter (Gilbert value
 MAXLS: 100
 alpha_L: 0
 alpha_R: 0
-alpha: 1.
+alpha: -1.
+alpha_init: -1.
 
 # debug 
 PRINT:  True 

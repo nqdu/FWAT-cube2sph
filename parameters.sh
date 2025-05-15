@@ -1,5 +1,5 @@
 # binary/python file location
-fksem='/home/l/liuqy/nqdu//specfem3d-cube2sph/'    # solver location
+fksem='/home//nqdu/src/specfem3d-cube2sph/'    # solver location
 FWATLIB=`pwd`/fwatlib    # fwatlib location
 FWATPARAM=`pwd`/fwat_params
 

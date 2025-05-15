@@ -2,8 +2,8 @@
 set -e
 module load gmt-6.0.0 
 
-#for material in dbeta;
-for material in vp vs rho; 
+for material in dbeta;
+#for material in vp vs rho; 
 do
   for iter in `seq 0 0`; # model index
   do

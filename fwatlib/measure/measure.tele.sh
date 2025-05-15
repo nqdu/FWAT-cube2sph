@@ -19,6 +19,8 @@ if  [ $run_opt -eq 2 ]; then
   lsflag=".ls"
 fi 
 
+ncpu=`cat /proc/cpuinfo |grep cores |wc -l |awk '{print $1/2}'`
+
 # set directory
 current_dir=`pwd`
 mod=M`printf "%02d" $iter`
@@ -59,7 +61,6 @@ cd $current_dir
 
 # synthetic observations/STF
 telemod_dir=$MEASURE_LIB/tele/
-ncpu=8
 echo " "
 if [ $run_opt -ne 1 ]; then
   echo "estimating STF and synthetic data ..."
@@ -83,13 +84,15 @@ outfile=$current_dir/output_fwat1_log.$mod.$evtid"$lsflag".txt
 if [ $run_opt == 2 ]; then
   outfile=$current_dir/output_fwat3_log.$mod.$evtid"$lsflag".txt 
 fi 
+
+
 for ((i=0;i<$NUM_FILTER;i++));
 do
   band=`printf "T%03g_T%03g" ${SHORT_P[$i]} ${LONG_P[$i]}`
   cd $band 
   mkdir -p OUTPUT_FILES
   \cp ../../DATA/MEASUREMENT.PAR  .
-  $MEASURE_LIB/bin/measure_adj
+  mpirun -np $ncpu $MEASURE_LIB/bin/measure_adj_mpi
   coef=1.
   avgmap=`head -1 average_amp.dat`
   dt=`tail -1 average_amp.dat`

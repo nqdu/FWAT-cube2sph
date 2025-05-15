@@ -1,12 +1,13 @@
 #!/bin/bash
-#SBATCH --nodes=4
-#SBATCH --ntasks=160
-#SBATCH --array=1,2,7,20,22,25,26,27,30,41%5
-#SBATCH --time=01:05:59
+#SBATCH --nodes=1
+#SBATCH --ntasks=8
+#SBATCH --array=1-4%5
+#SBATCH --time=00:35:59
 #SBATCH --job-name FWD
 #SBATCH --output=FWD-%j_set%a.txt
-#SBATCH --account=rrg-liuqy
+#SBATCH --account=def-liuqy
 #SBATCH --mem=12G
+#SBATCH --gpus-per-node=1
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=nanqiao.du@mail.utoronto.ca
 
@@ -26,9 +27,10 @@ set -e
 #==== Comment out the following if running SEM mesh with new models====#
 MODEL=M00
 simu_type=noise
-NJOBS=4
+NJOBS=8
 START_SET=1
-NPROC=$SLURM_NTASKS
+NPROC=`grep ^"NPROC" DATA/Par_file | cut -d'=' -f2`
+LOCAL_PC=1
 
 # parfile changer script
 change_par=$FWATLIB/change_par_file.sh
@@ -39,14 +41,20 @@ nevts=`cat $SOURCE_FILE |wc -l`
 work_dir=`pwd`
 mod=$MODEL
 
+# assign job id
+TASK_ID=1
+if [ "$LOCAL_PC" == "0" ]; then
+  TASK_ID=$SLURM_ARRAY_TASK_ID
+fi
+
 #logfile
-fwd=output_fwat0_log.$MODEL.$simu_type.job$SLURM_ARRAY_TASK_ID.txt
+fwd=output_fwat0_log.$MODEL.$simu_type.job$TASK_ID.txt
 :> $fwd
 
 for i in `seq 1 $NJOBS`; do
   cd $work_dir
-  ievt=`echo "($SLURM_ARRAY_TASK_ID-1) * $NJOBS + $i" |bc`
-  ievt_ed=`echo "($SLURM_ARRAY_TASK_ID-1) * $NJOBS + $NJOBS" |bc`
+  ievt=`echo "($TASK_ID-1) * $NJOBS + $i" |bc`
+  ievt_ed=`echo "($TASK_ID-1) * $NJOBS + $NJOBS" |bc`
   id=`echo "$START_SET + $ievt -1" |bc`
 
   # check if job is not included
