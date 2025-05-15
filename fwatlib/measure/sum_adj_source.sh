@@ -18,7 +18,7 @@ run_opt=3
 lsflag="" 
 if [[ $# -eq 4 ]]; then
   run_opt=$4
-  if [ $run_opt -eq 2 ]; then
+  if [ $run_opt -eq 2 ]; then 
     lsflag=".ls"
   fi
 fi
