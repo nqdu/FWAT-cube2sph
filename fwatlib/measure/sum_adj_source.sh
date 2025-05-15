@@ -15,7 +15,7 @@ iter=$1
 evtid=$2
 simu_type=$3
 run_opt=3
-lsflag=""
+lsflag="" 
 if [[ $# -eq 4 ]]; then
   run_opt=$4
   if [ $run_opt -eq 2 ]; then

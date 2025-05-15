@@ -16,7 +16,7 @@ set -e
 
 #
 ###################################################
-source module_env
+source module_env 
 . parameters.sh
 
 #==== Comment out the following if running SEM mesh with new models====#

@@ -11,7 +11,7 @@ set -e
 # include file
 . parameters.sh
 # load modules 
-source module_env
+source module_env 
 
 # input vars
 SOURCE_FILE=./src_rec/sources.dat.noise

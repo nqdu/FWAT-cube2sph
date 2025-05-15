@@ -9,7 +9,7 @@
 
 set -e 
 
-# load parameters
+# load parameters 
 . parameters.sh 
 source module_env
 SIMU_TYPE=noise
