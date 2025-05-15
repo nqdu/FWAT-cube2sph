@@ -50,17 +50,20 @@ def compute_zpred_hess(iter_cur):
     return hess
 
 def main():
-    if len(sys.argv) !=4 :
-        print("need 4 parameters: iter evtfile PRECOND_TYPE [zmin zmax]")
-        print("example: python sum_kernels.py 0 src_rec/sources.dat [default,none,z_precond,z2_precond] ")
+    import yaml 
+    if len(sys.argv) !=5 :
+        print("need 1 parameters: evtfile iter_cur PRECOND MODEL ")
+        print("example: python sum_kernels.py src_rec/sources.dat 0 z_precond M00.ls")
         exit(1)
     
     # get input 
-    iter_cur = int(sys.argv[1])
-    evtfile = sys.argv[2]
+    evtfile = sys.argv[1]
+    iter_cur = int(sys.argv[2])
     PRECOND = sys.argv[3]
+    MODEL = sys.argv[4] 
+
     assert(PRECOND in ['default','none','z_precond','z2_precond'])
-    KERNEL_DIR = './optimize/SUM_KERNELS_M%02d'%(iter_cur)
+    KERNEL_DIR = f'./optimize/SUM_KERNELS_{MODEL}'
     os.makedirs(KERNEL_DIR,exist_ok=True)
     
     # mpi rank/size
@@ -68,7 +71,7 @@ def main():
     myrank = comm.Get_rank()
 
     # only do preconditioning for first iteration
-    if iter_cur!= 0 and PRECOND == 'default':
+    if iter_cur!= 0 and PRECOND == 'default' and 'ls' in MODEL:
         if myrank == 0:
             print(f"iteration = {iter_cur} > 0, skip preconditiononing")
         PRECOND = 'none' 
@@ -97,7 +100,7 @@ def main():
         for ievt in range(nevts):
             # read kernel from h5
             setname = '/' + srctxt[ievt,0]
-            filename = './solver/M%02d'%(iter_cur) + setname + '/GRADIENT/' + grad_list[i] + '.h5'
+            filename = f'./solver/{MODEL}' + setname + '/GRADIENT/' + grad_list[i] + '.h5'
             fio = h5py.File(filename,"r")
             arr = fio[str(myrank)][:]
             fio.close()
@@ -141,7 +144,7 @@ def main():
         kl = np.float32(0.)
         for ievt in range(nevts):
             setname = '/' + srctxt[ievt,0]
-            filename = './solver/M%02d'%(iter_cur) + setname + '/GRADIENT/' + 'hess_kernel.h5'
+            filename = f'./solver/{MODEL}' + setname + '/GRADIENT/' + 'hess_kernel.h5'
 
             fio = h5py.File(filename,'r')
             arr = fio[str(myrank)][:]
@@ -178,4 +181,6 @@ def main():
         f.write_record(kl)
         f.close()
 
-main()
+
+if __name__ == "__main__":
+    main()

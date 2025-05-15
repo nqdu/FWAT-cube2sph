@@ -12,19 +12,17 @@
 #
 ###################################################
 #module load NiaEnv/2019b
-specfem_dir="${HOME}/specfem3d-cube2sph/"
-cub2sph_dir=$specfem_dir/utils/cube2sph/
+source module_env
 mkdir -p grdfolder pics profiles
 
 # run index
-run_indx=`seq 0 0`
+run_indx=`seq 6 6`
 #param_set="dbulk dbeta drho"
 #param_set="hess_kernel"
 param_set="vp vs rho"
 
 set -e 
 # interpolate
-module load intel 
 #for param in vp vs rho;do 
 for param in $param_set ;do 
 for name in A ;  do
@@ -33,9 +31,9 @@ for name in A ;  do
       ii=`printf %02d $iter`
       jj=`echo "$iter" |bc -l`
       jj=`printf %02d $jj`
-      $specfem_dir/bin/xcreate_slice $param ../../DATABASES_MPI/ ../../DATABASES_MPI/ input/prof$name.txt input/prof$name.loc $param.$name.$ii.out .false.
-      # $specfem_dir/bin/xcreate_slice $param ../../optimize/MODEL_M$ii/ ../../optimize/MODEL_M$ii/  \
-      #     input/prof$name.txt input/prof$name.loc $param.$name.$ii.out .false.
+      # $specfem_dir/bin/xcreate_slice $param ../tomo.ckbd/DATABASES_MPI/ ../tomo.ckbd/DATABASES_MPI/ input/prof$name.txt input/prof$name.loc $param.$name.$ii.out .false.
+      $specfem_dir/bin/xcreate_slice $param ../../optimize/MODEL_M$ii/ ../../optimize/MODEL_M$ii/  \
+          input/prof$name.txt input/prof$name.loc $param.$name.$ii.out .false.
       # $specfem_dir/bin/xcreate_slice $param  ../../optimize/SUM_KERNELS_M$ii/ ../../DATABASES_MPI/  \
       #   input/prof$name.txt input/prof$name.loc $param.$name.$ii.out .false.
       # $specfem_dir/bin/xcreate_slice $param  ../../solver/M00/P$jj/GRADIENT/ ../../DATABASES_MPI/  \
@@ -47,7 +45,7 @@ done
 done
 
 # generate_grd
-module load gcc gmt-6.0.0
+#module load gcc gmt/6.5.0
 for param in $param_set;do 
 for name in A ;  do
   # get grd file and plot
@@ -57,8 +55,8 @@ for name in A ;  do
   z1=`echo $info | awk '{print -$7/1000}'`
   bounds=-R0/$dmax/$z0/$z1 
   proj=-JX12c/6c
-  dx=`echo "0. $dmax" | awk '{print (-$1 + $2) / 128.}'`
-  dz=`echo "$z0 $z1" | awk '{print (-$1 + $2)/128.}'`
+  dx=`echo "0. $dmax" | awk '{print (-$1 + $2) / 127.}'`
+  dz=`echo "$z0 $z1" | awk '{print (-$1 + $2)/127.}'`
 
   for iter in $run_indx;
   do 
@@ -77,7 +75,7 @@ for name in A ;  do
       paste tmp.1 tmp.2 > tmp.3 
 
       # convert txt to grd
-      gmt surface tmp.3 -Ggrdfolder/$param.iter$jj.prof$name.grd -I$dx/$dz $bounds
+      gmt surface tmp.3 -Ggrdfolder/$param.iter$jj.prof$name.grd -I$dx/$dz $bounds -Vq
       mv tmp.3 profiles/$param.iter$jj.prof$name
       \rm tmp.1 tmp.2 $param.$name.$jj.out 
       gmt grdinfo -C grdfolder/$param.iter$jj.prof$name.grd

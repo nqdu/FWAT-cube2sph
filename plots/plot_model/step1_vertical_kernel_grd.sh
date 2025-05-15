@@ -12,13 +12,11 @@
 #
 ###################################################
 #module load NiaEnv/2019b
-specfem_dir="${HOME}/specfem3d-cube2sph/"
-cub2sph_dir=$specfem_dir/utils/cube2sph/
-NPROC=160
+source module_env
 mkdir -p grdfolder pics profiles
 
 # run index
-run_indx=`seq 0 5`
+run_indx=`seq 0 0`
 #param_set="dbulk dbeta drho"
 #param_set="hess_kernel"
 param_set="dbeta"

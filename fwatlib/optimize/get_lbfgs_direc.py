@@ -109,27 +109,15 @@ def get_lbfgs_direc(iter:int,paramfile:str):
     _,q_vec = get_model_grad(iter,nspec)
     grad_bak = q_vec.copy()
 
-    # get search direction names
-    direc_list =  get_direc_name_list()
-
     # load lbfgs parameters
     with open(paramfile,"r") as f:
         pdict = yaml.safe_load(f)
 
     # current search direction is -grad
-    iter_start:int = pdict['START_MODEL']
-    if iter == iter_start:
-        q_vec = np.float32(-q_vec)
-        nker = q_vec.shape[0]
-        for i in range(nker):
-            outname =  './/optimize/SUM_KERNELS_M%02d'%(iter) + '/proc%06d'%(myrank) + '_' + direc_list[i] + ".bin"
-            f = FortranFile(outname,'w')
-            f.write_record(q_vec[i,:,:])
-            f.close()
-        return 
+    iter_start:int = pdict['iter_start']
 
     # get istore
-    MAX_HIS = pdict['MAX_HISTORY']
+    MAX_HIS = pdict['MSTORE']
     iter_store = iter - MAX_HIS
     if iter_store <= iter_start: iter_store = iter_start
 
@@ -199,15 +187,6 @@ def get_lbfgs_direc(iter:int,paramfile:str):
     # search direc
     direc = -r_vec
 
-    # get min/max
-    for i in range(len(direc_list)):
-        min_vp = np.min(direc[i,...])
-        max_vp = np.max(direc[i,...])
-        min_all = comm.allreduce(min_vp,MPI.MIN)
-        max_all = comm.allreduce(max_vp,MPI.MAX)
-        if myrank == 0:
-            print(f"search direction : {direc_list[i]} min/max = %f %f"%(min_all,max_all))
-    
     # check the angle between search direction and negative grad
     grad_bak = - grad_bak
     grad_sum = compute_inner_dot(grad_bak,direc,weights,jaco)
@@ -216,22 +195,70 @@ def get_lbfgs_direc(iter:int,paramfile:str):
     grad_norm = np.sqrt(grad_norm); direc_norm = np.sqrt(direc_norm)
     a = grad_sum / (direc_norm * grad_norm)
     theta = np.arccos(a) * 180 / np.pi 
-
+    if myrank == 0: print(f"theta between search direction/-grad is {theta}")
     if theta <= 92.:
         if myrank == 0: print("The search direction is accepted!")
     else:
         if myrank == 0: 
             print("The search direction is not accepted!")
             print("clear previous information !")
-            direc = grad_bak
+            print("use negative grad as search direction")
+            direc = -grad_bak
 
             # write new info 
-            pdict['START_MODEL'] = iter
+            pdict['iter_start'] = iter
             with open(paramfile,"w") as f:
-                yaml.safe_dump(f)
+                yaml.safe_dump(pdict,f)
 
     comm.barrier()
 
+    return direc
+
+def get_sd_direction(iter:int,paramfile:str):
+    comm = MPI.COMM_WORLD
+    myrank = comm.Get_rank()
+
+    # read nspec/nglob/ibool
+    filename = './optimize/MODEL_M%02d'%(iter) + '/proc%06d'%(myrank) + '_external_mesh.bin'
+    f = FortranFile(filename)
+    nspec = f.read_ints('i4')[0]
+    f.close()
+
+    # get gradient
+    _,q_vec = get_model_grad(iter,nspec)
+    q_vec = np.float32(-q_vec)
+
+    return q_vec
+
+
+def get_search_direction(iter:int,paramfile:str):
+
+    comm = MPI.COMM_WORLD
+    myrank = comm.Get_rank()
+
+    # load lbfgs parameters
+    with open(paramfile,"r") as f:
+        pdict = yaml.safe_load(f)
+
+    # current search direction is -grad
+    iter_start:int = pdict['iter_start']
+    if iter == iter_start:
+        direc = get_sd_direction(iter,paramfile)
+    else:
+        direc = get_lbfgs_direc(iter,paramfile)
+
+    # get min/max
+    direc_list =  get_direc_name_list()
+    if myrank == 0:
+        print("")
+    for i in range(len(direc_list)):
+        min_vp = np.min(direc[i,...])
+        max_vp = np.max(direc[i,...])
+        min_all = comm.allreduce(min_vp,MPI.MIN)
+        max_all = comm.allreduce(max_vp,MPI.MAX)
+        if myrank == 0:
+            print(f"search direction : {direc_list[i]} min/max = %g %g"%(min_all,max_all))
+    
     # save search
     direc = np.float32(direc)
     nker = direc.shape[0]
@@ -240,11 +267,11 @@ def get_lbfgs_direc(iter:int,paramfile:str):
         f = FortranFile(outname,'w')
         f.write_record(direc[i,:,:])
         f.close()
-
+    
 def main():
     if len(sys.argv) !=3 :
         print("need 2 parameters: iter paramfile")
-        print("example: mpirun -np 160 python get_lbfgs_step_direc.py fwat_params/lbfgs.yaml")
+        print("example: mpirun -np 160 python get_lbfgs_step_direc.py iter fwat_params/lbfgs.yaml")
         exit(1)
 
     # get mpi info
@@ -262,7 +289,7 @@ def main():
     # load parameters
 
     # get search direction
-    get_lbfgs_direc(iter,paramfile)
+    get_search_direction(iter,paramfile)
 
 if __name__ == "__main__":
     main()

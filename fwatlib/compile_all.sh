@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # # gfortran
-# CC="gcc -O3 -fPIC -shared"
-# FC="gfortran -O3 -fPIC -shared"
-# linkf="-lgfortran -lopenblas"
+CC="gcc -O3 -fPIC -shared"
+FC="gfortran -O3 -fPIC -shared"
+linkf="-lgfortran -lblas"
 
 #ifort
-CC="icc -O3 -fPIC -shared"
-FC="ifort -O3 -fPIC -shared"
-linkf="-lifcore -lmkl_rt  -lpthread -lm -ldl"
+# CC="icc -O3 -fPIC -shared"
+# FC="ifort -O3 -fPIC -shared"
+# linkf="-lifcore -lmkl_rt  -lpthread -lm -ldl"
 
 #FC="gfortran  -fPIC"
 include=`python -m pybind11 --includes`

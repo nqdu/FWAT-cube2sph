@@ -1,0 +1,33 @@
+# Preconditioned L-BFGS Parameters
+MAXITER:  10000   # max iterations
+MSTORE: 10         # maximum number of stored pairs
+CONV: 1.0e-8
+
+# iteration flag
+iter: 0
+iter_start: 0
+iter_ls: 0
+first_ls: True
+
+# FLAG: str one of['INIT','GRAD','PREC','CONV','NSTE','FAIL']
+#     = 'INIT' must be used for first iteration
+#     = 'GRAD' the user must compute the cost and (preconditioned) gradient at current point x.  
+#     = 'PREC' the user must multiply the vector self.q_plb by its preconditioner.  
+#     = 'CONV' a minimizer has been found.  
+#     = 'NSTE' a new step is performed.    
+#     = 'FAIL' the linesearch has failed. 
+flag: 'INIT'   
+
+# line search
+M1: 1.0e-4 # Wolfe conditions parameter 1 (Nocedal value)
+M2: 0.9  # Wolfe conditions parameter 2 (Nocedal value)
+FACTOR: 10 # Bracketting parameter (Gilbert value
+MAXLS: 100
+alpha_L: 0
+alpha_R: 0
+alpha: -1.
+alpha_init: -1.
+
+# debug 
+PRINT:  True 
+DEBUG: False

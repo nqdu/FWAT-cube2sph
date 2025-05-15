@@ -12,12 +12,11 @@
 #
 ###################################################
 #module load NiaEnv/2019b
-specfem_dir="${HOME}/scratch/specfem3d-cube2sph/"
-cub2sph_dir=$specfem_dir/utils/cube2sph/
+source module_env
 mkdir -p grdfolder pics profiles
 
 # run index
-run_indx=`seq 0 0`
+run_indx=`seq 0 1`
 #param_set="dbulk dbeta drho"
 param_set="beta_kernel"
 #param_set="vp vs rho"
@@ -53,8 +52,8 @@ for name in A;  do
   z1=`echo $info | awk '{print -$7/1000}'`
   bounds=-R0/$dmax/$z0/$z1 
   proj=-JX12c/6c
-  dx=`echo "0. $dmax" | awk '{print (-$1 + $2) / 128.}'`
-  dz=`echo "$z0 $z1" | awk '{print (-$1 + $2)/128.}'`
+  dx=`echo "0. $dmax" | awk '{print (-$1 + $2) / 127.}'`
+  dz=`echo "$z0 $z1" | awk '{print (-$1 + $2)/127.}'`
 
   for iter in $run_indx;
   do 

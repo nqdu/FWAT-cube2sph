@@ -1,0 +1,4 @@
+{
+    "fortran.linter.includePaths": ["/opt/openmpi-5.0.6/lib"],
+    "fortran.linter.modOutput": "./obj"
+}
