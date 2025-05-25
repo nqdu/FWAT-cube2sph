@@ -3,7 +3,7 @@
 #SBATCH --ntasks=8
 #SBATCH --array=21-28%5
 #SBATCH --time=00:35:59
-#SBATCH --job-name FWD_ADJ
+#SBATCH --job-name=FWD_ADJ
 #SBATCH --output=FWD_ADJ-%j_set%a.txt
 #SBATCH --account=def-liuqy
 #SBATCH --mem=12G

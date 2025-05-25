@@ -2,7 +2,7 @@ import sys
 import os 
 from scipy.io import FortranFile 
 import numpy as np 
-from tools import *
+from tools import FwatModel
 from mpi4py import MPI
 import h5py
 
@@ -80,6 +80,9 @@ def main():
     if myrank == 0:
         print(f"PRECOND_TYPE = {PRECOND} ")
 
+    # init FwatModel
+    M = FwatModel()
+
     # read sourcenames
     srctxt = np.loadtxt(evtfile,dtype=str,ndmin=2)
     nevts = srctxt.shape[0]
@@ -92,15 +95,15 @@ def main():
         weight = np.loadtxt("optimize/weight_kl.txt")
 
     # sum kernels
-    grad_list = get_gradname_list()
-    nker = len(grad_list)
-    for i in range(nker):
-        if myrank == 0: print(f'sum kernel {grad_list[i]}')
+    grad_list_base = M.get_grad_names(base=True)
+    nmod = len(grad_list_base)
+    for i in range(nmod):
+        if myrank == 0: print(f'sum kernel {grad_list_base[i]}')
         kl = np.float32(0.)
         for ievt in range(nevts):
             # read kernel from h5
             setname = '/' + srctxt[ievt,0]
-            filename = f'./solver/{MODEL}' + setname + '/GRADIENT/' + grad_list[i] + '.h5'
+            filename = f'./solver/{MODEL}' + setname + '/GRADIENT/' + grad_list_base[i] + '.h5'
             fio = h5py.File(filename,"r")
             arr = fio[str(myrank)][:]
             fio.close()
@@ -108,7 +111,8 @@ def main():
             # sum kernel
             kl = kl + arr * weight[ievt]
         
-        outname = KERNEL_DIR + "/proc%06d"%myrank + '_' + grad_list[i] + '.bin'
+        # write out
+        outname = KERNEL_DIR + "/proc%06d"%myrank + '_' + grad_list_base[i] + '.bin'
         f = FortranFile(outname,"w")
         kl = np.float32(kl)
         f.write_record(kl)

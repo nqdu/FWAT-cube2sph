@@ -1,13 +1,13 @@
 import numpy as np 
 import sys 
 from scipy.io import FortranFile 
-from tools import *
+from tools import FwatModel
 import yaml
 import h5py
 
 def main():
     if len(sys.argv) !=6 :
-        print("need 6 parameters: MODEL OUT_DIR paramfile lbfgs nprocs")
+        print("need 5 parameters: MODEL OUT_DIR paramfile lbfgs nprocs")
         print("example: python get_lbfgs_next.py M06 OUT_DIR paramfile lbfgsnprocs")
         exit(1)
     model_str = sys.argv[1]
@@ -23,6 +23,7 @@ def main():
         params = yaml.safe_load(f)['optimize']
     with open(lbfgsfile,"r") as f:
         opt = yaml.safe_load(f)
+    M = FwatModel(paramfile)
 
     # print sth
     print("\n get L-BFGS step fac ...")
@@ -30,15 +31,22 @@ def main():
     print(f"KERNEL_DIR = {KERNEL_DIR}")
     print(f"OUTPUT_DIR = {OUT_DIR}")
     print(f"nprocs = {nprocs}")
+
+    # get name list
+    mname_list = M.get_model_names()
+    dname_list = M.get_direc_names()
+    nker = len(dname_list)
+    nmod = len(mname_list)
+    mname_user = dname_list.copy()
+    for i in range(nker):
+        mname_user[i] = mname_user[i][1:]
     
     # get direc_max
-    kername_list = get_direc_name_list()
-    nker = len(kername_list)
     direc_max = np.float32(-1.0)
     array_size = np.zeros((nprocs),'i4')
     for myrank in range(nprocs):
         for i in range(nker):
-            filename = KERNEL_DIR + kername_list[i] + ".h5"
+            filename = KERNEL_DIR + dname_list[i] + ".h5"
             f = h5py.File(filename,"r")
             direc_vp = f[str(myrank)][:]
             direc_max = max(direc_max,np.max(np.abs(direc_vp)))
@@ -51,64 +59,65 @@ def main():
     step_fac = opt['alpha']
     step_fac_in_per = params['MAX_PER']
 
-    # initialize step_fac if required
-    if opt['iter'] == opt['iter_start'] and opt['iter_ls'] == 0:
+    # first lbfgs step_fac = step_fac_in_per
+    if opt['iter'] == opt['iter_start']:
         step_fac = -1
-    if opt['iter'] == opt['iter_start'] + 1 and opt['iter_ls'] == 0:
-        # init step_fac is 1
-        step_fac = 1.
 
     if step_fac <= 0 or step_fac * direc_max > step_fac_in_per:
         step_fac = step_fac_in_per / direc_max
     print("step_fac dmax relvar = %g %g %g"%(step_fac,direc_max,step_fac * direc_max))
-    opt['alpha'] = float(step_fac) 
 
     # write new model
     for myrank in range(nprocs):
         # get model list
         size = array_size[myrank]
-        modname_list = get_model_name_list()
-        vec = np.zeros((nker,size),'f4')
+        nmod = len(mname_list)
+        vec0 = np.zeros((nmod,size),'f4')
 
         # read model
-        for i in range(nker):
-            filename = MODEL_DIR + '/proc%06d'%myrank + '_' + modname_list[i] + '.bin'
-            f = FortranFile(filename)
-            vec[i,...] = f.read_reals('f4')
+        for i in range(nmod):
+            filename = MODEL_DIR + '/proc%06d'%myrank + '_' + mname_list[i] + '.bin'
+            f = FortranFile(filename,"w")
+            vec0[i,...] = f.read_reals('f4')
             f.close()
 
         # convert model if required
-        vec = np.float32(convert_md(vec,False))
+        vec = np.float32(M.convert_md(vec0,False))
 
         # read search direction
         direc = np.zeros((nker,size),'f4')
         for i in range(nker):
-            filename = KERNEL_DIR + kername_list[i] + ".h5"
+            filename = KERNEL_DIR + dname_list[i] + ".h5"
             f = h5py.File(filename,"r")
             direc[i,...] = f[str(myrank)][:]
             f.close()
 
         # new model
-        vec = vec * np.exp(step_fac * direc)
+        vec = M.model_update(vec,step_fac * direc)
+
+        # write this model to OUT_DIR
+        for i in range(nker):
+            filename = OUT_DIR + '/proc%06d'%myrank + '_' + mname_user[i] + '.bin'
+            f = FortranFile(filename,"w")
+            f.write_record(np.float32(vec[i,...]))
+            f.close()
 
         # convert back if required
-        vec = np.float32(convert_md(vec,True))
+        vec0 = np.float32(M.convert_md(vec,True))
 
-        # write model
-        for i in range(nker):
-            filename = OUT_DIR + '/proc%06d'%myrank + '_' + modname_list[i] + '.bin'
+        # write base model
+        for i in range(nmod):
+            filename = OUT_DIR + '/proc%06d'%myrank + '_' + mname_list[i] + '.bin'
             f = FortranFile(filename,"w")
-            f.write_record(vec[i,...])
+            f.write_record(vec0[i,...])
             f.close()
     
     # update opt and write over 
     if opt['flag'] != 'LS': 
         opt['flag'] = 'LS'
         opt['iter_ls'] = 0 
-    
-    # save updated lbfgs file
-    with open(lbfgsfile,"w") as f:
-        yaml.safe_dump(opt,f)
+        with open(lbfgsfile,"w") as f:
+            yaml.safe_dump(opt,f)
 
 if __name__ == "__main__":
     main()

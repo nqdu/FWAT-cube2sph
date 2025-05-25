@@ -26,7 +26,6 @@ FLAG=`python $FWATLIB/get_param.py flag $FWATPARAM/lbfgs.yaml`
 MODEL=M`echo "$iter" |awk '{printf "%02d",$1}'`
 PRECOND=`python $FWATLIB/get_param.py optimize/PRECOND_TYPE`
 
-
 # create log file
 logfile=output_fwat2_post_log_${MODEL}.txt
 :> $logfile

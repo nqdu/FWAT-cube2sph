@@ -3,7 +3,7 @@
 # # gfortran
 CC="gcc -O3 -fPIC -shared"
 FC="gfortran -O3 -fPIC -shared"
-linkf="-lgfortran -lblas"
+linkf="-lgfortran -lopenblas"
 
 #ifort
 # CC="icc -O3 -fPIC -shared"
@@ -14,9 +14,8 @@ linkf="-lgfortran -lblas"
 include=`python -m pybind11 --includes`
 outname="libpca"`python3-config --extension-suffix`
 
-chmod +x *.sh 
-
 set -x 
+chmod +x *.sh  ../*.sh
 cd measure/tele/pca 
 $FC -g -c spanlib.f90 -o spanlib.o
 $FC -g -c pcalib.f90 -o pcalib.o
