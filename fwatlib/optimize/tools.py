@@ -203,7 +203,7 @@ class FwatModel:
                 vs = model[1,...]
                 model_new[0,...] = vpvs * vs 
         elif self._mdtype == "dtti":
-            model_new = self._cijkl2dtti(model,self._kltype,backward)
+            model_new = self._cijkl2dtti(model,backward)
         
         return model_new
     

@@ -55,7 +55,7 @@ def main():
             fio = FortranFile(filename,"r")
             x = fio.read_reals('f4') 
             fio.close()
-            md[i,:] = x * 1.
+            md[im,:] = x * 1.
         
         # convert to user model
         md_new = np.float32(M.convert_md(md))
