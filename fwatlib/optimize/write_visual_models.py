@@ -54,7 +54,8 @@ def main():
             md[im,:] = x * 1.
         
         # convert to user model
-        md_new,all_names = np.float32(M.convert_md_visual(md))
+        md_new,all_names = M.convert_md_visual(md)
+        md_new = np.float32(md_new)
 
         # write user model
         nker = len(all_names)
