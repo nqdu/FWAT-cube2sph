@@ -23,9 +23,9 @@ def main():
     M = FwatModel(None,mdtype,kltype)
 
     # print sth
-    print("\n write user model from cijkl ...")
+    print("write visual model from cijkl ...")
     print(f"MODEL_DIR = {MODEL_DIR}")
-    print(f"nprocs = {nprocs}")
+    print(f"nprocs = {nprocs}\n")
 
     # get name list
     mname_list = M.get_model_names()
@@ -61,6 +61,7 @@ def main():
         nker = len(all_names)
         for i in range(nker):
             filename = MODEL_DIR + "/proc%06d_" %(myrank) + all_names[i] + ".bin"
+            print(f"working on {filename}")
             fio = FortranFile(filename,"w")
             fio.write_record(md_new[i,...])
             fio.close()
