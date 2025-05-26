@@ -95,13 +95,6 @@ def main():
         # new model
         vec = M.model_update(vec,step_fac * direc)
 
-        # write this model to OUT_DIR
-        for i in range(nker):
-            filename = OUT_DIR + '/proc%06d'%myrank + '_' + mname_user[i] + '.bin'
-            f = FortranFile(filename,"w")
-            f.write_record(np.float32(vec[i,...]))
-            f.close()
-
         # convert back if required
         vec0 = np.float32(M.convert_md(vec,True))
 

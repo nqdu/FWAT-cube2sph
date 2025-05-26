@@ -29,11 +29,7 @@ def main():
 
     # get name list
     mname_list = M.get_model_names()
-    mname_user = M.get_direc_names()
-    nker = len(mname_user)
     nmod = len(mname_list)
-    for i in range(nker):
-        mname_user[i] = mname_user[i][1:]
 
     # get size for each proc
     array_size = np.zeros((nprocs),'i4')
@@ -58,11 +54,12 @@ def main():
             md[im,:] = x * 1.
         
         # convert to user model
-        md_new = np.float32(M.convert_md(md))
+        md_new,all_names = np.float32(M.convert_md_visual(md))
 
         # write user model
+        nker = len(all_names)
         for i in range(nker):
-            filename = MODEL_DIR + "/proc%06d_" %(myrank) + mname_user[i] + ".bin"
+            filename = MODEL_DIR + "/proc%06d_" %(myrank) + all_names[i] + ".bin"
             fio = FortranFile(filename,"w")
             fio.write_record(md_new[i,...])
             fio.close()

@@ -207,6 +207,54 @@ class FwatModel:
         
         return model_new
     
+    def convert_md_visual(self,model:np.ndarray):
+        """
+        convert from base models to modesl for visualization
+
+        Parameters
+        -----------
+        model: np.ndarray
+            base model
+
+        Returns
+        --------------
+        model_new : np.ndarray
+            model for visualization
+        plot_names: list[str]
+            names for visualization
+        """
+        model_new = self.convert_md(model)
+        plot_names = self.get_direc_names()
+        for i in range(len(plot_names)):
+            plot_names[i] = plot_names[i][1:]
+
+        if self._mdtype == "dtti":
+            if self._kltype == 1: # vp,vs,rho,gcp,gsp
+                gcp = model_new[3,...]
+                gsp = model_new[4,...]
+                phi = 0.5 * np.arctan2(gsp,gcp)
+                g0p = np.hypot(gsp,gcp)
+
+                # copy back to model_new
+                model_new[3,...] = np.float32(phi)
+                model_new[4,...] = np.float32(g0p)
+                plot_names[3] = "phi"
+                plot_names[4] = "G0"
+
+            elif self._kltype == 2: # vph,vpv,vsh,vsv,rho,gcp,gsp
+                gcp = model_new[5,...]
+                gsp = model_new[6,...]
+                phi = 0.5 * np.arctan2(gsp,gcp)
+                g0p = np.hypot(gsp,gcp)
+
+                # copy back to model_new
+                model_new[5,...] = np.float32(phi)
+                model_new[6,...] = np.float32(g0p)
+                plot_names[5] = "phi"
+                plot_names[6] = "G0"
+
+        return model_new,plot_names
+    
     def get_used_model(self,md:np.ndarray):
         """
         get model used in gradient based optimizer, return md for dimensionless parameter,
