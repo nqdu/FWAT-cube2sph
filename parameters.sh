@@ -3,8 +3,12 @@ fksem='/home/l/liuqy/nqdu//specfem3d-cube2sph/'    # solver location
 FWATLIB=`pwd`/fwatlib    # fwatlib location
 FWATPARAM=`pwd`/fwat_params
 
+# nprocs for preprocessing
+NPROC_PRE=4
 
 # STOP HERE ###################
+
+
 MEASURE_LIB=$FWATLIB/measure 
 OPT_LIB=$FWATLIB/optimize
 

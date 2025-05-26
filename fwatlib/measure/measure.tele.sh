@@ -19,8 +19,6 @@ if  [ $run_opt -eq 2 ]; then
   lsflag=".ls"
 fi 
 
-ncpu=`cat /proc/cpuinfo |grep cores |wc -l |awk '{print $1/2}'`
-
 # set directory
 current_dir=`pwd`
 mod=M`printf "%02d" $iter`
@@ -28,8 +26,8 @@ rundir=solver/$mod"$lsflag"/$evtid/
 echo "convert synthetic seismograms to sac : evtid=$evtid iter=$iter"
 SYN_DIR=$rundir/OUTPUT_FILES 
 
-# rotate seismograms to ENZ
-mpirun -np 4 python $MEASURE_LIB/rotate_seismogram.py --fn_matrix="src_rec/rot_$evtid"   \
+# rotate sesmograms to ENZ
+mpirun -np $NPROC_PRE python $MEASURE_LIB/rotate_seismogram.py --fn_matrix="src_rec/rot_$evtid"   \
        --rotate="XYZ->NEZ" --from_dir="$rundir/OUTPUT_FILES/" --to_dir="$rundir/OUTPUT_FILES/"   \
        --from_template='${nt}.${sta}.BX${comp}.semd'  \
        --to_template='${nt}.${sta}.BX${comp}.sem.ascii'
@@ -64,11 +62,11 @@ telemod_dir=$MEASURE_LIB/tele/
 echo " "
 if [ $run_opt -ne 1 ]; then
   echo "estimating STF and synthetic data ..."
-  mpirun -np $ncpu python $MEASURE_LIB/preprocess_tele.py $iter $evtid $run_opt
+  mpirun -np $$NPROC_PRE python $MEASURE_LIB/preprocess_tele.py $iter $evtid $run_opt
 else
   echo "synthetic data ..."
-  mpirun -np $ncpu python $MEASURE_LIB/preprocess_tele.py $iter $evtid $run_opt
-
+  mpirun -np $NPROC_PRE python $MEASURE_LIB/preprocess_tele.py $iter $evtid $run_opt
+  exit 0
 fi
 
 # measure misifts
@@ -92,7 +90,7 @@ do
   cd $band 
   mkdir -p OUTPUT_FILES
   \cp ../../DATA/MEASUREMENT.PAR  .
-  mpirun -np $ncpu $MEASURE_LIB/bin/measure_adj_mpi
+  mpirun -np $NPROC_PRE $MEASURE_LIB/bin/measure_adj_mpi
   coef=1.
   avgmap=`head -1 average_amp.dat`
   dt=`tail -1 average_amp.dat`

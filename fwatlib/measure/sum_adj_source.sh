@@ -64,7 +64,7 @@ python $MEASURE_LIB/pack_seismogram.py $rundir/SEM/seismograms.h5 $rundir/SEM/*.
 \rm $rundir/SEM/*.ascii
 echo "--fn_matrix="$current_dir/src_rec/rot_$evtid"   \
        --rotate='XYZ<-NEZ' --from_dir="$rundir/SEM" --to_dir="$rundir/SEM""
-mpirun -np 4 python $MEASURE_LIB/rotate_seismogram.py --fn_matrix="$current_dir/src_rec/rot_$evtid"   \
+mpirun -np $NPROC_PRE python $MEASURE_LIB/rotate_seismogram.py --fn_matrix="$current_dir/src_rec/rot_$evtid"   \
        --rotate='XYZ<-NEZ' --from_dir="$rundir/SEM" --to_dir="$rundir/SEM"   \
        --from_template='${nt}.${sta}.BX${comp}.adj.ascii'  \
        --to_template='${nt}.${sta}.BX${comp}.adj'
