@@ -110,8 +110,8 @@ if [ "$flag" == "GRAD" ]; then
 
   echo " Finish line search direction  here!!!" >> $logfile 
 else 
-  echo "python $OPT_LIB/get_lbfgs_next.py $MODEL $LSDIR $FWATPARAM/FWAT.PAR.yaml $FWATPARAM/lbfgs.yaml  $NPROC"
-  python $OPT_LIB/get_lbfgs_next.py $MODEL $LSDIR $FWATPARAM/FWAT.PAR.yaml $FWATPARAM/lbfgs.yaml  $NPROC  >> $logfile
+  echo "python $OPT_LIB/model_update.py $MODEL $LSDIR $FWATPARAM/FWAT.PAR.yaml $FWATPARAM/lbfgs.yaml  $NPROC"
+  python $OPT_LIB/model_update.py $MODEL $LSDIR $FWATPARAM/FWAT.PAR.yaml $FWATPARAM/lbfgs.yaml  $NPROC  >> $logfile
 
 
   # generate new model database

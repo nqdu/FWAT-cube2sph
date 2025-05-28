@@ -8,7 +8,7 @@ import h5py
 def main():
     if len(sys.argv) !=6 :
         print("need 5 parameters: MODEL OUT_DIR paramfile lbfgs nprocs")
-        print("example: python get_lbfgs_next.py M06 OUT_DIR paramfile lbfgsnprocs")
+        print("example: python model_update.py M06 OUT_DIR paramfile lbfgsnprocs")
         exit(1)
     model_str = sys.argv[1]
     MODEL_DIR = "./optimize/MODEL_" +  model_str + "/"
@@ -77,7 +77,7 @@ def main():
         # read model
         for i in range(nmod):
             filename = MODEL_DIR + '/proc%06d'%myrank + '_' + mname_list[i] + '.bin'
-            f = FortranFile(filename,"w")
+            f = FortranFile(filename,"r")
             vec0[i,...] = f.read_reals('f4')
             f.close()
 

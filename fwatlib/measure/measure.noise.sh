@@ -36,7 +36,7 @@ mpirun -np $NPROC_PRE python  \
 echo " python $MEASURE_LIB/ascii2sac.py $current_dir/src_rec/STATIONS_${evtid}_globe  \
       $current_dir/src_rec/FORCE_ORG/FORCESOLUTION_${evtid} $SYN_DIR"
 \rm -f $SYN_DIR/*.sac # clean all sac file
-python $MEASURE_LIB/ascii2sac.py $current_dir/src_rec/STATIONS_${evtid}_globe  \
+mpirun -np $NPROC_PRE python $MEASURE_LIB/ascii2sac.py $current_dir/src_rec/STATIONS_${evtid}_globe  \
       $current_dir/src_rec/FORCE_ORG/FORCESOLUTION_${evtid} $SYN_DIR
 \rm -f $SYN_DIR/*.sem.ascii
 

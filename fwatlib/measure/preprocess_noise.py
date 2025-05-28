@@ -4,9 +4,9 @@ import numpy as np
 from mpi4py import MPI
 import os 
 
-from utils import read_fwat_params,interpolate_syn
+from utils import read_params,interpolate_syn
 from utils import preprocess,dif1,cumtrapz1
-
+from utils import get_sem_seismo_info
 
 def main():
     if len(sys.argv) != 4:
@@ -28,7 +28,7 @@ def main():
     nprocs = comm.Get_size()
 
     # load paramfile as dictionary
-    pdict = read_fwat_params(f'solver/{mdir}/{evtname}/DATA/FWAT.PAR.yaml')['measure']['noise']
+    pdict = read_params(f'solver/{mdir}/{evtname}/DATA/FWAT.PAR.yaml')['measure']['noise']
 
     # print log
     verbose = pdict['VERBOSE_MODE']
@@ -38,14 +38,6 @@ def main():
     stationfile = f'solver/{mdir}/' + f'{evtname}/DATA/STATIONS_FILTERED'
     statxt = np.loadtxt(stationfile,dtype=str,ndmin=2)
     nsta = statxt.shape[0]
-    
-    # synthetic parameters
-    syndir = f'solver/{mdir}/' + f'{evtname}/OUTPUT_FILES/'
-    name = statxt[0,1] + "." + statxt[0,0] + CCODE + "Z.sac"
-    syn_z_hd = SACTrace.read(syndir + name,headonly=True)
-    npt_syn = syn_z_hd.npts
-    dt_syn = syn_z_hd.delta
-    t0_syn = syn_z_hd.b
 
     # get frequency band/ group velocity
     Tmin_list = [x[0] for x in pdict['FILTER_BANDS']]
@@ -56,6 +48,11 @@ def main():
     # get components
     ncomp = len(pdict['COMPS'])
     components = pdict['COMPS']
+
+    # synthetic parameters
+    syndir = f'solver/{mdir}/' + f'{evtname}/OUTPUT_FILES/'
+    name = statxt[0,1] + "." + statxt[0,0] + CCODE + f"{components[0]}.sac"
+    t0_syn,dt_syn,npt_syn = get_sem_seismo_info(syndir + name)
 
     # write synthetic data to SYN dir
     if run_opt == 1:
@@ -175,6 +172,19 @@ def main():
                     f.write("1\n")
                     f.write("%f %f\n" %(tstart,tend))
             f.close()
+
+    # end ib 
+
+    if myrank == 0:
+        # write MEASUREMENT.PAR
+        from utils import measure_adj_file
+        imeas = pdict['IMEAS']
+        ccode = pdict['CH_CODE']
+        txt = measure_adj_file(t0_syn,dt_syn,npt_syn,0.99*np.min(Tmin_list),1.01*np.max(Tmax_list),imeas,ccode)
+        f = open(f"solver/{mdir}/{evtname}/DATA/MEASUREMENT.PAR","w")
+        f.write(txt)
+        f.close()
+
     comm.Barrier()            
 
 

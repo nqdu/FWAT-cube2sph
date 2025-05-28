@@ -92,8 +92,8 @@ for ii in `seq 1 4`;do
 
 
   # copy first model to MODEL_M00
-  #if [[ "$iter" -eq 0 && ! -d "optimize/MODEL_M00" ]]; then
-  if [[ "$iter" -eq 0 ]]; then
+  if [[ "$iter" -eq 0 && ! -d "optimize/MODEL_M00" ]]; then
+  #if [[ "$iter" -eq 0 ]]; then
     # set model name
     mkdir -p optimize/MODEL_M00
     \cp ./DATABASES_MPI/* optimize/MODEL_M00
@@ -118,7 +118,6 @@ for ii in `seq 1 4`;do
 
   else  # line search
     set_fwat3 $simu_type $NJOBS $setb 
-    bash tmp.fwat3.$simu_type.sh > LS.$iter.txt
     job_line=$(sbatch tmp.fwat3.$simu_type.sh|cut -d ' ' -f4 )
 
     # check wolfe condition

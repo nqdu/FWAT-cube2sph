@@ -1,13 +1,15 @@
+#!bin/bash 
+
 # binary/python file location
 fksem='/home/l/liuqy/nqdu//specfem3d-cube2sph/'    # solver location
-FWATLIB=`pwd`/fwatlib    # fwatlib location
-FWATPARAM=`pwd`/fwat_params
+FWATLIB_PATH=`pwd`
 
 # nprocs for preprocessing
 NPROC_PRE=4
 
 # STOP HERE ###################
-
+FWATPARAM=`pwd`/fwat_params
+FWATLIB=$FWATLIB_PATH/fwatlib    # fwatlib location
 
 MEASURE_LIB=$FWATLIB/measure 
 OPT_LIB=$FWATLIB/optimize

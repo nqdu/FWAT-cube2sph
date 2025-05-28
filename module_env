@@ -1,2 +1,3 @@
+# environments
 module load intel openmpi
 export OMP_NUM_THREADS=1

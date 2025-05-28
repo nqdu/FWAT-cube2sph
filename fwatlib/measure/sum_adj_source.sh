@@ -43,10 +43,10 @@ cd $current_dir
 rm -rf $rundir/SEM; mkdir -p $rundir/SEM
 cd $rundir/OUTPUT_FILES
 band0=`printf "T%03g_T%03g" ${SHORT_P[0]} ${LONG_P[0]}`
-filenames=`ls ${band0}/OUTPUT_FILES/ |grep iker | cut -d'.' -f1,2 |sort -n |uniq`
+filenames=`ls ${band0}/OUTPUT_FILES/ |grep adj | cut -d'.' -f1,2 |sort -n |uniq`
 for f in $filenames
 do 
-  newf=`echo $f |awk -F'.' '{new_var=$2"."$1; print new_var}'`
+  newf=`echo $f |awk -F'.' '{new_var=$1"."$2; print new_var}'`
   for c in Z N E;
   do
     paste T*_T*/OUTPUT_FILES/$newf.BX$c.adj | awk '{

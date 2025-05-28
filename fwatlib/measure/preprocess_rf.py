@@ -4,7 +4,8 @@ import sys
 import os 
 from mpi4py import MPI
 
-from utils import interpolate_syn,read_fwat_params,get_average_amplitude
+from utils import interpolate_syn,read_params
+from tele.tele import get_average_amplitude
 from tele.deconit import deconit,gauss_filter,apply_gaussian
 
 def main():
@@ -27,7 +28,7 @@ def main():
     nprocs = comm.Get_size()
 
     # load paramfile as dictionary
-    pdict = read_fwat_params(f'solver/{mdir}/{evtname}/DATA/FWAT.PAR.yaml')['measure']['rf']
+    pdict = read_params(f'solver/{mdir}/{evtname}/DATA/FWAT.PAR.yaml')['measure']['rf']
     
     # print log
     verbose = pdict['VERBOSE_MODE']

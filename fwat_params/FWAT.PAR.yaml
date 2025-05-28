@@ -10,6 +10,7 @@ measure:
       - [5.,50.]
     TIME_WINDOW: [5.,45.] # before and after first arrival
     VERBOSE_MODE: True
+    IMEAS: 2 # 2 = L2 norm
   
   # noise 
   noise:
@@ -27,6 +28,7 @@ measure:
     ADJ_SRC_NORM: False  # if true, the adjoint source wiil be normalized
     USE_NEAR_OFFSET: True # if FALSE, reset tstart
     VERBOSE_MODE: True
+    IMEAS: 5 #  = 5 cross correlation  =7 multitaper
   
   # receiver function
   rf:
@@ -40,6 +42,7 @@ measure:
     TIME_WINDOW: [5.,25.] # time window, before/after t= 0
     TSHIFT: 5.
     VERBOSE_MODE: True
+    IMEAS: 2 # 2 = L2 norm
 
 # optimization
 optimize:

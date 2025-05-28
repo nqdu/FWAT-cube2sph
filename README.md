@@ -12,7 +12,7 @@ NAME evla evlo evdp evbur
 
 4. data should be in `fwat_data/$NAME`
 
-# Compile `measure_adj`
+# Compile `measure_adj_mpi`
 source `module_env` and then go to `measure_adj`, run :
 ```bash 
 make -f Makefile_ifort

@@ -1,0 +1,70 @@
+#!/bin/bash
+set -e 
+
+# gcc 
+F90="gfortran"
+MPIF90=mpif90
+F90FLAGS="-O3 -march=native"
+MODFLAG="-J"
+
+# intel 
+# MPIF90=mpif90
+# F90="ifort"
+# F90FLAGS="-O3 -xHost"
+# MODFLAG="-module "
+
+# SAC HOME
+SACHOME=${HOME}/software/seismology/sac/
+
+### STOP HERE ##########
+
+# check input dir
+if [[ $# -ne 1 ]]; then 
+    echo "Usage: ./INSTALL.sh INSTALL_DIR"
+    exit 1
+fi
+INSTALL_DIR=$1
+
+# sac lib
+SACLIB="-L ${SACHOME}/lib -lsacio -lsac"
+
+set -x 
+chmod +x *.sh 
+chmod +x fwatlib/*.sh
+
+# compile measure_adj
+cd measure_adj_mpi
+mkdir -p mod obj 
+
+set +x
+for m in ma_constants ma_variables ascii_rw ma_sub2 ma_sub sacio measure_adj_mod measure_adj_mpi;
+do 
+    set -x
+    $MPIF90  $F90FLAGS -g -c $m.f90 -o obj/$m.o  $MODFLAG mod 
+    set +x
+done 
+
+# link 
+set -x 
+$MPIF90 $F90FLAGS obj/*.o -o measure_adj_mpi $MODFLAG mod  $SACLIB 
+
+# rotate_adj_src
+$F90 $F90FLAGS -g -c rotate_adj_src.f90 -o obj/rotate_adj_src.o $MODFLAG mod 
+$F90 $F90FLAGS obj/ascii_rw.o obj/rotate_adj_src.o -o rotate_adj_src
+rm -rf obj mod 
+
+# install 
+mkdir -p ../fwatlib/measure/bin
+mv rotate_adj_src measure_adj_mpi ../fwatlib/measure/bin
+cd ..
+
+mkdir -p $INSTALL_DIR
+\cp -r module_env *.sh plots fwat_params $INSTALL_DIR/
+CDIR=`pwd`
+echo $CDIR
+awk -v val="$CDIR" '{if ($0 ~ /^FWATLIB_PATH=/) print "FWATLIB_PATH="val; else print $0}' $INSTALL_DIR/parameters.sh> tmp && mv tmp $INSTALL_DIR/parameters.sh
+set + x
+
+echo " ============= " 
+echo " Install Successfully ! 
+echo " ============= " 

@@ -1,12 +1,17 @@
 import numpy as np
 import sys 
 from obspy.io.sac import  SACTrace
-from obspy import read_events
+from mpi4py import MPI
 
 def main():
     if len(sys.argv) != 4:
         print("Usage: python ascii2sac.py stationfile sourcefile syndir")
         exit(1)
+
+    # initialize mpi
+    comm = MPI.COMM_WORLD
+    myrank = comm.Get_rank()
+    nprocs = comm.Get_size()    
     
     # get params
     stationfile = sys.argv[1]
@@ -37,7 +42,7 @@ def main():
     evdp = source_dict['depth']
 
     # loop around all stations
-    for i in range(nsta):
+    for i in range(myrank,nsta,nprocs):
         staname_base = statxt[i,1] + "." + statxt[i,0] + ".BX"
         stla = float(statxt[i,2])
         stlo = float(statxt[i,3])

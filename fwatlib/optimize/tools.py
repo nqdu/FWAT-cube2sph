@@ -66,8 +66,8 @@ class FwatModel:
             if self._kltype == 2:
                 direc_list[0] = 'dvpvs'
         elif self._mdtype == "dtti":
-            direc_list = ['drho']
-            direc_list += [f'dc{i+1}{j+1}' for i in range(6) for j in range(i,6)]
+            direc_list = [f'dc{i+1}{j+1}' for i in range(6) for j in range(i,6)]
+            direc_list += ['drho']
             if self._kltype == 1:
                 # vp,vs,rho,gc_nodim,gs_nodim  Zhu et al 2015, GJI, (25,26) 
                 direc_list = ["dalpha","dbeta","drho","dGcp","dGsp"]
@@ -194,14 +194,15 @@ class FwatModel:
     def convert_md(self,model:np.ndarray,backward=False):
         if self._mdtype == "iso":
             model_new = model.copy()
-            if not backward:
-                vp = model[0,...]
-                vs = model[1,...]
-                model_new[0,...] = vp / vs
-            else:
-                vpvs = model[0,...]
-                vs = model[1,...]
-                model_new[0,...] = vpvs * vs 
+            if self._kltype == 2:
+                if not backward:
+                    vp = model[0,...]
+                    vs = model[1,...]
+                    model_new[0,...] = vp / vs
+                else:
+                    vpvs = model[0,...]
+                    vs = model[1,...]
+                    model_new[0,...] = vpvs * vs 
         elif self._mdtype == "dtti":
             model_new = self._cijkl2dtti(model,backward)
         

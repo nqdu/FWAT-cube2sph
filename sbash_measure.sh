@@ -81,7 +81,6 @@ for i in `seq 1 $NJOBS`; do
   # copy common parameters
   \cp DATA/Par_file.$simu_type $evtdir/DATA/Par_file
   \cp fwat_params/FWAT.PAR.yaml $evtdir/DATA/FWAT.PAR.yaml
-  \cp fwat_params/MEASUREMENT.PAR.$simu_type $evtdir/DATA/MEASUREMENT.PAR
   \cp OUTPUT_FILES/*.h $evtdir/OUTPUT_FILES
   \rm -rf $evtdir/DATA/meshfem3D_files/*
   ln -s $work_dir/DATA/meshfem3D_files/* $evtdir/DATA/meshfem3D_files/
