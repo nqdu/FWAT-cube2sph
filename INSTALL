@@ -66,5 +66,5 @@ awk -v val="$CDIR" '{if ($0 ~ /^FWATLIB_PATH=/) print "FWATLIB_PATH="val; else p
 set + x
 
 echo " ============= " 
-echo " Install Successfully ! 
+echo " Install Successfully!"
 echo " ============= " 
