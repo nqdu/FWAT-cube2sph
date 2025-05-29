@@ -61,7 +61,7 @@ def main():
         phase = 'SKS'
     else:
         phase = evtid.split('_')[0]
-    tref = compute_ak135_time(evla,evlo,evdp,evtid,statxt,phase)
+    tref = compute_ak135_time(evla,evlo,evdp,statxt,phase)
     
     # synthetic data parameters
     syndir = f'solver/{mdir}/{evtname}/OUTPUT_FILES/'

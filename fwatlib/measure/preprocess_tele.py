@@ -206,7 +206,7 @@ def main():
     evla,evlo,evdp = get_source_loc(evtid,sourcefile)
 
     # compute ak135 theoretical travel time for each station
-    tref = compute_ak135_time(evla,evlo,evdp,evtid,statxt,'P')
+    tref = compute_ak135_time(evla,evlo,evdp,statxt,'P')
     
     # synthetic data parameters
     syndir = f'solver/{mdir}/{evtname}/OUTPUT_FILES/'
