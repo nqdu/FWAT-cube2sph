@@ -15,40 +15,22 @@ def get_injection_time(evtid:str):
     return t_inj 
 
 
-def compute_ak135_time(evtid,statxt,phase='P',do_ls = False,return_src_info=False):
+def compute_ak135_time(evla:float,evlo:float,evdp:float,statxt,phase='P'):
     from obspy.taup import TauPyModel
     
     nsta = statxt.shape[0]
     t_ref = np.zeros((nsta))
-    sourcefile = 'src_rec/sources.dat.tele'
-    if do_ls:
-        sourcefile = 'src_rec/sources.dat.ls.tele'
-    temp = np.loadtxt(sourcefile,dtype=str,ndmin=2)
 
     # create taup model
     model = TauPyModel("ak135")
-
-    # loop every source to find travel time
-    find_source = False
-    evla,evlo,evdp = 0,0,0
-    for i in range(temp.shape[0]):
-        if temp[i,0] == evtid:
-            evla,evlo,evdp = float(temp[i,1]),float(temp[i,2]),float(temp[i,3])
-            find_source = True
-    
-    if not find_source:
-        print(f"cannot find source, please check {evtid} and {sourcefile}")
-        exit(1)
     
     for i in range(nsta):
         stla = float(statxt[i,2])
         stlo = float(statxt[i,3])
         t_ref[i] = model.get_travel_times_geo(evdp,evla,evlo,stla,stlo,[phase])[0].time
     
-    if return_src_info:
-        return t_ref,evla,evlo,evdp
-    else:
-        return t_ref
+
+    return t_ref
 
 def get_average_amplitude(glob_obs,icomp):
     """

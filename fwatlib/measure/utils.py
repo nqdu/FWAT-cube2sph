@@ -131,7 +131,39 @@ def cumtrapz1(data,dt):
 
     return data1
 
-def get_sem_seismo_info(sacfile:str):
+def get_source_loc(evtid:str,sourcefile:str):
+    """
+    get source location evla,evlo,evdp
+
+    Parameters:
+    ----------------
+    evtid: str
+        source tag
+    sourcefile: str
+        source file, like sources.dat.tele
+
+    Returns
+    -------------
+    evla,evlo,evdp: lat/lon/depth (in km) of this source
+    """
+    # load source file in txt 
+    temp = np.loadtxt(sourcefile,dtype=str,ndmin=2)
+
+    # loop every source to find travel time
+    find_source = False
+    evla,evlo,evdp = 0,0,0
+    for i in range(temp.shape[0]):
+        if temp[i,0] == evtid:
+            evla,evlo,evdp = float(temp[i,1]),float(temp[i,2]),float(temp[i,3])
+            find_source = True
+    
+    if not find_source:
+        print(f"cannot find source, please check {evtid} and {sourcefile}")
+        exit(1)
+    
+    return evla,evlo, evdp 
+
+def get_simu_info(sacfile:str):
     from obspy.io.sac import SACTrace
     syn_z_hd = SACTrace.read(sacfile,headonly=True)
     npt = syn_z_hd.npts

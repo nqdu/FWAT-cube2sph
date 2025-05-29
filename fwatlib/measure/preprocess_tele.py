@@ -6,7 +6,7 @@ import os
 from mpi4py import MPI
 
 from utils import interpolate_syn,read_params,preprocess
-from utils import get_sem_seismo_info
+from utils import get_simu_info,get_source_loc
 from tele.tele import get_average_amplitude,compute_ak135_time
 from tele.tele import get_injection_time
 from scipy.signal import convolve,correlate
@@ -201,15 +201,17 @@ def main():
     statxt = np.loadtxt(stationfile,dtype=str,ndmin=2)
     nsta = statxt.shape[0]
 
+    # read source loc
+    sourcefile = "./src/sources.dat.tele"
+    evla,evlo,evdp = get_source_loc(evtid,sourcefile)
+
     # compute ak135 theoretical travel time for each station
-    do_ls = False
-    if run_opt == 2: do_ls=True
-    tref = compute_ak135_time(evtid,statxt,'P',do_ls)
+    tref = compute_ak135_time(evla,evlo,evdp,evtid,statxt,'P')
     
     # synthetic data parameters
     syndir = f'solver/{mdir}/{evtname}/OUTPUT_FILES/'
     name = statxt[0,1] + "." + statxt[0,0] + CCODE + f"{components[0]}.sac"
-    _,dt_syn,npt_syn = get_sem_seismo_info(syndir + name)
+    _,dt_syn,npt_syn = get_simu_info(syndir + name)
     t0_syn = t_inj # starttime is injection time
 
     # get time window 

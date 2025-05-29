@@ -12,13 +12,11 @@ NAME evla evlo evdp evbur
 
 4. data should be in `fwat_data/$NAME`
 
-# Compile `measure_adj_mpi`
-source `module_env` and then go to `measure_adj`, run :
-```bash 
-make -f Makefile_ifort
+5. change parameters in `INSTALL` and run it
+```bash
+./INSTALL INSTALL_DIR
 ```
-
-then go to `fwatlib`, run `compile_all.sh`
+then this package will be installed on `INSTAL_DIR`
 
 # python packages required
 see `requirements.txt`

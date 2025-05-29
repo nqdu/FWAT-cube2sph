@@ -16,21 +16,22 @@
 #
 ###################################################
 source module_env
-export OMP_NUM_THREADS=1
+. parameters.sh
 
 # error flag
 set -e 
-
-# include file
-. parameters.sh
 
 #==== Comment out the following if running SEM mesh with new models====#
 MODEL=M00
 simu_type=noise
 NJOBS=8
 START_SET=1
+LOCAL_PC=0
+
+#### STOP HERE #### #
+
 NPROC=`grep ^"NPROC" DATA/Par_file | cut -d'=' -f2`
-LOCAL_PC=1
+
 
 # parfile changer script
 change_par=$FWATLIB/change_par_file.sh
@@ -96,7 +97,8 @@ for i in `seq 1 $NJOBS`; do
   cd src_rec
   \cp STATIONS_$evtid $evtdir/DATA/STATIONS
   \cp STATIONS_$evtid $evtdir/DATA/STATIONS_ADJOINT
-  if [[ $simu_type == "tele" ]]; then 
+  if [[ $simu_type == "tele" ]] || \
+     [[ $simu_type == "sks" ]] ; then 
     :> $evtdir/DATA/FORCESOLUTION
     
     # change parameters
@@ -113,7 +115,8 @@ for i in `seq 1 $NJOBS`; do
     cd ..
     $change_par COUPLE_WITH_INJECTION_TECHNIQUE .false. $evtdir/DATA/Par_file
   else 
-    echo "noise"
+    echo "not implemented!"
+    exit 1
   fi
   cd $work_dir
 

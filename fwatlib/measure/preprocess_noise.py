@@ -6,7 +6,7 @@ import os
 
 from utils import read_params,interpolate_syn
 from utils import preprocess,dif1,cumtrapz1
-from utils import get_sem_seismo_info
+from utils import get_simu_info
 
 def main():
     if len(sys.argv) != 4:
@@ -52,7 +52,7 @@ def main():
     # synthetic parameters
     syndir = f'solver/{mdir}/' + f'{evtname}/OUTPUT_FILES/'
     name = statxt[0,1] + "." + statxt[0,0] + CCODE + f"{components[0]}.sac"
-    t0_syn,dt_syn,npt_syn = get_sem_seismo_info(syndir + name)
+    t0_syn,dt_syn,npt_syn = get_simu_info(syndir + name)
 
     # write synthetic data to SYN dir
     if run_opt == 1:

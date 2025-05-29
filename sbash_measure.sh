@@ -96,7 +96,8 @@ for i in `seq 1 $NJOBS`; do
   cd src_rec
   \cp STATIONS_$evtid $evtdir/DATA/STATIONS
   \cp STATIONS_$evtid $evtdir/DATA/STATIONS_ADJOINT
-  if [[ $simu_type == "tele" ]]; then 
+  if [[ $simu_type == "tele" ]] || \
+     [[ $simu_type == "sks" ]] ; then 
     :> $evtdir/DATA/FORCESOLUTION
     
     # change parameters
@@ -113,7 +114,8 @@ for i in `seq 1 $NJOBS`; do
     cd ..
     $change_par COUPLE_WITH_INJECTION_TECHNIQUE .false. $evtdir/DATA/Par_file
   else 
-    echo "noise"
+    echo "not implemented!"
+    exit 1
   fi
   cd $work_dir
 

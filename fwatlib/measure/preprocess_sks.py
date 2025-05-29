@@ -6,8 +6,8 @@ import numpy as np
 from obspy.io.sac import SACTrace
 
 from utils import preprocess,read_params,interpolate_syn
-from utils import get_sem_seismo_info,dif1,cumtrapz1
-from utils import rotate_RT_to_NE
+from utils import get_simu_info,dif1,cumtrapz1
+from utils import rotate_RT_to_NE,get_source_loc
 from tele.tele import compute_ak135_time,get_injection_time
 
 def main():
@@ -52,19 +52,21 @@ def main():
     statxt = np.loadtxt(stationfile,dtype=str,ndmin=2)
     nsta = statxt.shape[0]
 
+    # read source loc
+    sourcefile = "./src/sources.dat.sks"
+    evla,evlo,evdp = get_source_loc(evtid,sourcefile)
+
     # compute ak135 theoretical travel time for each station
-    do_ls = False
-    if run_opt == 2: do_ls=True
     if '_' not in evtid:
         phase = 'SKS'
     else:
         phase = evtid.split('_')[0]
-    tref,evla,evlo,_ = compute_ak135_time(evtid,statxt,phase,do_ls,True)
+    tref = compute_ak135_time(evla,evlo,evdp,evtid,statxt,phase)
     
     # synthetic data parameters
     syndir = f'solver/{mdir}/{evtname}/OUTPUT_FILES/'
     name = statxt[0,1] + "." + statxt[0,0] + CCODE + f"T.sac"
-    _,dt_syn,npt_syn = get_sem_seismo_info(syndir + name)
+    _,dt_syn,npt_syn = get_simu_info(syndir + name)
 
     # get time window 
     win_tb,win_te = pdict['TIME_WINDOW']

@@ -17,18 +17,29 @@ measure:
     COMPS: ['Z'] # components used 
     CH_CODE: BX   # CH_CODE
     FILTER_BANDS:  # filter bands used, in s, [T_min,Tmax]
-      - [3.,10.]
-      - [7.,12.]
-      - [12.,20.]
+      - [20.,40.]
+      - [15.,30.]
+      - [10.,20.]
+      - [5.,15.]
     GROUPVEL_WIN:   # Time window, determined by group velocity, km/s, [v_min,vmax]
-      - [2.3,4.5]
-      - [2.3,4.5]
-      - [2.3,4.5]
+      - [2.5,4.5]
+      - [2.5,4.5]
+      - [2.5,4.5]
+      - [2.5,4.5]
     USE_EGF: True   # if False, the input data is Cross-correlation, a negative derivative will be applied
     ADJ_SRC_NORM: False  # if true, the adjoint source wiil be normalized
     USE_NEAR_OFFSET: True # if FALSE, reset tstart
     VERBOSE_MODE: True
     IMEAS: 5 #  = 5 cross correlation  =7 multitaper
+
+  # sks 
+  sks:
+    CH_CODE: BX   # CH_CODE
+    FILTER_BANDS: 
+      - [5.,50.]
+    TIME_WINDOW: [5.,45.] # before and after first arrival
+    VERBOSE_MODE: True
+    IMEAS: 2 # 2 = L2 norm
   
   # receiver function
   rf:
@@ -46,19 +57,16 @@ measure:
 
 # optimization
 optimize:
-  SMOOTHING: [10000.,3500.]  # gaussian smoothing in horizontal/vertical direction, in m
+  SMOOTHING: [16000.,8000.]  # gaussian smoothing in horizontal/vertical direction, in m
   OPT_METHOD: LBFGS  # SD/ LBFGS
   PRECOND_TYPE: z_precond # default / z_precond /z2_precond
   MAX_PER: 0.02 # maximum relative perturbation
 
   # model/kernel type
-  #   iso configuration
-  #     0: kappa,mu,rho
-  #     1: vp,vs,rho
-  #     2: vp/vs,vs,rho
-  # dtti configuration:
-  #     0: c11-c66,rho
-  #     1: vp,vs,rho,gcp,gsp
-  #     2. vph,vpv,vsh,vsv,rho,gcp,gsp
-  MODEL_TYPE: dtti 
+  # iso model: 
+    # iso model by default, we use parameter set vp_vs_rho
+    # = 0 kappa_mu_rho
+    # = 1  vp_vs_rho
+    # = 2 vpvs_vs_rho  
+  MODEL_TYPE: iso 
   KERNEL_SET: 2
