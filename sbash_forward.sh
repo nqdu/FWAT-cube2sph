@@ -30,7 +30,7 @@ LOCAL_PC=0
 
 #### STOP HERE #### #
 
-NPROC=`grep ^"NPROC" DATA/Par_file | cut -d'=' -f2`
+NPROC=`grep ^"NPROC" DATA/Par_file.$simu_type | cut -d'=' -f2`
 
 
 # parfile changer script

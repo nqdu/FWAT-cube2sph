@@ -67,6 +67,7 @@ def main():
     syndir = f'solver/{mdir}/{evtname}/OUTPUT_FILES/'
     name = statxt[0,1] + "." + statxt[0,0] + CCODE + f"T.sac"
     _,dt_syn,npt_syn = get_simu_info(syndir + name)
+    t0_syn = t_inj * 1
 
     # get time window 
     win_tb,win_te = pdict['TIME_WINDOW']

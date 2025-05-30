@@ -70,6 +70,7 @@ NJOBS=8
 
 # mkdir 
 mkdir -p misfits optimize solver
+\cp DATA/Par_file.$simu_type  DATA/Par_file
 
 # some jobid 
 job_adj=0
