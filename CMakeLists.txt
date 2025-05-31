@@ -13,11 +13,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
-project(axisem LANGUAGES CXX Fortran)
+project(measure_adj LANGUAGES CXX Fortran)
 file (GLOB SOURCE_FILES "${PROJECT_SOURCE_DIR}/src/*.f90")
 
 #find_package(Python3 COMPONENTS Interpreter Development)
-find_package(pybind11 CONFIG)
+find_package(pybind11 CONFIG REQUIRED)
 pybind11_add_module(libmeas src/main.cpp ${SOURCE_FILES})
 
 #message(${SACHOME})
