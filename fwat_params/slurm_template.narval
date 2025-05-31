@@ -1,2 +1,0 @@
-#SBATCH --account=rrg-liuqy
-#SBATCH --mem=12G
