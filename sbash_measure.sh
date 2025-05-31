@@ -139,7 +139,8 @@ for i in `seq 1 $NJOBS`; do
   echo ""
   cd $work_dir
   date
-  bash $MEASURE_LIB/measure.$simu_type.sh $iter $evtid $run_opt >> $fwd 
+  mpirun -np $NPROC $MEASURE_LIB/run_preprocess.py $simu_type $iter $evtid $run_opt
+  #bash $MEASURE_LIB/measure.$simu_type.sh $iter $evtid $run_opt >> $fwd 
   date
 
   # adjoint simulation

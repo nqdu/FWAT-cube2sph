@@ -1,5 +1,22 @@
 import numpy as np 
 
+def alloc_mpi_jobs(ntasks,nprocs,myrank):
+    sub_n = ntasks // nprocs
+    num_larger_procs = ntasks - nprocs * sub_n
+    startid = 0
+    if myrank < num_larger_procs:
+        sub_n = sub_n + 1
+        startid = 0 + myrank * sub_n
+    elif sub_n > 0 : 
+        startid = 0 + num_larger_procs + myrank * sub_n
+    else : #// this process has only zero elements
+        startid = -1
+        sub_n = 0
+    
+    endid = startid + sub_n - 1
+
+    return startid,endid
+
 def read_params(paramfile="fwat_params/FWAT.PAR.yaml"):
     import yaml
     with open(paramfile,"r") as f:
@@ -115,6 +132,23 @@ def preprocess(u,dt,freqmin,freqmax):
 
     return w
 
+def bandpass(u,dt,freqmin,freqmax):
+    import obspy
+    tr = obspy.Trace(data = u)
+    tr.stats.delta = dt 
+
+    tr.detrend("demean")
+    tr.detrend("linear")
+    tr.taper(0.05)
+    tr.filter("bandpass",freqmin=freqmin,freqmax=freqmax,zerophase=True,corners=4)
+    tr.detrend("demean")
+    tr.detrend("linear")
+    tr.taper(0.05)
+
+    w = np.float32(tr.data)
+
+    return w
+
 # diff function,central difference 1-st order 
 def dif1(data,dt):
     n = len(data)
@@ -172,14 +206,40 @@ def get_simu_info(sacfile:str):
 
     return t0,dt,npt
 
-def rotate_NE_to_RT(vn:np.ndarray,ve:np.ndarray,bazd):
+def _geod2geoc(geographic_lat_deg, flattening=0.0033528106647474805):
+    """
+    Convert geographic (geodetic) latitude to geocentric latitude.
+    
+    Parameters:
+        geographic_lat_deg : float
+            Geographic latitude in degrees.
+        flattening : float
+            Flattening of the ellipsoid (default is WGS-84).
+    
+    Returns:
+        geocentric_lat_deg : float
+            Geocentric latitude in degrees.
+    """
+    phi = np.radians(geographic_lat_deg)
+    geocentric_phi = np.atan((1 - flattening) ** 2 * np.tan(phi))
+    return np.degrees(geocentric_phi)
+
+
+def cal_dist_baz(lat1:float,lon1:float,lat2:float,lon2:float):
+    from obspy.geodetics import calc_vincenty_inverse
+
+    dist_in_m,_,baz = calc_vincenty_inverse(_geod2geoc(lat1),lon1,_geod2geoc(lat2),lon2,6371000.,0.)
+    
+    return dist_in_m,baz
+
+def rotate_EN_to_RT(ve:np.ndarray,vn:np.ndarray,bazd):
     """
     rotate NE components to RT, by using bazd
     
     Parameters
     ---------------
-    vn,ve: np.ndarrray
-        N/E componenets
+    ve,vn: np.ndarrray
+        E/N componenets
     bazd: float
         back azimuth, in deg
 
@@ -194,7 +254,7 @@ def rotate_NE_to_RT(vn:np.ndarray,ve:np.ndarray,bazd):
 
     return vr,vt
 
-def rotate_RT_to_NE(vr:np.ndarray,vt:np.ndarray,bazd):
+def rotate_RT_to_EN(vr:np.ndarray,vt:np.ndarray,bazd):
     """
     rotate NE components to RT, by using bazd
     
@@ -206,12 +266,12 @@ def rotate_RT_to_NE(vr:np.ndarray,vt:np.ndarray,bazd):
         back azimuth, in deg
 
     Returns:
-    vn,ve: np.ndarray
-        N/E components
+    ve,vn: np.ndarray
+        E/N components
     """
     from numpy import sin,cos 
     baz = np.deg2rad(bazd)
     ve = -vr * sin(baz) - vt * cos(baz)
     vn = -vr * cos(baz) + vt * sin(baz)
 
-    return vn,ve
+    return ve,vn

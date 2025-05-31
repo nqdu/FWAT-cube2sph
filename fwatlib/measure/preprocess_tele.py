@@ -202,7 +202,7 @@ def main():
     nsta = statxt.shape[0]
 
     # read source loc
-    sourcefile = "./src/sources.dat.tele"
+    sourcefile = "./src_rec/sources.dat.tele"
     evla,evlo,evdp = get_source_loc(evtid,sourcefile)
 
     # compute ak135 theoretical travel time for each station

@@ -3,14 +3,12 @@ set -e
 
 # gcc 
 F90="gfortran"
-CXX="g++"
 MPIF90=mpif90
 F90FLAGS="-O3 -march=native"
 MODFLAG="-J"
 
 # intel 
 # MPIF90=mpif90
-#CXX="icc"
 # F90="ifort"
 # F90FLAGS="-O3 -xHost"
 # MODFLAG="-module "
@@ -27,17 +25,38 @@ if [[ $# -ne 1 ]]; then
 fi
 INSTALL_DIR=$1
 
+# sac lib
+SACLIB="-L ${SACHOME}/lib -lsacio -lsac"
+
 set -x 
 chmod +x *.sh 
 chmod +x fwatlib/*.sh
 
 # compile measure_adj
-mkdir -p build
-cd build
-cmake .. -DCXX=$CXX -DFC=$F90 -DSACHOME=${SACHOME}
-make install -j4 
+cd measure_adj_mpi
+mkdir -p mod obj 
+
+set +x
+for m in ma_constants ma_variables ascii_rw ma_sub2 ma_sub sacio measure_adj_mod measure_adj_mpi;
+do 
+    set -x
+    $MPIF90  $F90FLAGS -g -c $m.f90 -o obj/$m.o  $MODFLAG mod 
+    set +x
+done 
+
+# link 
+set -x 
+$MPIF90 $F90FLAGS obj/*.o -o measure_adj_mpi $MODFLAG mod  $SACLIB 
+
+# rotate_adj_src
+$F90 $F90FLAGS -g -c rotate_adj_src.f90 -o obj/rotate_adj_src.o $MODFLAG mod 
+$F90 $F90FLAGS obj/ascii_rw.o obj/rotate_adj_src.o -o rotate_adj_src
+rm -rf obj mod 
+
+# install 
+mkdir -p ../fwatlib/measure/bin
+mv rotate_adj_src measure_adj_mpi ../fwatlib/measure/bin
 cd ..
-rm -rf build 
 
 mkdir -p $INSTALL_DIR
 \cp -r module_env *.sh plots fwat_params $INSTALL_DIR/

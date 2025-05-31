@@ -71,7 +71,7 @@ fi
 echo ""
 cd $SYN_DIR
 fwat_file=../DATA/FWAT.PAR.yaml
-info=`python $FWATLIB/get_param.py measure/tele/FILTER_BANDS $fwat_file  | sed 's/\[\|]//g' | sed 's/,/ /g'`
+info=`python $FWATLIB/get_param.py measure/sks/FILTER_BANDS $fwat_file  | sed 's/\[\|]//g' | sed 's/,/ /g'`
 LONG_P=(`echo $info | awk '{for(i=2; i<=NF; i+=2) print $i}'`)
 SHORT_P=(`echo $info | awk '{for(i=1; i<=NF; i+=2) print $i}'`)
 NUM_FILTER=`echo ${#SHORT_P[@]}`
@@ -85,7 +85,7 @@ for ((i=0;i<$NUM_FILTER;i++));
 do
   band=`printf "T%03g_T%03g" ${SHORT_P[$i]} ${LONG_P[$i]}`
   cd $band 
-  cat window_chi >  $current_dir/misfits/$mod.${evtid}${lsflag}_${band}_tele_window_chi
+  cat window_chi >  $current_dir/misfits/$mod.${evtid}${lsflag}_${band}_sks_window_chi
 
   # convert sac to hdf5
   python $FWATLIB/measure/sac2h5.py ../seismogram.obs.$band.h5 *.sac.obs
@@ -93,4 +93,4 @@ do
 done
 
 cd $current_dir
-bash $MEASURE_LIB/sum_adj_source.sh $iter $evtid tele $run_opt
+bash $MEASURE_LIB/sum_adj_source.sh $iter $evtid sks $run_opt

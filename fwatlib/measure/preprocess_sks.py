@@ -162,8 +162,8 @@ def main():
                 norm = 1. / norm
             Tobs = obs_data[1,:]
             Tsyn = syn_data[1,:]
-            SI_obs = -2. * cumtrapz1(Robs_dot,Tobs,dt_syn)[-1] * norm
-            SI_syn = -2. * cumtrapz1(Robs_dot,Tsyn,dt_syn)[-1] * norm
+            SI_obs = -2. * cumtrapz1(Robs_dot*Tobs,dt_syn)[-1] * norm
+            SI_syn = -2. * cumtrapz1(Robs_dot*Tsyn,dt_syn)[-1] * norm
             L = 0.5 * (SI_syn - SI_obs)**2
             misfits[i,:] = [SI_obs,SI_syn,L]
 
@@ -193,12 +193,12 @@ def main():
 
             # save adjoint source
             data = np.zeros((3,npt_syn,2))
-            data[:,0,:] = np.arange(npt_syn) * dt_syn
-            data[0,1,:] = adjsrc_N
-            data[1,1,:] = adjsrc_E 
-            data[2,1,:] = adjsrc_Z
+            data[:,:,0] = np.arange(npt_syn) * dt_syn
+            data[0,:,1] = adjsrc_N
+            data[1,:,1] = adjsrc_E 
+            data[2,:,1] = adjsrc_Z
             for ic,ch in enumerate(['N','E','Z']):
-                filename = f"{syndir}/{bandname}/OUTPUT_FILES/" + statxt[i,1] + "." + statxt[i,0] + CCODE + "{ch}.adj"
+                filename = f"{syndir}/{bandname}/OUTPUT_FILES/" + statxt[i,1] + "." + statxt[i,0] + CCODE + f"{ch}.adj"
                 np.savetxt(filename,data[ic,:,:],fmt="%g")
         
         # gather misfits
@@ -213,7 +213,7 @@ def main():
                 ch = pdict['CH_CODE'] + 'T'
                 temp = np.zeros((20),'f4')
                 fio.write(
-                    f"{sta}.{net} {sta} {net} {ch} i 0 %f %f {temp} %f %f %f 0. 0.\n" %(
+                    f"{sta}.{net} {sta} {net} {ch} {i} 0 %f %f {' '.join(map(str,temp))} %f %f %f 0. 0.\n" %(
                         -win_tb + tref[i] - t_inj,win_te + tref[i] - t_inj, 
                         misfits[i,-1],misfits[i,0],misfits[i,1]
                     )
