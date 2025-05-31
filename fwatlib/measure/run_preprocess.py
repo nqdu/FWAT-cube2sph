@@ -68,7 +68,7 @@ class FwatPreOP:
 
         # read simulation info dt,t0,npts
         fio = h5py.File(f"{self.syndir}/OUTPUT_FILES/seismograms.h5","r")
-        t = fio[fio.keys()[0]][:,0]
+        t = fio[list(fio.keys())[0]][:,0]
         fio.close()
         self.t0_syn = t[0]
         self.dt_syn = t[1] - t[0]
