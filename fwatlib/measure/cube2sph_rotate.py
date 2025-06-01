@@ -4,9 +4,24 @@ from string import Template
 from mpi4py import MPI
 import h5py
 
+
+def _count_lines(filename):
+    with open(filename, 'rb') as f:
+        count = 0
+        while True:
+            buf = f.read(1024 * 1024)
+            if not buf:
+                break
+            count += buf.count(b'\n')
+            last_buf = buf
+        # Check if the last line is missing a newline
+        if last_buf and not last_buf.endswith(b'\n'):
+            count += 1
+        return count
+
 def rotate_seismo(fn_matrix:str,rotate:str,from_dir:str,
            to_dir:str,from_template_str:str,
-           to_template_str:str):
+           to_template_str:str,infile='h5'):
     """
     Python script to rotate seismograms between the Cartesian system and the Geographic system
     Tianshi Liu - 2022.03.24
@@ -47,6 +62,8 @@ def rotate_seismo(fn_matrix:str,rotate:str,from_dir:str,
 
     ignoring N and E components
     """
+    assert(infile in ['h5','ascii'])
+
     #--MPI-
     comm = MPI.COMM_WORLD
     myrank = comm.Get_rank()
@@ -67,7 +84,8 @@ def rotate_seismo(fn_matrix:str,rotate:str,from_dir:str,
         raise ValueError('invalid rotate parameter')
     
     # open h5py
-    fio = h5py.File(from_dir + "/seismograms.h5","r")
+    if infile == 'h5':
+        fio = h5py.File(from_dir + "/seismograms.h5","r")
 
     #arr = np.zeros(shape(nsteps, 2), dtype=float)
     nu = np.zeros(shape=(3,3), dtype=float)
@@ -95,27 +113,41 @@ def rotate_seismo(fn_matrix:str,rotate:str,from_dir:str,
             if (from_comp[i_comp] == '0'):
                 continue 
             dname = from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp])
-            if dname not in fio.keys():
-            # fn = os.path.join(from_dir, 
-            #         from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp]))
-            # if (not os.path.isfile(fn)):
-            #     #print(fn)
-                print(f"{dname} does not exist but required by rotation, skipping this station")
-                #os.system(f"wc -l {fn}")
-                missing_file = True
-                break
-            if (nstep < 0):
-                nstep = fio[dname].shape[0]
+            if infile == 'h5':
+                if dname not in fio.keys():
+                    print(f"{dname} does not exist but required by rotation, skipping this station")
+                    missing_file = True
+                    break
+
+                if nstep < 0:
+                    nstep = fio[dname].shape[0]
+            else:
+                fn = os.path.join(from_dir, 
+                        from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp]))
+                if (not os.path.isfile(fn)):
+                    print(fn)
+                    print(f"{dname} does not exist but required by rotation, skipping this station")
+                    #os.system(f"wc -l {fn}")
+                    missing_file = True
+                    break
+                if nstep < 0:
+                    nstep = _count_lines(fn)
+        
         if (missing_file):
             continue
         seis = np.zeros(shape=(nstep, 3), dtype=float)
         for i_comp in range(0, 3):
             if (from_comp[i_comp] == '0'):
                 continue
-            dname = from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp])
-            #print(f"reading from {fn}")
-            arr = fio[dname][:]
-            seis[:,i_comp] = arr[:,1]
+            if infile == 'h5':
+                dname = from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp])
+                arr = fio[dname][:]
+                seis[:,i_comp] = arr[:,1]
+            else:
+                fn = os.path.join(from_dir, 
+                    from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp]))
+                arr = np.loadtxt(fn)
+                seis[:,i_comp] = arr[:,1]
 
         if (forward):
             seis = np.matmul(seis, np.transpose(nu))

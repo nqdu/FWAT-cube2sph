@@ -141,7 +141,7 @@ class FwatPreOP:
 
         # rotate seismograms from XYZ to ZNE
         rotate_seismo(fn_matrix,rotate,from_dir,
-                      to_dir,from_template,to_template)
+                      to_dir,from_template,to_template,'ascii')
         
     def save_forward(self):
         import os 
@@ -263,7 +263,8 @@ class FwatPreOP:
                         print("tr_chi = %f am_chi = %f" %(tr_chi[ir],am_chi[ir]))
                         print("")
 
-                        fio.write(f"{name} {self.stnm[i]} {self.netwk[i]} {self.chcode} 1 {imeas} ")
+                        ch = self.components[ic]
+                        fio.write(f"{name} {self.stnm[i]} {self.netwk[i]} {self.chcode}{ch} 1 {imeas} ")
                         fio.write("%f %f " %(tstart[ir],tend[ir]))
                         for j in range(20):
                             fio.write("%f " %(window_chi[ir,j]))
