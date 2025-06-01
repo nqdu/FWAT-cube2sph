@@ -360,7 +360,7 @@ class FwatPreOP:
 
                 # compute time window
                 tstart[ir] = dist / vmax_list[ib] - self.Tmax[ib] * 0.5 
-                tend[ir] = dist / vmax_list[ib] - self.Tmax[ib] * 0.5 
+                tend[ir] = dist / vmax_list[ib] + self.Tmax[ib] * 0.5 
                 tstart[ir] = max(tstart[ir],t0_inp)
                 tend[ir] = min(tend[ir],t0_obs+(npt_obs-1)*dt_obs)
 
