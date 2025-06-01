@@ -167,4 +167,4 @@ def rotate_seismo(fn_matrix:str,rotate:str,from_dir:str,
             np.savetxt(fname=fn, X=arr, fmt='%11.6f%19.7E')
 
     comm.barrier()
-    fio.close()
+    if infile == 'h5': fio.close()
