@@ -7,7 +7,7 @@ subroutine measure_adj_fwat(obs_in,syn_in,npts,t0,dt,&
                           DT_SIGMA_MIN_in, DLNA_SIGMA_MIN_in, ITAPER_in, &
                           WTR_in, NPI_in, DT_FAC_in, ERR_FAC_in, DT_MAX_SCALE_in, &
                           NCYCLE_IN_WINDOW_in, USE_PHYSICAL_DISPERSION_in,&
-                          window_chi,tr_chi,am_chi,adj_out)
+                          window_chi,tr_chi,am_chi,adj_out) bind(C,name='measure_adj_fwat_')
   use iso_c_binding
   use ma_constants
   use ma_variables

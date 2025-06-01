@@ -14,17 +14,14 @@ set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
 project(measure_adj LANGUAGES CXX Fortran)
-file (GLOB SOURCE_FILES "${PROJECT_SOURCE_DIR}/src/*.f90")
+file (GLOB SOURCE "${PROJECT_SOURCE_DIR}/src/*.f90")
 
 #find_package(Python3 COMPONENTS Interpreter Development)
 find_package(pybind11 CONFIG REQUIRED)
-pybind11_add_module(libmeas src/main.cpp ${SOURCE_FILES})
+pybind11_add_module(libmeas src/main.cpp ${SOURCE})
 
-#message(${SACHOME})
 target_link_directories(libmeas PRIVATE ${SACHOME}/lib)
-#link_directories(${SACHOME}/lib)
 target_link_libraries(libmeas PRIVATE sacio sac)
-#set_target_properties(sacio sac  PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 install(TARGETS libmeas
   COMPONENT python

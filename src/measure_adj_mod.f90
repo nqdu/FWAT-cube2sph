@@ -178,7 +178,7 @@ subroutine measure_adj(data_in,syn_in,npts,t0,dt, &
     file_prefix0 = trim(sta)//'.'//trim(net)//'.'//trim(chan_syn)
     file_prefix2 = trim(OUT_DIR)//'/'//trim(file_prefix0)
     ! print *
-    print *,  trim(file_prefix2), ' --- '
+    !print *,  trim(file_prefix2), ' --- '
 
     ! note: MT measurement could revert to CC, but still keep the MT suffix
     write(adj_file_prefix,'(a,i2.2)') trim(file_prefix2)//'.iker', imeas0

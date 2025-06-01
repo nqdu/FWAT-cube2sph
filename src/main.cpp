@@ -1,5 +1,5 @@
-#include<pybind11/pybind11.h>
-#include<pybind11/numpy.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
 
 #include <iostream>
 #include <string>
@@ -87,7 +87,7 @@ auto measure(double t0,double dt, int npts,
     double tr_chi,am_chi;
     char chan[4] = "BXZ";
 
-    measure_adj_fwat_(obs.data(),syn.data(),npts,t0,dt,verbose,tstart,tend,tt,dtt,nn,
+    measure_adj_fwat(obs.data(),syn.data(),npts,t0,dt,verbose,tstart,tend,tt,dtt,nn,
                      chan,imeas,tlong,tshort,RUN_BANDPASS, DISPLAY_DETAILS, 
                      OUTPUT_MEASUREMENT_FILES,
                     COMPUTE_ADJOINT_SOURCE,

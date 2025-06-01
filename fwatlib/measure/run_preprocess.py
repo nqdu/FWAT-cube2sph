@@ -808,6 +808,7 @@ class FwatPreOP:
             return 0
         
         # loop each frequency band to compute misfit/adjoint source 
+        self._get_obs_info()
         for ib in range(len(self.Tmax)):
             self.cal_adj_source(ib)
         
