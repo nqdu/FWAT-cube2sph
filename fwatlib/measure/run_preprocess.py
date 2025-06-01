@@ -260,15 +260,15 @@ class FwatPreOP:
                         print("start and end time of window: %f %f" %(tstart[ir],tend[ir]) )
                         print(f"adjoint source and chi value for imeas = {imeas}")
                         print("%f" %(window_chi[ir,6]))
-                        print("tr_chi = %f am_chi = %f" %(tr_chi[ir],am_chi[ir]))
+                        print("tr_chi = %g am_chi = %g" %(tr_chi[ir],am_chi[ir]))
                         print("")
 
                         ch = self.components[ic]
-                        fio.write(f"{name} {self.stnm[i]} {self.netwk[i]} {self.chcode}{ch} 1 {imeas} ")
-                        fio.write("%f %f " %(tstart[ir],tend[ir]))
+                        fio.write(f"{self.evtid} {self.stnm[i]} {self.netwk[i]} {self.chcode}{ch} 1 {imeas} ")
+                        fio.write("%g %g " %(tstart[ir],tend[ir]))
                         for j in range(20):
-                            fio.write("%f " %(window_chi[ir,j]))
-                        fio.write("%f %f 0. 0.\n" %(tr_chi[ir],am_chi[ir]))
+                            fio.write("%g " %(window_chi[ir,j]))
+                        fio.write("%g %g 0. 0.\n" %(tr_chi[ir],am_chi[ir]))
                 
                 # close output file
                 fio.close()
