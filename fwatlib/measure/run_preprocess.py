@@ -686,6 +686,8 @@ class FwatPreOP:
         nb = len(self.Tmax)
         if self.myrank == 0:
             print("\nsum adjoint source ...")
+            os.makedirs(f"{self.syndir}/SEM",exist_ok=True)
+        MPI.COMM_WORLD.Barrier()
 
         # loop each stations
         for i in range(self.myrank,self.nsta,self.nprocs):
