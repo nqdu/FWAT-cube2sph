@@ -2,19 +2,20 @@
 set -e 
 
 # gcc 
-F90="gfortran"
-MPIF90=mpif90
-F90FLAGS="-O3 -march=native"
-MODFLAG="-J"
+# F90="gfortran"
+# MPIF90=mpif90
+# F90FLAGS="-O3 -march=native"
+# MODFLAG="-J"
 
 # intel 
-# MPIF90=mpif90
-# F90="ifort"
-# F90FLAGS="-O3 -xHost"
-# MODFLAG="-module "
+MPIF90=mpif90
+CXX="icc"
+F90="ifort"
+F90FLAGS="-O3 -march=core-avx2"
+MODFLAG="-module "
 
 # SAC HOME
-SACHOME=${HOME}/software/seismology/sac/
+SACHOME=${HOME}/software/sac/
 
 ### STOP HERE ##########
 

@@ -213,7 +213,7 @@ def main():
                 ch = pdict['CH_CODE'] + 'T'
                 temp = np.zeros((20),'f4')
                 fio.write(
-                    f"{sta}.{net} {sta} {net} {ch} {i} 0 %f %f {' '.join(map(str,temp))} %f %f %f 0. 0.\n" %(
+                    f"{evtid} {sta} {net} {ch} {i} 0 %f %f {' '.join(map(str,temp))} %f %f %f 0. 0.\n" %(
                         -win_tb + tref[i] - t_inj,win_te + tref[i] - t_inj, 
                         misfits[i,-1],misfits[i,0],misfits[i,1]
                     )

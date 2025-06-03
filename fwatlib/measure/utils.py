@@ -221,7 +221,7 @@ def _geod2geoc(geographic_lat_deg, flattening=0.0033528106647474805):
             Geocentric latitude in degrees.
     """
     phi = np.radians(geographic_lat_deg)
-    geocentric_phi = np.atan((1 - flattening) ** 2 * np.tan(phi))
+    geocentric_phi = np.arctan((1 - flattening) ** 2 * np.tan(phi))
     return np.degrees(geocentric_phi)
 
 

@@ -2,21 +2,15 @@
 set -e 
 
 # gcc 
-F90="gfortran"
-CXX="g++"
-MPIF90=mpif90
-F90FLAGS="-O3 -march=native"
-MODFLAG="-J"
+# F90="gfortran"
+# CXX="g++"
 
 # intel 
-# MPIF90=mpif90
-#CXX="icc"
-# F90="ifort"
-# F90FLAGS="-O3 -xHost"
-# MODFLAG="-module "
+CXX="icc"
+F90="ifort"
 
 # SAC HOME
-SACHOME=${HOME}/software/seismology/sac/
+SACHOME=${HOME}/software//sac/
 
 ### STOP HERE ##########
 
@@ -38,7 +32,6 @@ rm -rf build
 mkdir -p $INSTALL_DIR
 \cp -r module_env *.sh plots fwat_params $INSTALL_DIR/
 CDIR=`pwd`
-echo $CDIR
 awk -v val="$CDIR" '{if ($0 ~ /^FWATLIB_PATH=/) print "FWATLIB_PATH="val; else print $0}' $INSTALL_DIR/parameters.sh> tmp && mv tmp $INSTALL_DIR/parameters.sh
 
 chmod +x *.sh 

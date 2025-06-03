@@ -25,13 +25,18 @@ def compute_misfits(evts:list,files:list):
 
 def main():
     # check input args
-    if len(sys.argv) !=3:
-        print("please run like: python ./cal_misfit.py M00 simu_type")
+    if len(sys.argv) !=4 and len(sys.argv) !=3: 
+        print("please run like: python ./cal_misfit.py M00 simu_type step_index")
         exit(1)
 
     # get 
     mod = sys.argv[1]
     simu_type = sys.argv[2]
+    do_ls = False
+    if len(sys.argv) == 4:
+        do_ls = True
+        step_index = int(sys.argv[3])
+        assert(step_index in [0,1])
     
     # get period band used
     all_bands = []
@@ -55,15 +60,30 @@ def main():
     sumn = 0
     for i in range(len(all_bands)):
         band = all_bands[i]
-        evts = np.loadtxt(f"src_rec/sources.dat.{simu_type}",usecols=0,dtype=str)
-        files = []
-        tempfiles = glob(f"./misfits/{mod}_*_{band}_{simu_type}_window_chi")
-        for f in tempfiles:
-            if '.ls' not in f:
-                files.append(f)
-        chi,n = compute_misfits(evts,files)
-        sumf += chi 
-        sumn += n
+        if do_ls:
+            evts = np.loadtxt(f"src_rec/sources.dat.ls.{simu_type}",usecols=0,dtype=str)
+            files = glob(f"./misfits/{mod}*.ls_{band}_{simu_type}_window_chi")
+            if step_index == 0:
+                tempfiles = glob(f"./misfits/{mod}.*_{band}_{simu_type}_window_chi")
+                files = []
+                for f in tempfiles:
+                    if '.ls' not in f:
+                        files.append(f)
+            
+            # compute misfit
+            chi,n = compute_misfits(evts,files)
+            sumf += chi 
+            sumn += n 
+        else:
+            evts = np.loadtxt(f"src_rec/sources.dat.{simu_type}",usecols=0,dtype=str)
+            files = []
+            tempfiles = glob(f"./misfits/{mod}.*_{band}_{simu_type}_window_chi")
+            for f in tempfiles:
+                if '.ls' not in f:
+                    files.append(f)
+            chi,n = compute_misfits(evts,files)
+            sumf += chi 
+            sumn += n
 
     print(sumf,sumn) 
 
