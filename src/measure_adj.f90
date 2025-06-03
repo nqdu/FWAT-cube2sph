@@ -78,6 +78,7 @@ subroutine measure_adj_fwat(obs_in,syn_in,npts,t0,dt,&
     end if
   end do
   chan = transfer(chan_c(1:len_chan_c), chan)
+  chan = chan(1:len_chan_c)
 
   imeas = imeas0
   fstart0 = 1./TLONG ; fend0 = 1./TSHORT
@@ -87,7 +88,7 @@ subroutine measure_adj_fwat(obs_in,syn_in,npts,t0,dt,&
     print *, 'INPUTS FROM MEASUREMENT.PAR :'
     print *, '  tt, dtt, nn : ',sngl(tt),sngl(dtt),nn
     print *, '  imeas : ',imeas
-    print *, '  chan : ',chan
+    print *, '  chan : ',trim(chan)
     print *, '  TLONG, TSHORT : ',sngl(TLONG), sngl(TSHORT)
     
     print *, '  fstart, fend : ', sngl(fstart0), sngl(fend0)
