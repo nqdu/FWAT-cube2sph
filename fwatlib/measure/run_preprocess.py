@@ -91,6 +91,12 @@ class FwatPreOP:
                 self.evla,self.evlo,self.evdp,
                 statxt,phase
             )
+        
+        # sanity check 
+        self._sanity_check()
+    
+    def _sanity_check(self):
+        pass
 
     def _get_station_code(self,i:int,ic:int):
         """
@@ -214,7 +220,7 @@ class FwatPreOP:
 
                 # channel and others
                 tr.kcmpnm = f"{self.chcode}{ch}"
-                tr.knetwk=self.netwk[i],
+                tr.knetwk = self.netwk[i],
                 tr.kstnm = self.stnm[i],
                 tr.stla = self.stla[i]
                 tr.stlo = self.stlo[i]
@@ -234,8 +240,8 @@ class FwatPreOP:
     def _print_measure_info(self,bandname,tstart,tend,tr_chi,am_chi,window_chi):
         from utils import alloc_mpi_jobs
 
-        nsta = self.nsta 
-        istart,iend = alloc_mpi_jobs(nsta,self.nprocs,self.myrank)
+        ncomp = tr_chi.shape[1]
+        istart,iend = alloc_mpi_jobs(self.nsta,self.nprocs,self.myrank)
         nsta_loc = iend - istart + 1
         imeas = self.pdict['IMEAS']
 
@@ -245,7 +251,7 @@ class FwatPreOP:
             if irank == self.myrank:
 
                 # open outfile
-                outfile = f"{self.MISFIT}/{self.mod}_{self.evtid}_{bandname}_noise_window_chi"
+                outfile = f"{self.MISFIT}/{self.mod}_{self.evtid}_{bandname}_{self.meatype}_window_chi"
                 if irank == 0:
                     fio = open(outfile,"w")
                 else:
@@ -253,22 +259,22 @@ class FwatPreOP:
 
                 for ir in range(nsta_loc):
                     i = ir + istart 
-                    for ic in range(self.ncomp):
+                    for ic in range(ncomp):
                         name = self._get_station_code(i,ic)
                         print(f'{name}')
                         print("Measurement window No.  1")
                         print("start and end time of window: %f %f" %(tstart[ir],tend[ir]) )
                         print(f"adjoint source and chi value for imeas = {imeas}")
-                        print("%f" %(window_chi[ir,6]))
-                        print("tr_chi = %g am_chi = %g" %(tr_chi[ir],am_chi[ir]))
+                        print("%e" %(window_chi[ir,ic,6]))
+                        print("tr_chi = %e am_chi = %e" %(tr_chi[ir,ic],am_chi[ir,ic]))
                         print("")
 
                         ch = self.components[ic]
                         fio.write(f"{self.evtid} {self.stnm[i]} {self.netwk[i]} {self.chcode}{ch} 1 {imeas} ")
                         fio.write("%g %g " %(tstart[ir],tend[ir]))
                         for j in range(20):
-                            fio.write("%g " %(window_chi[ir,j]))
-                        fio.write("%g %g 0. 0.\n" %(tr_chi[ir],am_chi[ir]))
+                            fio.write("%g " %(window_chi[ir,ic,j]))
+                        fio.write("%g %g 0. 0.\n" %(tr_chi[ir,ic],am_chi[ir,ic]))
                 
                 # close output file
                 fio.close()
@@ -311,11 +317,12 @@ class FwatPreOP:
         nsta_loc = iend - istart + 1
 
         # misfits
+        ncomp = self.ncomp
         tstart = np.zeros((nsta_loc))
         tend = np.zeros((nsta_loc))
-        window = np.zeros((nsta_loc,20))
-        tr_chi = np.zeros((nsta_loc))
-        am_chi = np.zeros((nsta_loc))
+        window = np.zeros((nsta_loc,ncomp,20))
+        tr_chi = np.zeros((nsta_loc,ncomp))
+        am_chi = np.zeros((nsta_loc,ncomp))
 
         # loop every station to do preprocessing
         for ir in range(nsta_loc):
@@ -361,16 +368,16 @@ class FwatPreOP:
 
                 # compute time window
                 tstart[ir] = dist / vmax_list[ib] - self.Tmax[ib] * 0.5 
-                tend[ir] = dist / vmax_list[ib] + self.Tmax[ib] * 0.5 
+                tend[ir] = dist / vmin_list[ib] + self.Tmax[ib] * 0.5 
                 tstart[ir] = max(tstart[ir],t0_inp)
                 tend[ir] = min(tend[ir],t0_obs+(npt_obs-1)*dt_obs)
 
                 # compute misfits and adjoint source
-                verbose = (self.myrank == 0) and (ir == 0)
-                tr_chi[ir],am_chi[ir],window[ir,:],adjsrc =   \
+                verbose = (self.myrank == 0) and (ir == 0) and (icomp == 0)
+                tr_chi[ir,ic],am_chi[ir,ic],window[ir,ic,:],adjsrc =   \
                     measure_adj(t0_inp,dt_inp,npt_cut,t0_syn,dt_syn,npt_syn,
-                                tstart[ir],tend[ir],imeas,self.Tmax[ib],
-                                self.Tmin[ib],verbose,dat_inp,
+                                tstart[ir],tend[ir],imeas,self.Tmax[ib]*1.01,
+                                self.Tmin[ib]*0.99,verbose,dat_inp,
                                 syn_inp,)
 
                 # save adjoint source
@@ -429,11 +436,12 @@ class FwatPreOP:
         nsta_loc = iend - istart + 1
 
         # misfits
+        ncomp = self.ncomp
         tstart = np.zeros((nsta_loc))
         tend = np.zeros((nsta_loc))
-        window = np.zeros((nsta_loc,20))
-        tr_chi = np.zeros((nsta_loc))
-        am_chi = np.zeros((nsta_loc))
+        window = np.zeros((nsta_loc,ncomp,20))
+        tr_chi = np.zeros((nsta_loc,ncomp))
+        am_chi = np.zeros((nsta_loc,ncomp))
 
         # glob arrays
         ncomp = self.ncomp
@@ -441,7 +449,8 @@ class FwatPreOP:
         glob_syn = np.zeros((nsta,ncomp,npt_syn))
 
         # loop each station
-        for i in range(nsta):
+        for ir in range(nsta_loc):
+            i = ir + istart
             for ic in range(ncomp):
                 name = self._get_station_code(i,ic)
 
@@ -452,11 +461,11 @@ class FwatPreOP:
 
                 # data processing
                 obs_data = bandpass(obs_data,dt_obs,freqmin,freqmax)
-                syn_data = bandpass(syn_data,dt_obs,freqmin,freqmax)
+                syn_data = bandpass(syn_data,dt_syn,freqmin,freqmax)
 
                 # interpolate the obs/syn data to the same sampling of syn data
                 t0_inp = self.t_ref[i] - win_tb
-                u1 = interpolate_syn(obs_data,t0_obs,dt_obs,npt_obs,t0_inp,dt_syn,npt2)
+                u1 = interpolate_syn(obs_data,t0_obs + self.t_ref[i],dt_obs,npt_obs,t0_inp,dt_syn,npt2)
                 w1 = interpolate_syn(syn_data,t_inj,dt_syn,npt_syn,t0_inp,dt_syn,npt2)
                 u = interpolate_syn(u1,t0_inp,dt_syn,npt2,t_inj,dt_syn,npt_syn)
                 w = interpolate_syn(w1,t0_inp,dt_syn,npt2,t_inj,dt_syn,npt_syn)     
@@ -476,10 +485,14 @@ class FwatPreOP:
         for ic in range(ncomp):
             has_stf_flag = has_stf_flag and os.path.isfile(stf_names[ic])
         if has_stf_flag: # read stf from directory
+            if self.myrank == 0:
+                print(f"read stf from {self.SRC_REC} ...")
             stf = np.zeros((ncomp,npt_syn),'f4')
             for ic in range(ncomp):
                 stf[ic,:] = SACTrace.read(stf_names[ic]).data
         else: # estimate stf
+            if self.myrank == 0:
+                print("estimation stf by PCA ...")
             stf = compute_stf(glob_syn,glob_obs,dt_syn,freqmin,freqmax,self.components)
 
             # save to SRC_REC
@@ -495,7 +508,7 @@ class FwatPreOP:
                 ic = i 
         avgamp = get_average_amplitude(glob_obs,ic)
         if self.myrank == 0: 
-            print("average amplitude for data gather: %g" %(avgamp))
+            print("average amplitude for data gather: %g\n" %(avgamp))
     
         # call measure_adj for misfits
         for ir in range(nsta_loc):
@@ -508,12 +521,14 @@ class FwatPreOP:
                 tstart[ir] = self.t_ref[i] - self.t_inj - win_tb
                 tend[ir] = self.t_ref[i] - self.t_inj + win_te
 
-                verbose = (self.myrank == 0) and (ir == 0)
-                tr_chi[ir],am_chi[ir],window[ir,:],adjsrc =  \
+                # verboase
+                verbose = (self.myrank == 0) and (ir == 0) and (ic == 0)
+                
+                tr_chi[ir,ic],am_chi[ir,ic],window[ir,ic,:],adjsrc =  \
                     measure_adj(t0_syn,dt_syn,npt_syn,
                                 t0_syn,dt_syn,npt_syn,
                                 tstart[ir],tend[ir],2,
-                                self.Tmax[ib],self.Tmin[ib],verbose,
+                                1.01*self.Tmax[ib],0.99*self.Tmin[ib],verbose,
                                 glob_obs[i,ic,:],glob_syn[i,ic,:])
 
                 # contributions on stf
@@ -541,7 +556,6 @@ class FwatPreOP:
                     kstnm = self.stnm[i],
                     kcmpnm = self.chcode + self.components[ic]
                 )
-                tr.stla = self.sta
                 name = self._get_station_code(i,ic)
                 tr.data = glob_obs[i,ic,:]
                 tr.write(f"{out_dir}/{bandname}/{name}.sac.obs")
@@ -584,9 +598,9 @@ class FwatPreOP:
         # misfits
         tstart = np.zeros((nsta_loc))
         tend = np.zeros((nsta_loc))
-        window = np.zeros((nsta_loc,20))
-        tr_chi = np.zeros((nsta_loc))
-        am_chi = np.zeros((nsta_loc))
+        window = np.zeros((nsta_loc,1,20))
+        tr_chi = np.zeros((nsta_loc,1))
+        am_chi = np.zeros((nsta_loc,1))
 
         # loop each station
         for ir in range(nsta_loc):
@@ -608,11 +622,11 @@ class FwatPreOP:
 
                 # data processing
                 odata = bandpass(odata,dt_obs,freqmin,freqmax)
-                sdata = bandpass(sdata,dt_obs,freqmin,freqmax)
+                sdata = bandpass(sdata,dt_syn,freqmin,freqmax)
 
                 # interpolate the obs/syn data to the same sampling of syn data
                 t0_inp = self.t_ref[i] - win_tb
-                u1 = interpolate_syn(odata,t0_obs,dt_obs,npt_obs,t0_inp,dt_syn,npt2)
+                u1 = interpolate_syn(odata,t0_obs + self.t_ref[i],dt_obs,npt_obs,t0_inp,dt_syn,npt2)
                 w1 = interpolate_syn(sdata,t_inj,dt_syn,npt_syn,t0_inp,dt_syn,npt2)
                 u = interpolate_syn(u1,t0_inp,dt_syn,npt2,t_inj,dt_syn,npt_syn)
                 w = interpolate_syn(w1,t0_inp,dt_syn,npt2,t_inj,dt_syn,npt_syn)     
@@ -628,7 +642,7 @@ class FwatPreOP:
                     stlo=self.stlo[i],stel=0,lcalda=1,
                     delta = dt_syn,b=t0_syn,
                     t0 = self.t_ref[i] - t_inj,
-                    knetwk=self.netwk[i],
+                    knetwk = self.netwk[i],
                     kstnm = self.stnm[i],
                     kcmpnm = self.chcode + self.components[ic]
                 )
@@ -651,10 +665,10 @@ class FwatPreOP:
             SI_obs = -2. * cumtrapz1(Robs_dot*Tobs,dt_syn)[-1] * norm
             SI_syn = -2. * cumtrapz1(Robs_dot*Tsyn,dt_syn)[-1] * norm
             L = 0.5 * (SI_syn - SI_obs)**2
-            tr_chi[ir] = L 
-            am_chi[ir] = L
-            window[ir,6] = SI_syn
-            window[ir,7] = SI_obs
+            tr_chi[ir,0] = L 
+            am_chi[ir,0] = L
+            window[ir,6,0] = SI_syn
+            window[ir,7,0] = SI_obs
 
             # adjoint source
             adjsrc_T = -2. * norm * (SI_syn - SI_obs) * Robs_dot
@@ -779,12 +793,12 @@ class FwatPreOP:
             need_rt_rotate = True 
             for i in range(self.nsta):
                 _,self.bazd[i] = cal_dist_baz(self.evla,self.evlo,self.stla[i],self.stlo[i])
-        
+
         # rotate to R/T if required
         if need_rt_rotate:
             for i in range(self.myrank,self.nsta,self.nprocs):
                 temp_syn = np.zeros((2,self.npt_syn))
-                data = np.zeros((2,self.npt_syn))
+                data = np.zeros((self.npt_syn,2))
                 for ic,ch in enumerate(['E','N']):
                     name = f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}{ch}.sem.ascii"
                     filename = f"{self.syndir}/OUTPUT_FILES/{name}"
@@ -800,7 +814,7 @@ class FwatPreOP:
 
                 # save to ascii
                 for ic,ch in enumerate(['R','T']):
-                    name = self._get_station_code(i,ic) + ".sem.ascii"
+                    name = f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}{ch}.sem.ascii"
                     filename = f"{self.syndir}/OUTPUT_FILES/{name}"
                     data[:,1] = temp_syn[ic,:] 
                     np.savetxt(filename,data,fmt='%g')
@@ -832,12 +846,12 @@ def main():
 
     # get input parameter
     mtype = sys.argv[1]
-    iter = int(sys.argv[2])
+    iter0 = int(sys.argv[2])
     evtid = sys.argv[3]
     run_opt = int(sys.argv[4])
 
     # init operator
-    op = FwatPreOP(mtype,iter,evtid,run_opt)
+    op = FwatPreOP(mtype,iter0,evtid,run_opt)
 
     # run
     op.execute()

@@ -21,20 +21,29 @@ def wrap_string(s, max_len=60,indent=4):
 
     return result
 
+def _c66mat(A,C,L,N,F,gc,gs):
+    C0 = sp.Array([
+        [A,A-2*N,F,0,0,0],
+        [A-2*N,A,F,0,0,0],
+        [F,F,C,0,0,0],
+        [0,0,0,L - gc,-gs,0],
+        [0,0,0,-gs,L+gc,0],
+        [0,0,0,0,0,N]
+    ])
+
+    return C0
+
 def dhti_call():
     vp,vs,rho,gsp,gcp = sp.symbols("vp,vs,rho,gsp,gcp")
     A = rho*vp**2 
+    C = A 
     N = rho*vs**2
-    gs = gsp * N 
-    gc =  gcp * N 
-    C = sp.Array([
-        [A,A-2*N,A-2*N,0,0,0],
-        [A-2*N,A,A-2*N,0,0,0],
-        [A-2*N,A-2*N,A,0,0,0],
-        [0,0,0,A - gc,-gs,0],
-        [0,0,0,-gs,A+gc,0],
-        [0,0,0,0,0,N]
-    ])
+    L = N 
+    gs = gsp * L 
+    gc =  gcp * L 
+    eta = 1
+    F = eta * (A - 2 * L)
+    C0 = _c66mat(A,C,L,N,F,gc,gs)
 
     # compute derivative 
     for ii,param in enumerate([vp,vs,rho,gcp,gsp]):
@@ -45,7 +54,7 @@ def dhti_call():
         kk = 0
         for i in range(6):
             for j in range(i,6):
-                out = sp.diff(C[i,j],param)
+                out = sp.diff(C0[i,j],param)
                 if out !=0:
                     expr = expr + f"md_kl[{kk},...]*" + f"({str(sp.pycode(out))})+"
                 kk += 1
@@ -62,14 +71,7 @@ def dtti_call():
     gc = gcp * L 
     gs = gsp * L 
     F = (A - 2* L)
-    C0 = sp.Array([
-        [A,A-2*N,F,0,0,0],
-        [A-2*N,A,F,0,0,0],
-        [F,F,C,0,0,0],
-        [0,0,0,L - gc,-gs,0],
-        [0,0,0,-gs,L+gc,0],
-        [0,0,0,0,0,N]
-    ])
+    C0 = _c66mat(A,C,L,N,F,gc,gs)
 
     # compute derivative 
     for ii,param in enumerate([vph,vpv,vsh,vsv,rho,gcp,gsp]):

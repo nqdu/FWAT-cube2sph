@@ -45,14 +45,14 @@ def get_average_amplitude(glob_obs,icomp):
     nsta = glob_obs.shape[0]
     avgamp0 = 0.
     for i in range(nsta):
-        avgamp0 += np.max(np.abs(glob_obs[i,0,:]))
+        avgamp0 += np.max(np.abs(glob_obs[i,icomp,:]))
     avgamp0 /= nsta 
     igood =0 
     avgamp = 0. 
     for i in range(nsta):
-        if np.max(np.abs(glob_obs[i,0,:])) - avgamp0 < 0.2 * avgamp0:
+        if np.max(np.abs(glob_obs[i,icomp,:])) - avgamp0 < 0.2 * avgamp0:
             igood += 1 
-            avgamp += np.max(np.abs(glob_obs[i,0,:])) 
+            avgamp += np.max(np.abs(glob_obs[i,icomp,:])) 
     avgamp /= igood 
 
     return avgamp

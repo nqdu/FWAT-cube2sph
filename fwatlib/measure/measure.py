@@ -1,4 +1,4 @@
-from .lib import libmeas
+from lib import libmeas
 
 def measure_adj(t0_inp,dt_inp,npt_inp,
                 t0_syn,dt_syn,npt_syn,
