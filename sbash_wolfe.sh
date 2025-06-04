@@ -21,9 +21,9 @@ FLAG=`python $FWATLIB/get_param.py flag $FWATPARAM/lbfgs.yaml`
 MODEL=M`echo "$iter" |awk '{printf "%02d",$1}'`
 
 # compute misfit
-info=`python $MEASURE_LIB/cal_misfit.py $MODEL $SIMU_TYPE 00`
+info=`python $MEASURE_LIB/cal_misfit.py $MODEL $SIMU_TYPE`
 chi=`echo $info |awk '{print $1}'`
-info=`python $MEASURE_LIB/cal_misfit.py $MODEL $SIMU_TYPE 01`
+info=`python $MEASURE_LIB/cal_misfit.py $MODEL.ls $SIMU_TYPE`
 chi1=`echo $info |awk '{print $1}'`
 
 echo "misfit current/next = $chi $chi1"
