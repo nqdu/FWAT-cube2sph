@@ -46,6 +46,6 @@ $(MOD_OBJ): $(OBJ_DIR)/%.o : $(SRC_DIR)/%.f90
 .PHONY : clean
 
 clean:
-	\rm -f *.o *.mod $(OBJ_DIR)/*.o $(MOD_DIR)/*.mod  *.txt* STA.*  OUTPUT_FILES/*  *.sac rotate_adj_src measure_adj
+	\rm -f *.o *.mod $(OBJ_DIR)/*.o $(MOD_DIR)/*.mod  *.txt* STA.*  OUTPUT_FILES/*  *.sac rotate_adj_src measure_adj_mpi
 
 

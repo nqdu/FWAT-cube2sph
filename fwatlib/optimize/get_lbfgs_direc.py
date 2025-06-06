@@ -3,22 +3,22 @@ import sys
 from scipy.io import FortranFile 
 from mpi4py import MPI 
 import os 
-from tools import *
+from tools import FwatModel
 import h5py
 import yaml
 
 NGLL = 5; NGLL3 = NGLL**3
 
-def get_model_grad(iter,nspec):
+def get_model_grad(iter:int,nspec:int,M:FwatModel):
     comm = MPI.COMM_WORLD
     myrank = comm.Get_rank()
 
     # initialize
-    grad_list = get_gradname_list()
-    mod_list = get_model_name_list()
-    nker = len(grad_list)
-    mod_vec = np.zeros((nker,nspec,NGLL3),'f4')
-    ker_vec = np.zeros((nker,nspec,NGLL3),'f4')
+    grad_list = M.get_grad_names(base=True)
+    mod_list = M.get_model_names()
+    nmod = len(grad_list)
+    mod_vec = np.zeros((nmod,nspec,NGLL3),'f4')
+    ker_vec = np.zeros((nmod,nspec,NGLL3),'f4')
 
     # print log info
     KERNEL_DIR = './optimize/SUM_KERNELS_M%02d/'%(iter)
@@ -26,7 +26,7 @@ def get_model_grad(iter,nspec):
     if myrank == 0: print('reading ',KERNEL_DIR,MODEL_DIR)
 
     # reading model/kernels
-    for i in range(nker):
+    for i in range(nmod):
         # read kernel 
         filename = KERNEL_DIR + grad_list[i] + ".h5"
         fio = h5py.File(filename,"r")
@@ -39,14 +39,14 @@ def get_model_grad(iter,nspec):
         mod_vec[i,:,:] = f.read_reals('f4').reshape(nspec,NGLL3)
         f.close()
 
-    # convert kernel to required type
-    ker_vec = np.float32(convert_kernel(mod_vec,ker_vec))
+    # convert kernel and model to required type
+    mod_vec1,ker_vec1 = M.convert_kl(mod_vec,ker_vec)
+    ker_vec1 = np.float32(ker_vec1)
 
-    # convert model to required type
-    mod_vec = np.float32(convert_md(mod_vec))
-    mod_vec = np.log(mod_vec)
+    # convert model to required optimzed type
+    mod_vec1 = np.float32(M.get_used_model(mod_vec1))
 
-    return mod_vec,ker_vec
+    return mod_vec1,ker_vec1
 
 def compute_inner_dot(a,b,weights,jaco):
     """
@@ -69,7 +69,7 @@ def compute_inner_dot(a,b,weights,jaco):
 
     return q_sum * c1 * c2 
 
-def get_lbfgs_direc(iter:int,paramfile:str):
+def get_lbfgs_direc(iter:int,paramfile:str,M:FwatModel):
 
     from libgll import get_gll_weights
 
@@ -106,7 +106,7 @@ def get_lbfgs_direc(iter:int,paramfile:str):
     a = np.zeros((1000),dtype='f4'); p = a * np.float32(1.) 
 
     # read current gradient
-    _,q_vec = get_model_grad(iter,nspec)
+    _,q_vec = get_model_grad(iter,nspec,M)
     grad_bak = q_vec.copy()
 
     # load lbfgs parameters
@@ -128,8 +128,8 @@ def get_lbfgs_direc(iter:int,paramfile:str):
         print("**************************************")
     
     for istore in range(iter-1,iter_store-1,-1):
-        model1,grad1 = get_model_grad(istore+1,nspec)
-        model0,grad0 = get_model_grad(istore,nspec)
+        model1,grad1 = get_model_grad(istore+1,nspec,M)
+        model0,grad0 = get_model_grad(istore,nspec,M)
         grad_diff = grad1 - grad0 
         model_diff = model1 - model0
 
@@ -143,8 +143,8 @@ def get_lbfgs_direc(iter:int,paramfile:str):
         q_vec -= a[istore] * grad_diff
     
     istore = iter - 1
-    model1,grad1 = get_model_grad(istore+1,nspec)
-    model0,grad0 = get_model_grad(istore,nspec)
+    model1,grad1 = get_model_grad(istore+1,nspec,M)
+    model0,grad0 = get_model_grad(istore,nspec,M)
     grad_diff = grad1 - grad0 
     model_diff = model1 - model0
 
@@ -174,8 +174,8 @@ def get_lbfgs_direc(iter:int,paramfile:str):
         print("**************************************")
     
     for istore in range(iter_store,iter):
-        model1,grad1 = get_model_grad(istore+1,nspec)
-        model0,grad0 = get_model_grad(istore,nspec)
+        model1,grad1 = get_model_grad(istore+1,nspec,M)
+        model0,grad0 = get_model_grad(istore,nspec,M)
         grad_diff = grad1 - grad0 
         model_diff = model1 - model0
         b_sum = compute_inner_dot(grad_diff,r_vec,weights,jaco)
@@ -195,7 +195,7 @@ def get_lbfgs_direc(iter:int,paramfile:str):
     grad_norm = np.sqrt(grad_norm); direc_norm = np.sqrt(direc_norm)
     a = grad_sum / (direc_norm * grad_norm)
     theta = np.arccos(a) * 180 / np.pi 
-    if myrank == 0: print(f"theta between search direction/-grad is {theta}")
+
     if theta <= 92.:
         if myrank == 0: print("The search direction is accepted!")
     else:
@@ -214,7 +214,7 @@ def get_lbfgs_direc(iter:int,paramfile:str):
 
     return direc
 
-def get_sd_direction(iter:int,paramfile:str):
+def get_sd_direction(iter:int,paramfile:str,M:FwatModel):
     comm = MPI.COMM_WORLD
     myrank = comm.Get_rank()
 
@@ -225,7 +225,7 @@ def get_sd_direction(iter:int,paramfile:str):
     f.close()
 
     # get gradient
-    _,q_vec = get_model_grad(iter,nspec)
+    _,q_vec = get_model_grad(iter,nspec,M)
     q_vec = np.float32(-q_vec)
 
     return q_vec
@@ -240,15 +240,18 @@ def get_search_direction(iter:int,paramfile:str):
     with open(paramfile,"r") as f:
         pdict = yaml.safe_load(f)
 
+    # initialize FwatModel
+    M = FwatModel()
+
     # current search direction is -grad
     iter_start:int = pdict['iter_start']
     if iter == iter_start:
-        direc = get_sd_direction(iter,paramfile)
+        direc = get_sd_direction(iter,paramfile,M)
     else:
-        direc = get_lbfgs_direc(iter,paramfile)
+        direc = get_lbfgs_direc(iter,paramfile,M)
 
     # get min/max
-    direc_list =  get_direc_name_list()
+    direc_list =  M.get_direc_names()
     if myrank == 0:
         print("")
     for i in range(len(direc_list)):
@@ -261,8 +264,8 @@ def get_search_direction(iter:int,paramfile:str):
     
     # save search
     direc = np.float32(direc)
-    nker = direc.shape[0]
-    for i in range(nker):
+    ndirec = direc.shape[0]
+    for i in range(ndirec):
         outname =  './optimize/SUM_KERNELS_M%02d'%(iter) + '/proc%06d'%(myrank) + '_' + direc_list[i] + ".bin"
         f = FortranFile(outname,'w')
         f.write_record(direc[i,:,:])
@@ -286,8 +289,6 @@ def main():
         os.makedirs(KERNEL_DIR,exist_ok=True)
         print(f"get L-BFGS search direction for iteration {iter}")
     
-    # load parameters
-
     # get search direction
     get_search_direction(iter,paramfile)
 

@@ -18,8 +18,6 @@ if  [ $run_opt -eq 2 ]; then
   lsflag=".ls"
 fi 
 
-ncpu=`cat /proc/cpuinfo |grep cores |wc -l |awk '{print $1/2}'`
-
 # set directory
 current_dir=`pwd`
 mod=M`printf "%02d" $iter`
@@ -28,7 +26,7 @@ echo "convert synthetic seismograms to sac : evtid=$evtid iter=$iter ..."
 SYN_DIR=$rundir/OUTPUT_FILES 
 
 # rotate seismograms to ENZ
-mpirun -np 4 python  \
+mpirun -np $NPROC_PRE python  \
         $MEASURE_LIB/rotate_seismogram.py --fn_matrix="src_rec/rot_$evtid"   \
        --rotate="XYZ->NEZ" --from_dir="$rundir/OUTPUT_FILES/" --to_dir="$rundir/OUTPUT_FILES/"   \
        --from_template='${nt}.${sta}.BX${comp}.semd'  \
@@ -38,16 +36,16 @@ mpirun -np 4 python  \
 echo " python $MEASURE_LIB/ascii2sac.py $current_dir/src_rec/STATIONS_${evtid}_globe  \
       $current_dir/src_rec/FORCE_ORG/FORCESOLUTION_${evtid} $SYN_DIR"
 \rm -f $SYN_DIR/*.sac # clean all sac file
-python $MEASURE_LIB/ascii2sac.py $current_dir/src_rec/STATIONS_${evtid}_globe  \
+mpirun -np $NPROC_PRE python $MEASURE_LIB/ascii2sac.py $current_dir/src_rec/STATIONS_${evtid}_globe  \
       $current_dir/src_rec/FORCE_ORG/FORCESOLUTION_${evtid} $SYN_DIR
 \rm -f $SYN_DIR/*.sem.ascii
 
 # run measure and write measure_adj file
 echo " "
 if [ $run_opt -ne 1 ]; then 
-  mpirun -np $ncpu python $MEASURE_LIB/preprocess_noise.py $iter $evtid $run_opt
+  mpirun -np $NPROC_PRE python $MEASURE_LIB/preprocess_noise.py $iter $evtid $run_opt
 else 
-  mpirun -np $ncpu python $MEASURE_LIB/preprocess_noise.py $iter $evtid $run_opt
+  mpirun -np $NPROC_PRE python $MEASURE_LIB/preprocess_noise.py $iter $evtid $run_opt
   exit 0
 fi 
 
@@ -74,7 +72,7 @@ do
   cd $band 
   mkdir -p OUTPUT_FILES
   \cp ../../DATA/MEASUREMENT.PAR  .
-  mpirun -np $ncpu $MEASURE_LIB/bin/measure_adj_mpi
+  mpirun -np $NPROC_PRE $MEASURE_LIB/bin/measure_adj_mpi
   awk -v a=$evtid '{$1=a;$29=$29*1.; print}' window_chi >  $current_dir/misfits/$mod.${evtid}${lsflag}_${band}_noise_window_chi
   
   # # continue for line search

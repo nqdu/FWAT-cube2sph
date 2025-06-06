@@ -26,7 +26,6 @@ FLAG=`python $FWATLIB/get_param.py flag $FWATPARAM/lbfgs.yaml`
 MODEL=M`echo "$iter" |awk '{printf "%02d",$1}'`
 PRECOND=`python $FWATLIB/get_param.py optimize/PRECOND_TYPE`
 
-
 # create log file
 logfile=output_fwat2_post_log_${MODEL}.txt
 :> $logfile
@@ -103,8 +102,8 @@ done
 LSDIR=./optimize/MODEL_${MODEL}.ls
 mkdir -p $LSDIR
 echo " "
-echo "python $OPT_LIB/get_lbfgs_next.py $MODEL $LSDIR $FWATPARAM/FWAT.PAR.yaml $FWATPARAM/lbfgs.yaml  $NPROC"
-python $OPT_LIB/get_lbfgs_next.py $MODEL $LSDIR $FWATPARAM/FWAT.PAR.yaml $FWATPARAM/lbfgs.yaml  $NPROC  >> $logfile
+echo "python $OPT_LIB/model_update.py $MODEL $LSDIR $FWATPARAM/FWAT.PAR.yaml $FWATPARAM/lbfgs.yaml  $NPROC"
+python $OPT_LIB/model_update.py $MODEL $LSDIR $FWATPARAM/FWAT.PAR.yaml $FWATPARAM/lbfgs.yaml  $NPROC  >> $logfile
 
 # generate new model database
 $change_par LOCAL_PATH $LSDIR DATA/Par_file

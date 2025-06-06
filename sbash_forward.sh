@@ -3,7 +3,7 @@
 #SBATCH --ntasks=8
 #SBATCH --array=1-4%5
 #SBATCH --time=00:35:59
-#SBATCH --job-name FWD
+#SBATCH --job-name=FWD
 #SBATCH --output=FWD-%j_set%a.txt
 #SBATCH --account=def-liuqy
 #SBATCH --mem=12G
@@ -16,21 +16,22 @@
 #
 ###################################################
 source module_env
-export OMP_NUM_THREADS=1
+. parameters.sh
 
 # error flag
 set -e 
-
-# include file
-. parameters.sh
 
 #==== Comment out the following if running SEM mesh with new models====#
 MODEL=M00
 simu_type=noise
 NJOBS=8
 START_SET=1
-NPROC=`grep ^"NPROC" DATA/Par_file | cut -d'=' -f2`
-LOCAL_PC=1
+LOCAL_PC=0
+
+#### STOP HERE #### #
+
+NPROC=`grep ^"NPROC" DATA/Par_file.$simu_type | cut -d'=' -f2`
+
 
 # parfile changer script
 change_par=$FWATLIB/change_par_file.sh
@@ -77,7 +78,6 @@ for i in `seq 1 $NJOBS`; do
   # copy common parameters
   \cp DATA/Par_file.$simu_type $evtdir/DATA/Par_file
   \cp fwat_params/FWAT.PAR.yaml $evtdir/DATA/FWAT.PAR.yaml
-  \cp fwat_params/MEASUREMENT.PAR.$simu_type $evtdir/DATA/MEASUREMENT.PAR
   \cp OUTPUT_FILES/*.h $evtdir/OUTPUT_FILES
   \rm -rf $evtdir/DATA/meshfem3D_files/*
   ln -s $work_dir/DATA/meshfem3D_files/* $evtdir/DATA/meshfem3D_files/
@@ -97,7 +97,8 @@ for i in `seq 1 $NJOBS`; do
   cd src_rec
   \cp STATIONS_$evtid $evtdir/DATA/STATIONS
   \cp STATIONS_$evtid $evtdir/DATA/STATIONS_ADJOINT
-  if [[ $simu_type == "tele" ]]; then 
+  if [[ $simu_type == "tele" ]] || \
+     [[ $simu_type == "sks" ]] ; then 
     :> $evtdir/DATA/FORCESOLUTION
     
     # change parameters
@@ -114,7 +115,8 @@ for i in `seq 1 $NJOBS`; do
     cd ..
     $change_par COUPLE_WITH_INJECTION_TECHNIQUE .false. $evtdir/DATA/Par_file
   else 
-    echo "noise"
+    echo "not implemented!"
+    exit 1
   fi
   cd $work_dir
 

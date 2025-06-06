@@ -3,10 +3,8 @@
 set -e
 module load gmt-6.0.0 
 
-# 假定台站位于 105E，30N 处
 stlo=-122.25
 stla=44.42
-# 使用 -JE 投影（四个参数: 中心经度/中心纬度/最大震中距/图片宽度）
 J=E$stlo/$stla/110/10c
 
 :> events.txt

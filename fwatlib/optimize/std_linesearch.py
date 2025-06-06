@@ -2,8 +2,7 @@ import numpy as np
 import sys 
 from scipy.io import FortranFile 
 from mpi4py import MPI 
-import os 
-from tools import *
+from tools import FwatModel
 from get_lbfgs_direc import compute_inner_dot
 from libgll import get_gll_weights
 import yaml
@@ -33,6 +32,9 @@ def main():
     fcost1 = float(sys.argv[4])
     if myrank == 0: print("\nChecking Wolfe Condtion ...")
 
+    # load FWAT Model
+    M = FwatModel()
+
     # get weights
     w = get_gll_weights()
     weights = np.zeros((NGLL3),dtype='f4')
@@ -60,25 +62,49 @@ def main():
     f.close()
 
     # read search direction, grad, grad for linesearch
-    grad_list = get_gradname_list()
-    direc_list = get_direc_name_list()
-    nker = len(grad_list)
+    grad_list_base = M.get_grad_names()
+    direc_list = M.get_direc_names()
+    mod_list = M.get_model_names()
+    nker_base = len(grad_list_base)
+    nker = len(direc_list)
     direc = np.zeros((nker,nspec,NGLL3),'f4')
-    grad_sub = np.zeros((nker,nspec,NGLL3),'f4')
-    grad_sub1 = np.zeros((nker,nspec,NGLL3),'f4')
-    for i in range(nker):
+    grad_sub_base = np.zeros((nker_base,nspec,NGLL3),'f4')
+    grad_sub1_base = np.zeros((nker_base,nspec,NGLL3),'f4')
+    mod_sub_base = np.zeros((nker_base,nspec,NGLL3),'f4')
+    mod_sub1_base = np.zeros((nker_base,nspec,NGLL3),'f4')
+
+    # read gradient and model
+    for i in range(nker_base):
         # read forward kernel 
-        filename = f"{KERNEL_DIR}/{grad_list[i]}.h5"
+        filename = f"{KERNEL_DIR}/{grad_list_base[i]}.h5"
         f = h5py.File(filename,"r")
-        grad_sub[i,:] = f[str(myrank)][:].reshape(nspec,NGLL3)
+        grad_sub_base[i,:] = f[str(myrank)][:].reshape(nspec,NGLL3)
         f.close()
+
+        # read model
+        filename = f"{MODEL_DIR}/proc%06d_{mod_list[i]}.bin" %(myrank)
+        fio = FortranFile(filename,"r")
+        mod_sub_base[i,:] = fio.read_reals('f4').reshape(nspec,NGLL3)
+        fio.close()
 
         # kernel for line search
-        filename = f"{KERNEL_DIR}.ls/{grad_list[i]}.h5"
+        filename = f"{KERNEL_DIR}.ls/{grad_list_base[i]}.h5"
         f = h5py.File(filename,"r")
-        grad_sub1[i,:] = f[str(myrank)][:].reshape(nspec,NGLL3)
+        grad_sub1_base[i,:] = f[str(myrank)][:].reshape(nspec,NGLL3)
         f.close()
 
+        # read model for line search
+        filename = f"{MODEL_DIR}.ls/proc%06d_{mod_list[i]}.bin" %(myrank)
+        fio = FortranFile(filename,"r")
+        mod_sub1_base[i,:] = fio.read_reals('f4').reshape(nspec,NGLL3)
+        fio.close()
+    
+    # convert to user defined model
+    _,grad_sub = M.convert_kl(mod_sub_base,grad_sub_base)
+    _,grad_sub1 = M.convert_kl(mod_sub1_base,grad_sub1_base)
+
+    # read search direction
+    for i in range(nker):
         # search direction
         filename = f"{KERNEL_DIR}/{direc_list[i]}.h5"
         f = h5py.File(filename,"r")
@@ -105,7 +131,14 @@ def main():
     # determine current step_fac
     with open("fwat_params/FWAT.PAR.yaml","r") as f:
         params = yaml.safe_load(f)['optimize']
+    step_fac_in_per = params['MAX_PER']
     step_fac = opt['alpha']
+    if opt['iter'] == opt['iter_start']:
+        step_fac = -1
+    d0 = np.max(abs(direc))
+    direc_max = comm.allreduce(d0,MPI.MAX)
+    if step_fac <= 0 or step_fac * direc_max > step_fac_in_per:
+        step_fac = step_fac_in_per / direc_max
 
     # check wolfe conditions
     cond1:bool = fcost1 <= (fcost + m1 * step_fac * q)
@@ -117,7 +150,6 @@ def main():
     if cond1 and cond2: # wolfe condition is satisfied 
         opt['flag'] = 'GRAD'
         opt['iter'] += 1
-        opt['iter_ls'] = 0
 
     elif not cond1:
         opt['alpha_R'] = opt['alpha']

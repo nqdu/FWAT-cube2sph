@@ -1,45 +1,15 @@
 import numpy as np
 from obspy import Trace
 from obspy.io.sac import SACTrace
-from obspy.taup import TauPyModel
 import sys 
 import os 
 from mpi4py import MPI
 
-from utils import interpolate_syn,read_fwat_params,get_average_amplitude
-from utils import preprocess,cumtrapz1
-from tele.deconit import time_decon
+from utils import interpolate_syn,read_params,preprocess
+from utils import get_simu_info,get_source_loc
+from tele.tele import get_average_amplitude,compute_ak135_time
+from tele.tele import get_injection_time
 from scipy.signal import convolve,correlate
-
-def compute_ak135_time(evtid,statxt,do_ls = False):
-    nsta = statxt.shape[0]
-    t_ref = np.zeros((nsta))
-    sourcefile = 'src_rec/sources.dat.tele'
-    if do_ls:
-        sourcefile = 'src_rec/sources.dat.ls.tele'
-    temp = np.loadtxt(sourcefile,dtype=str,ndmin=2)
-
-    # create taup model
-    model = TauPyModel("ak135")
-
-    # loop every source to find travel time
-    find_source = False
-    evla,evlo,evdp = 0,0,0
-    for i in range(temp.shape[0]):
-        if temp[i,0] == evtid:
-            evla,evlo,evdp = float(temp[i,1]),float(temp[i,2]),float(temp[i,3])
-            find_source = True
-    
-    if not find_source:
-        print(f"cannot find source, please check {evtid} and {sourcefile}")
-        exit(1)
-    
-    for i in range(nsta):
-        stla = float(statxt[i,2])
-        stlo = float(statxt[i,3])
-        t_ref[i] = model.get_travel_times_geo(evdp,evla,evlo,stla,stlo,['P'])[0].time
-    
-    return t_ref
 
 def shift_data(u,dt,t0):
     u_spec = np.fft.fft(u)
@@ -74,27 +44,58 @@ def seis_pca(stf_collect:np.ndarray):
 
     return stf
 
-def compute_stf(glob_syn,glob_obs,stf_collect,dt_syn,components):
-    from tele.pca.libpca import PCA
+def compute_stf(glob_syn,glob_obs,dt_syn,freqmin,freqmax,components):
+    # load stf function
+    from tele.deconit import time_decon
 
+    # get dimension
     nsta,ncomp,nt = glob_syn.shape
+
+    # compute stf station by station 
+    comm = MPI.COMM_WORLD
+    myrank = comm.Get_rank()
+    nprocs = comm.Get_size()
+    stf_collect = np.zeros((nsta,nt))
+    for i in range(myrank,nsta,nprocs):
+        for ic in range(ncomp):
+            ch = components[ic]
+            if ch != 'Z': continue
+
+            # get syn/obs data 
+            u = glob_obs[i,ic,:] * 1. 
+            w = glob_syn[i,ic,:] * 1.
+
+            # time deconvolution
+            stf1 = time_decon(u,w,dt_syn)
+            #stf1 = compute_stf_freq(u,w,dt_syn)
+            #stf1 = deconit(u,w,dt_syn,0.,1.5)
+            tr = Trace(stf1); tr.stats.delta = dt_syn
+            tr.filter("bandpass",freqmin=freqmin,freqmax=freqmax,zerophase = True,corners=4)
+            stf1 = np.float32(tr.data) 
+
+            # save stf
+            stf_collect[i,:] = stf1 * 1.
+    
+    # all gather
+    tmp = comm.allreduce(stf_collect); stf_collect = tmp * 1.
+
+    # now get stf  by using PCA/ average    
     stf = np.zeros((2,glob_syn.shape[2]),'f4')
-    temp = PCA(np.float32(stf_collect))
+    temp = seis_pca(stf_collect)
     # temp = np.mean(stf_collect,axis=0)
     #temp = temp / np.max(np.abs(temp))
-
-    # = xnew[:,0]
     stf[0,:] = temp
     stf[1,:] = temp * 1.
-    avgamp = np.zeros((2),'f4')
     
     # compute time shift between syn and obs
     time_shift = np.zeros((nsta))
-    for i in range(nsta):
-        for ic in range(1):
+    for i in range(myrank,nsta,nprocs):
+        for ic in range(ncomp):
+            if components[ic] != 'Z': continue
             out = dt_syn * convolve(glob_syn[i,ic,:],stf[ic,:],'same')
             corr = correlate(glob_obs[i,ic,:],out,"full")
             time_shift[i] = (np.argmax(abs(corr)) - nt + 1) * dt_syn 
+    tmp = comm.allreduce(time_shift); time_shift = tmp * 1.
     t0 = np.mean(time_shift)
 
     # shift stf to remove tshift residulas
@@ -102,45 +103,56 @@ def compute_stf(glob_syn,glob_obs,stf_collect,dt_syn,components):
         stf[i,:] = shift_data(stf[i,:],dt_syn,t0)
     
     # recover data
-    recp_syn = glob_syn.copy()
-    for i in range(nsta):
+    recp_syn = glob_syn * 0
+    for i in range(myrank,nsta,nprocs):
         for ic in range(ncomp):
             recp_syn[i,ic,:] = dt_syn * convolve(glob_syn[i,ic,:],stf[ic,:],'same')
+    tmp = comm.allreduce(recp_syn); recp_syn = tmp * 1.
     
     # calculate amplitude scale factor 
-    print('\ncalculate ampl scale factors ...')
-    avgarr = np.zeros((nsta),'f4')
+    avgamp = np.zeros((2))
+    if myrank == 0: print('\ncalculate ampl scale factors ...')
     for ic in range(ncomp):
+        avgarr = np.zeros((nsta))
         ch = components[ic]
-        print(f'Initial amp factors: {ch}')
+        if myrank == 0: print(f'Initial amp factors: {ch}')
         sumamp = 0.
         j = 0
-        for i in range(nsta):
+        for i in range(myrank,nsta,nprocs):
             if np.max(np.abs(recp_syn[i,ic,:])) > 0:
                 avgarr[i] = np.dot(glob_obs[i,ic,:],recp_syn[i,ic,:]) / np.sum(recp_syn[i,ic,:]**2)
                 sumamp += avgarr[i]
                 j += 1 
             else :
                 avgarr[i] = -9999.
-        
-        print(f"There are {j} non zero rec found")
-        if j == 0:
-            print(f"skip ic {ch}")
-            continue 
+        tmp = comm.allreduce(avgarr); avgarr = tmp * 1.
+        j_all = comm.allreduce(j,MPI.SUM); j = j_all 
+        sumamp_all = comm.allreduce(sumamp,MPI.SUM); sumamp = sumamp_all * 1.
         avgamp0 = sumamp / j 
-        print("Initial average amp: %f" % avgamp0)
-        print("selecting amp factors |A - A0| <=0.2")
+
+        if j == 0:
+            if myrank == 0: print(f"skip ic {ch}")
+            continue 
+        if myrank == 0:
+            print(f"There are {j} non zero rec found")
+            print("Initial average amp: %f" % avgamp0)
+            print("selecting amp factors |A - A0| <=0.2")
         sumamp = 0. 
         j = 0
-        for i in range(nsta):
+        for i in range(myrank,nsta,nprocs):
             if np.abs(avgarr[i] - avgamp0) <=0.2 and avgarr[i] != -9999.:
                 sumamp += avgarr[i]
                 j += 1
+        j_all = comm.allreduce(j,MPI.SUM); j = j_all 
+        sumamp_all = comm.allreduce(sumamp,MPI.SUM); sumamp = sumamp_all * 1.
+
+        # check usage
         if j == 0 or j <= int(0.1 * nsta):
             print("Error: too little data satisfy |A-A0| <=0.2")
             exit(1)
+
         avgamp[ic] = sumamp / j 
-        print("final average amp: %f" %(avgamp[ic]))
+        if myrank == 0: print("final average amp: %f" %(avgamp[ic]))
 
         # normalize stf
         stf[ic,:] *= avgamp[ic]
@@ -167,47 +179,11 @@ def main():
     nprocs = comm.Get_size()
 
     # load paramfile as dictionary
-    pdict = read_fwat_params(f'solver/{mdir}/{evtname}/DATA/FWAT.PAR.yaml')['measure']['tele']
+    pdict = read_params(f'solver/{mdir}/{evtname}/DATA/FWAT.PAR.yaml')['measure']['tele']
     
     # print log
     verbose = pdict['VERBOSE_MODE']
     CCODE = "." + pdict['CH_CODE']
-
-    # read injection starttime 
-    temp = np.loadtxt('src_rec/injection_time',dtype=str,ndmin=2)
-    find_src = False
-    for i in range(temp.shape[0]):
-        if temp[i,0] == evtid:
-            t_inj = float(temp[i,1])
-            find_src = True
-            break
-    if not find_src:
-        print(f'please check {evtid} in src_rec/injection_time')
-    
-    # read station coordinates
-    stationfile = f'src_rec/STATIONS_{evtid}_globe'
-    statxt = np.loadtxt(stationfile,dtype=str,ndmin=2)
-    nsta = statxt.shape[0]
-
-    # compute ak135 theoretical travel time for each station
-    do_ls = False
-    if run_opt == 2: do_ls=True
-    tref = compute_ak135_time(evtid,statxt,do_ls)
-    
-    # synthetic data parameters
-    syndir = f'solver/{mdir}/{evtname}/OUTPUT_FILES/'
-    name = statxt[0,1] + "." + statxt[0,0] + CCODE + "Z.sac"
-    syn_z_hd = SACTrace.read(syndir + name,headonly=True)
-    npt_syn = syn_z_hd.npts
-    dt_syn = syn_z_hd.delta
-    t0_syn =  t_inj # starttime is injection time
-    sac_head = syn_z_hd.copy()
-
-    # get time window 
-    win_tb,win_te = pdict['TIME_WINDOW']
-    npt2 = int((win_te + win_tb) / dt_syn)
-    if npt2 // 2 * 2 != npt2:
-        npt2 += 1
 
     # get frequency band
     Tmin_list = [x[0] for x in pdict['FILTER_BANDS']]
@@ -216,6 +192,33 @@ def main():
     # get components
     ncomp = len(pdict['COMPS'])
     components = pdict['COMPS']
+
+    # read injection starttime 
+    t_inj = get_injection_time(evtid)
+    
+    # read station coordinates
+    stationfile = f'src_rec/STATIONS_{evtid}_globe'
+    statxt = np.loadtxt(stationfile,dtype=str,ndmin=2)
+    nsta = statxt.shape[0]
+
+    # read source loc
+    sourcefile = "./src_rec/sources.dat.tele"
+    evla,evlo,evdp = get_source_loc(evtid,sourcefile)
+
+    # compute ak135 theoretical travel time for each station
+    tref = compute_ak135_time(evla,evlo,evdp,statxt,'P')
+    
+    # synthetic data parameters
+    syndir = f'solver/{mdir}/{evtname}/OUTPUT_FILES/'
+    name = statxt[0,1] + "." + statxt[0,0] + CCODE + f"{components[0]}.sac"
+    _,dt_syn,npt_syn = get_simu_info(syndir + name)
+    t0_syn = t_inj # starttime is injection time
+
+    # get time window 
+    win_tb,win_te = pdict['TIME_WINDOW']
+    npt2 = int((win_te + win_tb) / dt_syn)
+    if npt2 // 2 * 2 != npt2:
+        npt2 += 1
 
     # if run_opt == 1, save synthetic data to SYN
     if run_opt == 1:
@@ -244,7 +247,7 @@ def main():
 
                 # write data to outdir
                 syn_tr.data = data 
-                syn_tr.data = t_inj - tref[i]
+                syn_tr.b = t_inj - tref[i]
                 syn_tr.write(outdir + '/' + name)
         
         # finish here
@@ -264,14 +267,13 @@ def main():
 
         # deconvolution to get stf 
         nsta = statxt.shape[0]
-        stf_collect = np.zeros((nsta,npt_syn),'f4')
-        glob_obs = np.zeros((nsta,ncomp,npt_syn),'f4')
-        glob_syn = np.zeros((nsta,ncomp,npt_syn),'f4')
+        glob_obs = np.zeros((nsta,ncomp,npt_syn))
+        glob_syn = np.zeros((nsta,ncomp,npt_syn))
         
         # allocate tasks
         for i in range(myrank,nsta,nprocs):
             # check time window
-            name = statxt[i,1] + "." + statxt[i,0]  +  CCODE + "Z.sac"
+            name = statxt[i,1] + "." + statxt[i,0]  +  CCODE + f"{components[0]}.sac"
             head = SACTrace.read(syndir + "/" + name,headonly=True)
             if tref[i] +  win_te > t0_syn + head.npts * head.delta:
                 print("time window exceed data range")
@@ -304,54 +306,44 @@ def main():
                 u = interpolate_syn(u1,t0_inp,dt_syn,npt2,t0_syn,dt_syn,npt_syn)
                 w = interpolate_syn(w1,t0_inp,dt_syn,npt2,t0_syn,dt_syn,npt_syn)     
 
-                if ch == 'Z':
-                    # deconv
-                    stf1 = time_decon(u,w,dt_syn)
-                    #stf1 = compute_stf_freq(u,w,dt_syn)
-                    #stf1 = deconit(u,w,dt_syn,0.,1.5)
-                    tr = Trace(stf1); tr.stats.delta = dt_syn
-                    tr.filter("bandpass",freqmin=freqmin,freqmax=freqmax,zerophase = True,corners=4)
-                    stf1 = np.float32(tr.data) 
-
-                    # save field
-                    stf_collect[i,:] = stf1
-                    
+                # save to  global array   
                 glob_obs[i,ic,:] = u
                 glob_syn[i,ic,:] = w 
 
         # all reduce
-        tmp = comm.allreduce(glob_obs); glob_obs = tmp
-        tmp = comm.allreduce(glob_syn); glob_syn = tmp
-        tmp = comm.allreduce(stf_collect); stf_collect = tmp
+        tmp = comm.allreduce(glob_obs); glob_obs = tmp * 1.
+        tmp = comm.allreduce(glob_syn); glob_syn = tmp * 1.
         
-        # compute PCA analysis to get primary STF
-        # PCA to get optimal stf
-        stf = None 
-        if myrank == 0:
-            # check if sac file exists
-            stf_names = [f'src_rec/stf_{ch}.sac.' + f"{bandname}" + f"_{evtid}" for ch in components]
-            flag = True 
+        # get source time function 
+        # check if sac file exists
+        stf_names = [f'src_rec/stf_{ch}.sac.' + f"{bandname}" + f"_{evtid}" for ch in components]
+        has_stf_flag = True 
+        for ic in range(ncomp):
+            has_stf_flag = has_stf_flag and os.path.isfile(stf_names[ic])
+        if has_stf_flag: # read stf from directory
+            stf = np.zeros((ncomp,npt_syn),'f4')
             for ic in range(ncomp):
-                flag = flag and os.path.isfile(stf_names[ic])
-            if flag:
-                stf = np.zeros((ncomp,npt_syn),'f4')
-                for ic in range(ncomp):
-                    stf[ic,:] = SACTrace.read(stf_names[ic]).data
-            else:
-                stf = compute_stf(glob_syn,glob_obs,stf_collect,dt_syn,components)
-                for ic in range(ncomp):
-                    sac_head.data = stf[ic,:]
-                    sac_head.write(stf_names[ic])
-            
-            # write stf to syndir
+                stf[ic,:] = SACTrace.read(stf_names[ic]).data
+        else: # estimate stf
+            stf = compute_stf(glob_syn,glob_obs,dt_syn,freqmin,freqmax,components)
+
+            # save to stfnames
+            sac_head = SACTrace(b=0,npts=npt_syn,delta=dt_syn)
+            for ic in range(ncomp):
+                sac_head.data = stf[ic,:]
+                if myrank ==0 : sac_head.write(stf_names[ic])
+
+        # save stf to syndir
+        if myrank == 0:
             path = syndir + f'{bandname}/'
+            sac_head = SACTrace(b=0,npts=npt_syn,delta=dt_syn)
             for ic in range(ncomp):
                 ch = components[ic]
                 sac_head.data = stf[ic,:]
-                sac_head.b = 0
-                sac_head.delta = dt_syn
                 sac_head.write(path + f'stf_{ch}.sac')
-        stf = comm.bcast(stf)
+
+        # wait all jobs finished
+        comm.Barrier()
 
         # save semdata 
         if verbose:
@@ -407,6 +399,15 @@ def main():
                     f.write("1\n")
                     f.write("%f %f\n" %(tstart,tend))
 
+            f.close()
+
+            # write MEASUREMENTS.PAR
+            from utils import measure_adj_file
+            imeas = pdict['IMEAS']
+            ccode = pdict['CH_CODE']
+            txt = measure_adj_file(0,dt_syn,npt_syn,0.99*np.min(Tmin_list),1.01*np.max(Tmax_list),imeas,ccode)
+            f = open(f"solver/{mdir}/{evtname}/DATA/MEASUREMENT.PAR","w")
+            f.write(txt)
             f.close()
     
     comm.Barrier()

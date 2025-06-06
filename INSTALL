@@ -1,0 +1,42 @@
+#!/bin/bash
+set -e 
+
+# gcc 
+# F90="gfortran"
+# CXX="g++"
+
+# intel 
+CXX="icc"
+F90="ifort"
+
+# SAC HOME
+SACHOME=${HOME}/software//sac/
+
+### STOP HERE ##########
+
+# check input dir
+if [[ $# -ne 1 ]]; then 
+    echo "Usage: ./INSTALL.sh INSTALL_DIR"
+    exit 1
+fi
+INSTALL_DIR=$1
+
+# compile measure_adj
+mkdir -p build
+cd build
+cmake .. -DCXX=$CXX -DFC=$F90 -DSACHOME=${SACHOME} -DPYTHON_EXECUTABLE=`which python`
+make install -j4 
+cd ..
+rm -rf build 
+
+mkdir -p $INSTALL_DIR
+\cp -r module_env *.sh plots fwat_params $INSTALL_DIR/
+CDIR=`pwd`
+awk -v val="$CDIR" '{if ($0 ~ /^FWATLIB_PATH=/) print "FWATLIB_PATH="val; else print $0}' $INSTALL_DIR/parameters.sh> tmp && mv tmp $INSTALL_DIR/parameters.sh
+
+chmod +x *.sh 
+chmod +x fwatlib/*.sh
+
+echo " ============= " 
+echo " Install Successfully!"
+echo " ============= " 

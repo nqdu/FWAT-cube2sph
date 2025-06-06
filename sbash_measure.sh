@@ -3,7 +3,7 @@
 #SBATCH --ntasks=8
 #SBATCH --array=21-28%5
 #SBATCH --time=00:35:59
-#SBATCH --job-name FWD_ADJ
+#SBATCH --job-name=FWD_ADJ
 #SBATCH --output=FWD_ADJ-%j_set%a.txt
 #SBATCH --account=def-liuqy
 #SBATCH --mem=12G
@@ -81,7 +81,6 @@ for i in `seq 1 $NJOBS`; do
   # copy common parameters
   \cp DATA/Par_file.$simu_type $evtdir/DATA/Par_file
   \cp fwat_params/FWAT.PAR.yaml $evtdir/DATA/FWAT.PAR.yaml
-  \cp fwat_params/MEASUREMENT.PAR.$simu_type $evtdir/DATA/MEASUREMENT.PAR
   \cp OUTPUT_FILES/*.h $evtdir/OUTPUT_FILES
   \rm -rf $evtdir/DATA/meshfem3D_files/*
   ln -s $work_dir/DATA/meshfem3D_files/* $evtdir/DATA/meshfem3D_files/
@@ -97,7 +96,8 @@ for i in `seq 1 $NJOBS`; do
   cd src_rec
   \cp STATIONS_$evtid $evtdir/DATA/STATIONS
   \cp STATIONS_$evtid $evtdir/DATA/STATIONS_ADJOINT
-  if [[ $simu_type == "tele" ]]; then 
+  if [[ $simu_type == "tele" ]] || \
+     [[ $simu_type == "sks" ]] ; then 
     :> $evtdir/DATA/FORCESOLUTION
     
     # change parameters
@@ -114,7 +114,8 @@ for i in `seq 1 $NJOBS`; do
     cd ..
     $change_par COUPLE_WITH_INJECTION_TECHNIQUE .false. $evtdir/DATA/Par_file
   else 
-    echo "noise"
+    echo "not implemented!"
+    exit 1
   fi
   cd $work_dir
 
@@ -138,7 +139,8 @@ for i in `seq 1 $NJOBS`; do
   echo ""
   cd $work_dir
   date
-  bash $MEASURE_LIB/measure.$simu_type.sh $iter $evtid $run_opt >> $fwd 
+  mpirun -np $NPROC $MEASURE_LIB/run_preprocess.py $simu_type $iter $evtid $run_opt
+  #bash $MEASURE_LIB/measure.$simu_type.sh $iter $evtid $run_opt >> $fwd 
   date
 
   # adjoint simulation

@@ -7,6 +7,10 @@ set_fwat1()
   local nevts=`cat src_rec/sources.dat.$simu_type|wc -l`
   local narray=`echo "($nevts + $njobs - 1) / $njobs"|bc`
 
+  # if [[ $iter == 0 || $iter == $iter_end ]]; then
+  #   sed -i "/SHOW_DETAILS:/c\SHOW_DETAILS: .true." fwat_params/FWAT.PAR
+  # fi
+
   # substitute 
   cp sbash_measure.sh tmp.fwat1.$simu_type.sh
   \cp DATA/Par_file.$simu_type DATA/Par_file
@@ -16,7 +20,7 @@ set_fwat1()
   sed -i "/NJOBS=/c\NJOBS=$njobs" $fwd
   sed -i "/START_SET=/c\START_SET=$start_set" $fwd
   sed -i "/simu_type=/c\simu_type=$simu_type" $fwd
-  sed -i "/LOCAL_PC=/c\LOCAL_PC=0" $fwd
+  sed -i "/LOCAL_PC=/c\LOCAL_PC=1" $fwd
 
   if [[ $simu_type == "noise" ]]; then
     sed -i "/#SBATCH --time=/c\#SBATCH --time=00:25:00" $fwd
@@ -48,7 +52,7 @@ set_fwat3()
   sed -i "/NJOBS=/c\NJOBS=$njobs" $fwd
   sed -i "/START_SET=/c\START_SET=$start_set" $fwd
   sed -i "/simu_type=/c\simu_type=$simu_type" $fwd
-  sed -i "/LOCAL_PC=/c\LOCAL_PC=0" $fwd
+  sed -i "/LOCAL_PC=/c\LOCAL_PC=1" $fwd
 
 
   if [[ $simu_type == "noise" ]]; then
@@ -70,7 +74,6 @@ NJOBS=8
 
 # mkdir 
 mkdir -p misfits optimize solver
-\cp DATA/Par_file.$simu_type  DATA/Par_file
 
 # some jobid 
 job_adj=0
@@ -82,6 +85,7 @@ job_wait=0
 # set number
 # initialize set number
 setb=1
+date 
 
 for ii in `seq 1 4`;do 
 
@@ -103,32 +107,31 @@ for ii in `seq 1 4`;do
   # check flag type and run 
   if [ $flag == "INIT" ]; then 
     set_fwat1 $simu_type $NJOBS $setb
-    job_adj=$(sbatch tmp.fwat1.$simu_type.sh|cut -d ' ' -f4 )
+    bash tmp.fwat1.$simu_type.sh > FWD_ADJ.$iter.txt
     
     # sum kernels, get search direction, generate trial model 
     fwd=sbash_postproc_kl.sh
     sed -i "/SOURCE_FILE=/c\SOURCE_FILE=./src_rec/sources.dat.$simu_type" $fwd
-    job_post=$(sbatch --dependency=afterok:${job_adj} $fwd | cut -d ' ' -f4)
+    bash $fwd > POST.$iter.txt 
     
   elif [ $flag == "GRAD"  ];then 
     # get search direction, generate trial model 
     fwd=sbash_postproc_kl.sh
     sed -i "/SOURCE_FILE=/c\SOURCE_FILE=./src_rec/sources.dat.$simu_type" $fwd
     echo "Post processing ..."
-    job_post=$(sbatch $fwd | cut -d ' ' -f4)
+    bash $fwd > POST.$iter.txt 
 
   else  # line search
     set_fwat3 $simu_type $NJOBS $setb 
-    job_line=$(sbatch tmp.fwat3.$simu_type.sh|cut -d ' ' -f4 )
+    bash tmp.fwat3.$simu_type.sh > LS.$iter.txt
 
     # check wolfe condition
     fwd=sbash_wolfe.sh
     sed -i "/SIMU_TYPE=/c\SIMU_TYPE=$simu_type" $fwd
     sed -i "/SOURCE_FILE=/c\SOURCE_FILE=./src_rec/sources.dat.$simu_type" $fwd
     echo "checking wolfe condition ..."
-    job_post=$(sbatch --dependency=afterok:${job_line} $fwd | cut -d ' ' -f4)
+    bash $fwd > WOLFE.$iter.txt 
   fi
-
-  # wait to finish
-  srun --dependency=afterok:${job_post} --nodes=1 --time=00:00:10 --ntasks=1 --job-name=wait  ./wait.sh
 done
+
+date 

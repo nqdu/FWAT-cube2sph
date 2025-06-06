@@ -1,8 +1,6 @@
 import sys 
-import os 
 from scipy.io import FortranFile 
 import numpy as np 
-from tools import *
 import h5py
 
 def main():
