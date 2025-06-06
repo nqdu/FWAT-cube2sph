@@ -176,7 +176,6 @@ class FwatPreOP:
         if self.myrank == 0:
             print("Synthetic Observations ...")
             os.makedirs(outdir,exist_ok=True)
-        MPI.COMM_WORLD.Barrier()
         
         # load stf for tele seismic events
         stf = None
@@ -193,14 +192,17 @@ class FwatPreOP:
                     stf[ic,:] += tr.data 
         
         # loop every station to save sac
-        for i in range(myrank,self.nsta,nprocs):
+        data = np.zeros((npt_syn,2))
+        data[:,0] = np.arange(npt_syn) * dt_syn + t0_syn 
+        for ir in range(self.nsta_loc):
+            i = ir + self._istart
             for ic in range(ncomp):
                 ch = components[ic]
 
-                # load synthetics from ascii
+                # fetch synthetics 
                 code = self._get_station_code(i,ic)
-                filename = f"{self.syndir}/OUTPUT_FILES/{code}.sem.ascii"
-                data =  np.loadtxt(filename)
+                iloc = self._syncmp.index(ch)
+                data[:,1] = self.seismo[ir,iloc,:]
 
                 # special handling for each type
                 if self.meatype == "tele":
@@ -209,7 +211,6 @@ class FwatPreOP:
                     tr.b =  self.t_inj - self.t_ref[i]
                 elif self.meatype == "sks":
                     tr.b =  self.t_inj - self.t_ref[i]
-                    tr.data = data[:,1] * 1.
                 elif self.meatype == "noise":
                     if self.pdict['USE_EGF'] == False:
                         if i == myrank and myrank == 0 and ic == 0:
@@ -222,8 +223,8 @@ class FwatPreOP:
 
                 # channel and others
                 tr.kcmpnm = f"{self.chcode}{ch}"
-                tr.knetwk = self.netwk[i]
-                tr.kstnm = self.stnm[i]
+                tr.knetwk = self.netwk[i],
+                tr.kstnm = self.stnm[i],
                 tr.stla = self.stla[i]
                 tr.stlo = self.stlo[i]
 
@@ -290,7 +291,6 @@ class FwatPreOP:
         from utils import interpolate_syn,dif1
         from utils import bandpass
         from measure import measure_adj
-        from utils import alloc_mpi_jobs
 
         freqmin = 1. / self.Tmax[ib]
         freqmax = 1. / self.Tmin[ib]
@@ -315,8 +315,7 @@ class FwatPreOP:
 
         # allocate mpi jobs
         nsta = self.nsta 
-        istart,iend = alloc_mpi_jobs(nsta,self.nprocs,self.myrank)
-        nsta_loc = iend - istart + 1
+        nsta_loc = self.nsta_loc
 
         # misfits
         ncomp = self.ncomp
@@ -328,11 +327,14 @@ class FwatPreOP:
 
         # loop every station to do preprocessing
         for ir in range(nsta_loc):
-            i = ir + istart
+            i = ir + self._istart
             for icomp in range(self.ncomp):
                 name = self._get_station_code(i,icomp)
                 obs_tr = SACTrace.read(f'{self.DATA_DIR}/{self.evtid}/{name}.sac')
-                syn_tr = np.loadtxt(f"{out_dir}/{name}.sem.ascii")[:,1]
+
+                # synthetic data
+                iloc = self._syncmp.index(self.components[icomp])
+                syn_tr = self.seismo[ir,iloc,:] * 1.
 
 
                 # new npts/t0 for interpolate
@@ -408,7 +410,6 @@ class FwatPreOP:
         from utils import interpolate_syn
         from utils import bandpass
         from measure import measure_adj
-        from utils import alloc_mpi_jobs
         from scipy.signal import convolve,correlate
         from tele.tele import compute_stf,get_average_amplitude
         import os 
@@ -434,8 +435,7 @@ class FwatPreOP:
         
         # allocate global arrays 
         nsta = self.nsta 
-        istart,iend = alloc_mpi_jobs(nsta,self.nprocs,self.myrank)
-        nsta_loc = iend - istart + 1
+        nsta_loc = self.nsta_loc
 
         # misfits
         ncomp = self.ncomp
@@ -452,12 +452,15 @@ class FwatPreOP:
 
         # loop each station
         for ir in range(nsta_loc):
-            i = ir + istart
+            i = ir + self._istart
             for ic in range(ncomp):
                 name = self._get_station_code(i,ic)
 
-                # read data
-                syn_data = np.loadtxt(f"{out_dir}/{name}.sem.ascii")[:,1]
+                # syn data
+                iloc = self._syncmp.index(self.components[ic])
+                syn_data = self.seismo[ir,iloc,:] * 1. 
+
+                # read obs data
                 obs_tr = SACTrace.read(f"{self.DATA_DIR}/{self.evtid}/{name}.sac")
                 obs_data = obs_tr.data
 
@@ -514,7 +517,7 @@ class FwatPreOP:
     
         # call measure_adj for misfits
         for ir in range(nsta_loc):
-            i = ir + istart 
+            i = ir + self._istart 
             for ic in range(self.ncomp):
                 # convolve with stf
                 glob_syn[i,ic,:] = dt_syn * convolve(glob_syn[i,ic,:],stf[ic,:],'same')
@@ -571,7 +574,6 @@ class FwatPreOP:
         from obspy.io.sac import SACTrace
         from utils import interpolate_syn
         from utils import bandpass,cumtrapz1,dif1
-        from utils import alloc_mpi_jobs
 
         freqmin = 1. / self.Tmax[ib]
         freqmax = 1. / self.Tmin[ib]
@@ -594,8 +596,7 @@ class FwatPreOP:
         
         # allocate global arrays 
         nsta = self.nsta 
-        istart,iend = alloc_mpi_jobs(nsta,self.nprocs,self.myrank)
-        nsta_loc = iend - istart + 1
+        nsta_loc = self.nsta_loc
 
         # misfits
         tstart = np.zeros((nsta_loc))
@@ -606,7 +607,7 @@ class FwatPreOP:
 
         # loop each station
         for ir in range(nsta_loc):
-            i = ir + istart
+            i = ir + self._istart
             obs_data = np.zeros((2,npt_syn))
             syn_data = np.zeros((2,npt_syn))
 
@@ -618,9 +619,12 @@ class FwatPreOP:
                 name = self._get_station_code(i,ic)
 
                 # read data
-                sdata = np.loadtxt(f"{out_dir}/{name}.sem.ascii")[:,1]
                 obs_tr = SACTrace.read(f"{self.DATA_DIR}/{self.evtid}/{name}.sac")
                 odata = obs_tr.data 
+
+                # synthetic
+                iloc = self._syncmp.index(self.components[ic])
+                sdata = self.seismo[ir,iloc,:] * 1.
 
                 # data processing
                 odata = bandpass(odata,dt_obs,freqmin,freqmax)
@@ -653,30 +657,19 @@ class FwatPreOP:
                 tr.data = w
                 tr.write(f"{out_dir}/{bandname}/{name}.sac.syn")
 
-            # compute normalization factor
+            # compute SI
             ic_r = self.components.index("R")
             ic_t = self.components.index("T")
-            dRobs = dif1(obs_data[ic_r,:],dt_syn)
-            dRsyn = dif1(syn_data[ic_r,:],dt_syn)
-            norm_obs = np.sum(dRobs**2) * dt_syn
-            norm_syn = np.sum(dRsyn**2) * dt_syn
-            if norm_obs < 1.0e-15:
-                norm_obs = 0.
+            Robs_dot = dif1(obs_data[ic_r,:],dt_syn)
+            norm = cumtrapz1(Robs_dot**2,dt_syn)[-1]
+            if norm < 1.0e-15:
+                norm = 0.
             else:
-                norm_obs = 1. / norm_obs
-            if norm_syn < 1.0e-15:
-                norm_syn = 0. 
-            else:
-                norm_syn = 1. / norm_syn
-
-            # compute si 
+                norm = 1. / norm
             Tobs = obs_data[ic_t,:]
             Tsyn = syn_data[ic_t,:]
-            dTcomp = dif1(Tsyn,dt_syn)
-            SI_obs = -2. * np.sum(dRobs * Tobs) * dt_syn * norm_obs 
-            SI_syn = -2. * np.sum(dRsyn * Tsyn) * dt_syn * norm_syn 
-
-            # compute misfit function
+            SI_obs = -2. * cumtrapz1(Robs_dot*Tobs,dt_syn)[-1] * norm
+            SI_syn = -2. * cumtrapz1(Robs_dot*Tsyn,dt_syn)[-1] * norm
             L = 0.5 * (SI_syn - SI_obs)**2
             tr_chi[ir,0] = L 
             am_chi[ir,0] = L
@@ -684,30 +677,11 @@ class FwatPreOP:
             window[ir,0,7] = SI_obs
 
             # adjoint source
-            ddRsyn = dif1(dRsyn,dt_syn)
-            adjsrc_T = -2. * dt_syn * (SI_syn - SI_obs) * dRsyn * norm_syn
-            adjsrc_R = -2. * (SI_syn - SI_obs) * dt_syn * (  
-                2. * np.sum(dRsyn * Tsyn) * dt_syn * norm_syn**2 * ddRsyn - 
-                dTcomp * norm_syn
-            )
-
-            # filter adjoint source 
-            adjsrc_R = bandpass(adjsrc_R,dt_syn,freqmin,freqmax)
-            adjsrc_T = bandpass(adjsrc_T,dt_syn,freqmin,freqmax)
-
-            # only keep adjoint source inside time window
-            w = interpolate_syn(adjsrc_R,t_inj,dt_syn,npt_syn,t0_inp,dt_syn,npt2)
-            adjsrc_R = interpolate_syn(w,t0_inp,dt_syn,npt2,t_inj,dt_syn,npt_syn)
-            w = interpolate_syn(adjsrc_T,t_inj,dt_syn,npt_syn,t0_inp,dt_syn,npt2)
-            adjsrc_T = interpolate_syn(w,t0_inp,dt_syn,npt2,t_inj,dt_syn,npt_syn)
-
+            adjsrc_T = -2. * norm * (SI_syn - SI_obs) * Robs_dot
             data = np.zeros((npt_syn,2))
             data[:,0] = t0_syn + np.arange(npt_syn) * dt_syn
             data[:,1] = adjsrc_T
             outname = f"{out_dir}/{bandname}/{self.netwk[i]}.{self.stnm[i]}.{self.chcode}T.adj.sem.ascii"
-            np.savetxt(outname,data,fmt='%g')
-            data[:,1] = adjsrc_R
-            outname = f"{out_dir}/{bandname}/{self.netwk[i]}.{self.stnm[i]}.{self.chcode}R.adj.sem.ascii"
             np.savetxt(outname,data,fmt='%g')
         
         # save measurement files
@@ -815,6 +789,7 @@ class FwatPreOP:
 
     def execute(self):
         from utils import rotate_EN_to_RT,cal_dist_baz
+        from utils import alloc_mpi_jobs
 
         # rotate seismograms from XYZ to ZNE
         self._rotate_XYZ_to_ZNE()
@@ -825,31 +800,35 @@ class FwatPreOP:
             need_rt_rotate = True 
             for i in range(self.nsta):
                 _,self.bazd[i] = cal_dist_baz(self.evla,self.evlo,self.stla[i],self.stlo[i])
+        
+        # allocate syn arrays
+        istart,iend = alloc_mpi_jobs(self.nsta,self.nprocs,self.myrank)
+        self.nsta_loc = iend - istart + 1
+        self._istart = istart 
+        self.seismo = np.zeros((self.nsta_loc,3,self.npt_syn))
+        self._syncmp = ['E','N','Z']
+
+        # load synthetic data 
+        for ir in range(self.nsta_loc):
+            i = ir + self._istart
+            for ic,ch in enumerate(self._syncmp):
+                name = f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}{ch}.sem.ascii"
+                filename = f"{self.syndir}/OUTPUT_FILES/{name}"
+                data = np.loadtxt(filename)
+                self.seismo[ir,ic,:] = data[:,1]
 
         # rotate to R/T if required
         if need_rt_rotate:
-            for i in range(self.myrank,self.nsta,self.nprocs):
-                temp_syn = np.zeros((2,self.npt_syn))
-                data = np.zeros((self.npt_syn,2))
-                for ic,ch in enumerate(['E','N']):
-                    name = f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}{ch}.sem.ascii"
-                    filename = f"{self.syndir}/OUTPUT_FILES/{name}"
-                    data[:,:] = np.loadtxt(filename)
-                    temp_syn[ic,:] = data[:,1]
+            for ir in range(self.nsta_loc):
+                i = ir + self._istart
 
                 # rotate to R/T
-                ve = temp_syn[0,:]
-                vn = temp_syn[1,:]
+                ve = self.seismo[ir,0,:]
+                vn = self.seismo[ir,1,:]
                 vr,vt = rotate_EN_to_RT(ve,vn,self.bazd[i])
-                temp_syn[0,:] = vr * 1.
-                temp_syn[1,:] = vt * 1.
-
-                # save to ascii
-                for ic,ch in enumerate(['R','T']):
-                    name = f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}{ch}.sem.ascii"
-                    filename = f"{self.syndir}/OUTPUT_FILES/{name}"
-                    data[:,1] = temp_syn[ic,:] 
-                    np.savetxt(filename,data,fmt='%g')
+                self.seismo[ir,0,:] = vr * 1.
+                self.seismo[ir,1,:] = vt * 1.
+            self._syncmp = ['R','T','Z']
 
         # save current synthetics as observation if required
         if self.run_opt == 1:

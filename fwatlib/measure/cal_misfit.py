@@ -59,8 +59,7 @@ def main():
         files = []
         tempfiles = glob(f"./misfits/{mod}_*_{band}_{simu_type}_window_chi")
         for f in tempfiles:
-            if '.ls' not in f:
-                files.append(f)
+            files.append(f)
         chi,n = compute_misfits(evts,files)
         sumf += chi 
         sumn += n
