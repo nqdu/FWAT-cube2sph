@@ -158,10 +158,8 @@ def dif1(data,dt):
     return data1
 
 def cumtrapz1(data,dt):
-    from scipy.integrate import cumtrapz
-    n = len(data)
-    data1 = np.zeros((n))
-    data1[1:n] = cumtrapz(data) * dt 
+    from scipy.integrate import cumulative_trapezoid
+    data1 = cumulative_trapezoid(data,dx=dt,initial=0.)
 
     return data1
 
