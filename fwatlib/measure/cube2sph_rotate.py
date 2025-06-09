@@ -4,6 +4,19 @@ from string import Template
 from mpi4py import MPI
 import h5py
 
+def _get_first_dim_npy(filename):
+    import numpy.lib.format
+
+    with open(filename,"rb") as fobj:
+        version = numpy.lib.format.read_magic(fobj)
+        func_name = 'read_array_header_' + '_'.join(str(v) for v in version)
+        func = getattr(numpy.lib.format, func_name)
+        
+        # get header
+        out = func(fobj)
+
+    return out[0][0]
+
 
 def _count_lines(filename):
     with open(filename, 'rb') as f:
@@ -150,7 +163,7 @@ def rotate_seismo_adj(fn_matrix:str,from_dir:str,to_dir:str,
                 missing_file = True
                 break
             if nstep < 0:
-                nstep = os.path.getsize(fn) // (2*4)
+                nstep = _get_first_dim_npy(fn)
         
         if (missing_file):
             continue
