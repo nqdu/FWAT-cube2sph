@@ -70,11 +70,11 @@ def dtti_call():
     N = rho * vsh**2
     gc = gcp * L 
     gs = gsp * L 
-    F = (A - 2* L)
+    F = eta * (A - 2* L)
     C0 = _c66mat(A,C,L,N,F,gc,gs)
 
     # compute derivative 
-    for ii,param in enumerate([vph,vpv,vsh,vsv,rho,gcp,gsp]):
+    for ii,param in enumerate([vph,vpv,vsh,vsv,rho,eta,gcp,gsp]):
         expr = ""
         out = sp.diff(rho,param)
         if out !=0:

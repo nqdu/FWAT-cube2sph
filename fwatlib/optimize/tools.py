@@ -6,7 +6,6 @@ def _Index(m,n):
 
     return idx
 
-
 class FwatModel:
     def initialize(self,mdtype='iso',kltype=2) -> None:
         """
@@ -25,7 +24,7 @@ class FwatModel:
             dtti configuration:
                 0: c11-c66,rho
                 1: vp,vs,rho,gcp,gsp
-                2. vph,vpv,vsh,vsv,rho,gcp,gsp
+                2. vph,vpv,vsh,vsv,rho,eta,gcp,gsp
         """
         self._mdtype = mdtype
         self._kltype =kltype
@@ -38,12 +37,18 @@ class FwatModel:
         """
         when filename is provided, mdtype and kltype will be overwritten
         """
+        self._mask_vars = []
         if filename is not None:
             import yaml
             with open(filename,"r") as f:
                 pdict = yaml.safe_load(f)['optimize']
             mdtype = pdict['MODEL_TYPE']
             kltype = pdict['KERNEL_SET']
+
+            # mask option
+            
+            if 'MASK_VARS' in pdict.keys():
+                self._mask_vars = pdict['MASK_VARS']
         else:
             assert(mdtype is not None)
             assert(kltype is not None)
@@ -72,7 +77,8 @@ class FwatModel:
                 # vp,vs,rho,gc_nodim,gs_nodim  Zhu et al 2015, GJI, (25,26) 
                 direc_list = ["dalpha","dbeta","drho","dGcp","dGsp"]
             elif self._kltype == 2:
-                direc_list = ["dalphah","dbetav","dalphah","dbetav","drho","dGcp","dGsp"]
+                direc_list = ["dalphah","dbetav","dalphah","dbetav","drho","deta","dGcp","dGsp"]
+
             
         return direc_list
     
@@ -136,10 +142,10 @@ class FwatModel:
                 model_new[_Index(5,5),...] = vs**2 * rho
                 model_new[_Index(3,4),...] = -gs
 
-        elif self._kltype == 2: # vph,vpv,vsh,vsv,rho,gcp,gsp
+        elif self._kltype == 2: # vph,vpv,vsh,vsv,rho,eta,gcp,gsp
             if not backward:
                 rho = model[-1,:] * 1.
-                new_shape = (7,) + model.shape[1:]
+                new_shape = (8,) + model.shape[1:]
                 model_new = np.zeros(new_shape)
 
                 # get parameters
@@ -147,6 +153,8 @@ class FwatModel:
                 C = model[_Index(1,1),...]
                 L = 0.5 * (model[_Index(3,3),...] + model[_Index(4,4),...])
                 N = model[_Index(5,5),...]
+                F = model[_Index(0,2),...]
+                eta = F / (A - 2 * L)
                 gcp = (model[_Index(4,4),...] - L) / L
                 gsp = -model[_Index(3,4),...] / L 
 
@@ -156,8 +164,9 @@ class FwatModel:
                 model_new[2,...] = np.sqrt(N / rho) # vsh
                 model_new[3,...] = np.sqrt(L / rho) # vsv
                 model_new[4,...] = rho * 1.
-                model_new[5,...] = gcp 
-                model_new[6,...] = gsp 
+                model_new[5,...] = eta * 1. 
+                model_new[6,...] = gcp 
+                model_new[7,...] = gsp 
 
                 pass
             else:
@@ -170,10 +179,10 @@ class FwatModel:
                 vpv = model[1,...]; C = vpv**2 * rho 
                 vsh = model[2,...]; N = vsh**2 * rho 
                 vsv = model[3,...]; L = vsv**2 * rho
-        
-                gc = model[5,...] * L
-                gs = model[6,...]* L 
-                F = A - 2 * L 
+                eta = model[5,...]
+                gc = model[6,...] * L
+                gs = model[7,...]* L 
+                F = eta * (A - 2 * L)
 
                 # copy to cijkl
                 model_new[_Index(0,0),...] = A
@@ -242,9 +251,9 @@ class FwatModel:
                 plot_names[3] = "phi"
                 plot_names[4] = "G0"
 
-            elif self._kltype == 2: # vph,vpv,vsh,vsv,rho,gcp,gsp
-                gcp = model_new[5,...]
-                gsp = model_new[6,...]
+            elif self._kltype == 2: # vph,vpv,vsh,vsv,rho,eta,gcp,gsp
+                gcp = model_new[6,...]
+                gsp = model_new[7,...]
                 phi = 0.5 * np.arctan2(gsp,gcp)
                 g0p = np.hypot(gsp,gcp)
 
@@ -273,7 +282,7 @@ class FwatModel:
         elif self._mdtype == "dtti":
             if self._kltype == 1: # vp,vs,rho,gcp,gsp
                 md_used[:3,...] = np.log(md[:3,...])
-            elif self._kltype == 2: # vph,vpv,vsh,vsv,rho,gcp,gsp
+            elif self._kltype == 2: # vph,vpv,vsh,vsv,rho,eta,gcp,gsp
                 md_used[:5,...] = np.log(md[:5,...])
         
         return md_used
@@ -294,7 +303,7 @@ class FwatModel:
             if self._kltype == 1: # vp,vs,rho,gcp,gsp
                 md_update[3:,...] = md[3:,...] + direc[3:,...]
                 md_update[:3,...] = md[:3,...] * np.exp(direc[:3,...])
-            elif self._kltype == 2: # vph,vpv,vsh,vsv,rho,gcp,gsp
+            elif self._kltype == 2: # vph,vpv,vsh,vsv,rho,eta,gcp,gsp
                 md_update[5:,...] = md[5:,...] + direc[5:,...]
                 md_update[:5,...] = md[:5,...] * np.exp(direc[:5,...])
 
@@ -334,28 +343,30 @@ class FwatModel:
             vsh  = md_new[2,...] * 1.
             vsv  = md_new[3,...] * 1.
             rho = md_new[4,...] * 1.
-            gcp = md_new[5,...]
-            gsp = md_new[6,...]
+            eta = md_new[5,...] * 1.
+            gcp = md_new[6,...]
+            gsp = md_new[7,...]
 
             # auto generated by sympy
             md_newkl[0,...] = md_kl[0,...]*(2*rho*vph)+md_kl[1,...]*(2*rho*vph)+ \
-                md_kl[2,...]*(2*rho*vph)+md_kl[6,...]*(2*rho*vph)+ \
-                md_kl[7,...]*(2*rho*vph)
+                md_kl[2,...]*(2*eta*rho*vph)+md_kl[6,...]*(2*rho*vph)+ \
+                md_kl[7,...]*(2*eta*rho*vph)
             md_newkl[1,...] = md_kl[11,...]*(2*rho*vpv)
             md_newkl[2,...] = md_kl[1,...]*(-4*rho*vsh)+md_kl[20,...]*(2*rho*vsh)
-            md_newkl[3,...] = md_kl[2,...]*(-4*rho*vsv)+md_kl[7,...]*(-4*rho*vsv)+ \
+            md_newkl[3,...] = md_kl[2,...]*(-4*eta*rho*vsv)+md_kl[7,...]*(-4*eta*rho*vsv)+ \
                 md_kl[15,...]*(-2*gcp*rho*vsv + 2*rho*vsv)+md_kl[16,...]*(-2 \
                 *gsp*rho*vsv)+md_kl[18,...]*(2*gcp*rho*vsv + 2*rho*vsv)
             md_newkl[4,...] = md_kl[-1,...]* (1)+md_kl[0,...]*(vph**2)+md_kl[1,...]*(vph** \
-                2 - 2*vsh**2)+md_kl[2,...]*(vph**2 - 2*vsv**2)+md_kl[6,...]* \
-                (vph**2)+md_kl[7,...]*(vph**2 - 2*vsv**2)+md_kl[11,...]*(vpv \
-                **2)+md_kl[15,...]*(-gcp*vsv**2 + vsv**2)+md_kl[16,...]*(- \
-                gsp*vsv**2)+md_kl[18,...]*(gcp*vsv**2 + vsv**2)+ \
-                md_kl[20,...]*(vsh**2)
-            md_newkl[5,...] = md_kl[15,...]*(-rho*vsv**2)+md_kl[18,...]*(rho*vsv**2)
-            md_newkl[6,...] = md_kl[16,...]*(-rho*vsv**2)
+                2 - 2*vsh**2)+md_kl[2,...]*(eta*(vph**2 - 2*vsv**2))+ \
+                md_kl[6,...]*(vph**2)+md_kl[7,...]*(eta*(vph**2 - 2*vsv**2)) \
+                +md_kl[11,...]*(vpv**2)+md_kl[15,...]*(-gcp*vsv**2 + vsv**2) \
+                +md_kl[16,...]*(-gsp*vsv**2)+md_kl[18,...]*(gcp*vsv**2 + vsv \
+                **2)+md_kl[20,...]*(vsh**2)
+            md_newkl[5,...] = md_kl[2,...]*(rho*vph**2 - 2*rho*vsv**2)+md_kl[7,...]*(rho* \
+                vph**2 - 2*rho*vsv**2)
+            md_newkl[6,...] = md_kl[15,...]*(-rho*vsv**2)+md_kl[18,...]*(rho*vsv**2)
+            md_newkl[7,...] = md_kl[16,...]*(-rho*vsv**2)
 
-            
             # get relative change if required
             md_newkl[0:5,...] *= md_new[0:5,...]
 
@@ -391,5 +402,9 @@ class FwatModel:
 
         elif self._mdtype == "dtti":
             md_newkl = self._cijkl_kl2dtti(md_new,md_kl)
+
+
+        # mask part of the kernels
+        md_newkl[self._mask_vars,...] = 0.
 
         return md_new,md_newkl

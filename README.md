@@ -1,4 +1,4 @@
-FWAT Package Usage
+Full Waveform Adjoint Tomography Package for Cube2sph
 ====================
 
 # Source and Stations

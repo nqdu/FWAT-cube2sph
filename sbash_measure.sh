@@ -139,7 +139,7 @@ for i in `seq 1 $NJOBS`; do
   echo ""
   cd $work_dir
   date
-  mpirun -np $NPROC $MEASURE_LIB/run_preprocess.py $simu_type $iter $evtid $run_opt
+  mpirun -np $NPROC python $MEASURE_LIB/run_preprocess.py $simu_type $iter $evtid $run_opt >> $fwd
   #bash $MEASURE_LIB/measure.$simu_type.sh $iter $evtid $run_opt >> $fwd 
   date
 
