@@ -120,34 +120,30 @@ class FwatPreOP:
         return name 
 
     def _rotate_XYZ_to_ZNE(self):
-        from cube2sph_rotate import rotate_seismo
+        from cube2sph_rotate import rotate_seismo_fwd
 
         # set parameters
         fn_matrix = f"{self.SRC_REC}/rot_{self.evtid}"
-        rotate = "XYZ->NEZ"
         from_dir = f"{self.syndir}/OUTPUT_FILES/"
         to_dir = f"{self.syndir}/OUTPUT_FILES/"
         from_template='${nt}.${sta}.BX${comp}.semd'
-        to_template='${nt}.${sta}.BX${comp}.sem.ascii'
+        to_template='${nt}.${sta}.BX${comp}.sem.npy'
 
         # rotate seismograms from XYZ to ZNE
-        rotate_seismo(fn_matrix,rotate,from_dir,
-                      to_dir,from_template,to_template)
+        rotate_seismo_fwd(fn_matrix,from_dir,to_dir,from_template,to_template)
     
     def _rotate_ZNE_to_XYZ(self):
-        from cube2sph_rotate import rotate_seismo
+        from cube2sph_rotate import rotate_seismo_adj
 
         # set parameters
         fn_matrix = f"{self.SRC_REC}/rot_{self.evtid}"
-        rotate = "XYZ<-NEZ"
         from_dir = f"{self.syndir}/SEM/"
         to_dir = f"{self.syndir}/SEM/"
-        from_template='${nt}.${sta}.BX${comp}.adj.sem.ascii'
+        from_template='${nt}.${sta}.BX${comp}.adj.sem.npy'
         to_template='${nt}.${sta}.BX${comp}.adj'
 
         # rotate seismograms from XYZ to ZNE
-        rotate_seismo(fn_matrix,rotate,from_dir,
-                      to_dir,from_template,to_template,'ascii')
+        rotate_seismo_adj(fn_matrix,from_dir,to_dir,from_template,to_template)
         
     def save_forward(self):
         import os 
@@ -199,8 +195,8 @@ class FwatPreOP:
 
                 # load synthetics from ascii
                 code = self._get_station_code(i,ic)
-                filename = f"{self.syndir}/OUTPUT_FILES/{code}.sem.ascii"
-                data =  np.loadtxt(filename)
+                filename = f"{self.syndir}/OUTPUT_FILES/{code}.sem.npy"
+                data =  np.load(filename)
 
                 # special handling for each type
                 if self.meatype == "tele":
@@ -332,7 +328,7 @@ class FwatPreOP:
             for icomp in range(self.ncomp):
                 name = self._get_station_code(i,icomp)
                 obs_tr = SACTrace.read(f'{self.DATA_DIR}/{self.evtid}/{name}.sac')
-                syn_tr = np.loadtxt(f"{out_dir}/{name}.sem.ascii")[:,1]
+                syn_tr = np.load(f"{out_dir}/{name}.sem.npy")[:,1]
 
 
                 # new npts/t0 for interpolate
@@ -386,8 +382,8 @@ class FwatPreOP:
                 data = np.zeros((npt_syn,2))
                 data[:,0] = t0_syn + np.arange(npt_syn) * dt_syn
                 data[:,1] = adjsrc
-                name = self._get_station_code(i,icomp) + ".adj.sem.ascii"
-                np.savetxt(f"{out_dir}/{bandname}/{name}",data,fmt='%g')
+                name = self._get_station_code(i,icomp) + ".adj.sem.npy"
+                np.save(f"{out_dir}/{bandname}/{name}",data)
 
                 # save obs and syn as sac
                 name = self._get_station_code(i,icomp) + ".sac"
@@ -457,7 +453,7 @@ class FwatPreOP:
                 name = self._get_station_code(i,ic)
 
                 # read data
-                syn_data = np.loadtxt(f"{out_dir}/{name}.sem.ascii")[:,1]
+                syn_data = np.load(f"{out_dir}/{name}.sem.npy")[:,1]
                 obs_tr = SACTrace.read(f"{self.DATA_DIR}/{self.evtid}/{name}.sac")
                 obs_data = obs_tr.data
 
@@ -543,8 +539,8 @@ class FwatPreOP:
                 data = np.zeros((npt_syn,2))
                 data[:,0] = t0_syn + np.arange(npt_syn) * dt_syn
                 data[:,1] = adjsrc
-                name = self._get_station_code(i,ic) + ".adj.sem.ascii"
-                np.savetxt(f"{out_dir}/{bandname}/{name}",data,fmt='%g')
+                name = self._get_station_code(i,ic) + ".adj.sem.npy"
+                np.save(f"{out_dir}/{bandname}/{name}",data)
 
                 # save SAC obs and syn
                 # init a sac header
@@ -570,7 +566,7 @@ class FwatPreOP:
     def _cal_adjsrc_sks(self,ib:int,bandname:str):
         from obspy.io.sac import SACTrace
         from utils import interpolate_syn
-        from utils import bandpass,cumtrapz1,dif1
+        from utils import bandpass,dif1
         from utils import alloc_mpi_jobs
 
         freqmin = 1. / self.Tmax[ib]
@@ -618,7 +614,7 @@ class FwatPreOP:
                 name = self._get_station_code(i,ic)
 
                 # read data
-                sdata = np.loadtxt(f"{out_dir}/{name}.sem.ascii")[:,1]
+                sdata = np.load(f"{out_dir}/{name}.sem.npy")[:,1]
                 obs_tr = SACTrace.read(f"{self.DATA_DIR}/{self.evtid}/{name}.sac")
                 odata = obs_tr.data 
 
@@ -685,8 +681,8 @@ class FwatPreOP:
 
             # adjoint source
             ddRsyn = dif1(dRsyn,dt_syn)
-            adjsrc_T = -2. * dt_syn * (SI_syn - SI_obs) * dRsyn * norm_syn
-            adjsrc_R = -2. * (SI_syn - SI_obs) * dt_syn * (  
+            adjsrc_T = -2. * (SI_syn - SI_obs) * dRsyn * norm_syn
+            adjsrc_R = -2. * (SI_syn - SI_obs) * (  
                 2. * np.sum(dRsyn * Tsyn) * dt_syn * norm_syn**2 * ddRsyn - 
                 dTcomp * norm_syn
             )
@@ -704,11 +700,11 @@ class FwatPreOP:
             data = np.zeros((npt_syn,2))
             data[:,0] = t0_syn + np.arange(npt_syn) * dt_syn
             data[:,1] = adjsrc_T
-            outname = f"{out_dir}/{bandname}/{self.netwk[i]}.{self.stnm[i]}.{self.chcode}T.adj.sem.ascii"
-            np.savetxt(outname,data,fmt='%g')
+            outname = f"{out_dir}/{bandname}/{self.netwk[i]}.{self.stnm[i]}.{self.chcode}T.adj.sem.npy"
+            np.save(outname,data)
             data[:,1] = adjsrc_R
-            outname = f"{out_dir}/{bandname}/{self.netwk[i]}.{self.stnm[i]}.{self.chcode}R.adj.sem.ascii"
-            np.savetxt(outname,data,fmt='%g')
+            outname = f"{out_dir}/{bandname}/{self.netwk[i]}.{self.stnm[i]}.{self.chcode}R.adj.sem.npy"
+            np.save(outname,data)
         
         # save measurement files
         self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,window)
@@ -753,9 +749,9 @@ class FwatPreOP:
                 input_dir = f"{self.syndir}/OUTPUT_FILES/{bandname}"
 
                 for ic,ch in enumerate(comps_read):
-                    name = f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}{ch}.adj.sem.ascii"
+                    name = f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}{ch}.adj.sem.npy"
                     if os.path.exists(f"{input_dir}/{name}"):
-                        data = np.loadtxt(f"{input_dir}/{name}")
+                        data = np.load(f"{input_dir}/{name}")
                         adj[ic,:] += data[:,1]
                 
             # rotation if required
@@ -766,9 +762,9 @@ class FwatPreOP:
             data = np.zeros((self.npt_syn,2))
             data[:,0] = self.t0_syn + self.dt_syn * np.arange(self.npt_syn)
             for ic,ch in enumerate(['E','N','Z']):
-                name = f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}{ch}.adj.sem.ascii"
+                name = f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}{ch}.adj.sem.npy"
                 data[:,1] = adj[ic,:]
-                np.savetxt(f"{self.syndir}/SEM/{name}",data,fmt="%g")
+                np.save(f"{self.syndir}/SEM/{name}",data)
         
         # rotate to XYZ
         self._rotate_ZNE_to_XYZ()
@@ -806,10 +802,10 @@ class FwatPreOP:
         filenames = glob(f"{self.syndir}/OUTPUT_FILES/*.semd")
         for f in filenames:
             os.remove(f)
-        filenames = glob(f"{self.syndir}/OUTPUT_FILES/*.sem.ascii")
+        filenames = glob(f"{self.syndir}/OUTPUT_FILES/*.sem.npy")
         for f in filenames:
             os.remove(f)
-        filenames = glob(f"{self.syndir}/SEM/*.sem.ascii")
+        filenames = glob(f"{self.syndir}/SEM/*.sem.npy")
         for f in filenames:
             os.remove(f)
 
@@ -832,9 +828,9 @@ class FwatPreOP:
                 temp_syn = np.zeros((2,self.npt_syn))
                 data = np.zeros((self.npt_syn,2))
                 for ic,ch in enumerate(['E','N']):
-                    name = f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}{ch}.sem.ascii"
+                    name = f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}{ch}.sem.npy"
                     filename = f"{self.syndir}/OUTPUT_FILES/{name}"
-                    data[:,:] = np.loadtxt(filename)
+                    data[:,:] = np.load(filename)
                     temp_syn[ic,:] = data[:,1]
 
                 # rotate to R/T
@@ -846,10 +842,11 @@ class FwatPreOP:
 
                 # save to ascii
                 for ic,ch in enumerate(['R','T']):
-                    name = f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}{ch}.sem.ascii"
+                    name = f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}{ch}.sem.npy"
                     filename = f"{self.syndir}/OUTPUT_FILES/{name}"
                     data[:,1] = temp_syn[ic,:] 
-                    np.savetxt(filename,data,fmt='%g')
+                    #data.tofile(filename)
+                    np.save(filename,data)
 
         # save current synthetics as observation if required
         if self.run_opt == 1:

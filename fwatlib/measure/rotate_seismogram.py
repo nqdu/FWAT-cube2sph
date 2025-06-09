@@ -38,8 +38,8 @@ writing to $OUTPUT_FILES_cart/TS.TS11.BXZ.semd
 
 ignoring N and E components
 """
-import mpi4py.rc
-mpi4py.rc.threads = False
+# import mpi4py.rc
+# mpi4py.rc.threads = False
 import numpy as np
 import argparse
 import os
