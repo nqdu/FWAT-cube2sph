@@ -18,10 +18,170 @@ def _count_lines(filename):
         if last_buf and not last_buf.endswith(b'\n'):
             count += 1
         return count
+    
+def rotate_seismo_fwd(fn_matrix:str,from_dir:str,to_dir:str,
+                      from_template_str:str,to_template_str:str):
+    # input is hdf5
+    #--MPI-
+    comm = MPI.COMM_WORLD
+    myrank = comm.Get_rank()
+    nproc = comm.Get_size()
+
+    from_template = Template(from_template_str)
+    to_template = Template(to_template_str)
+
+    rotate = "XYZ->NEZ"
+    comp_left = rotate[0:3]
+    comp_right = rotate[5:8]
+    from_comp, to_comp = comp_left, comp_right
+
+    # open hdf5
+    fio = h5py.File(from_dir + "/seismograms.h5","r")
+
+    #arr = np.zeros(shape(nsteps, 2), dtype=float)
+    nu = np.zeros(shape=(3,3), dtype=float)
+    with open(fn_matrix, 'r') as rot_sta:
+        lines = rot_sta.readlines()
+
+    nrec = len(lines)//4
+    nrec_local = nrec // nproc
+    if (myrank < (nrec % nproc)): nrec_local = nrec_local + 1
+    for i_sta_local in range(0, nrec_local):
+        i_sta = i_sta_local * nproc + myrank
+        line_segs = lines[i_sta*4].strip().split(' ')
+        line_segs = [_ for _ in line_segs if _ != '']
+        nt = line_segs[0]
+        sta = line_segs[1]
+        for i_comp in range(0, 3):
+            line_segs = lines[i_sta*4+i_comp+1].strip().split(' ')
+            line_segs = [_ for _ in line_segs if _ != '']
+            nu[i_comp,0] = float(line_segs[0])
+            nu[i_comp,1] = float(line_segs[1])
+            nu[i_comp,2] = float(line_segs[2])
+        missing_file = False
+        nstep = -1
+        for i_comp in range(0, 3):
+            if (from_comp[i_comp] == '0'):
+                continue 
+            dname = from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp])
+            if dname not in fio.keys():
+                print(f"{dname} does not exist but required by rotation, skipping this station")
+                missing_file = True
+                break
+
+            if nstep < 0:
+                nstep = fio[dname].shape[0]
+        
+        if (missing_file):
+            continue
+        seis = np.zeros(shape=(nstep, 3), dtype=float)
+        for i_comp in range(0, 3):
+            if (from_comp[i_comp] == '0'):
+                continue
+
+            dname = from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp])
+            arr =  np.float64(fio[dname][:])
+            seis[:,i_comp] = arr[:,1]
+
+
+        # apply rotation matrix
+        seis = np.matmul(seis, np.transpose(nu))
+        for i_comp in range(0, 3):
+            if (to_comp[i_comp] == '0'):
+                continue
+            fn = os.path.join(to_dir, 
+                    to_template.substitute(nt=nt, sta=sta, comp=to_comp[i_comp]))
+            #print(fn)
+            arr[:,1] = seis[:,i_comp]
+            #print(f"writing to ${fn}")
+            np.save(fn,arr)
+
+    comm.barrier()
+    fio.close()
+
+def rotate_seismo_adj(fn_matrix:str,from_dir:str,to_dir:str,
+                      from_template_str:str,to_template_str:str):
+
+    #--MPI-
+    comm = MPI.COMM_WORLD
+    myrank = comm.Get_rank()
+    nproc = comm.Get_size()
+
+    from_template = Template(from_template_str)
+    to_template = Template(to_template_str)
+
+    rotate = "XYZ<-NEZ"
+    comp_left = rotate[0:3] 
+    comp_right = rotate[5:8]
+    from_comp, to_comp = comp_right, comp_left
+
+    #arr = np.zeros(shape(nsteps, 2), dtype=float)
+    nu = np.zeros(shape=(3,3), dtype=float)
+    with open(fn_matrix, 'r') as rot_sta:
+        lines = rot_sta.readlines()
+
+    nrec = len(lines)//4
+    nrec_local = nrec // nproc
+    if (myrank < (nrec % nproc)): nrec_local = nrec_local + 1
+    for i_sta_local in range(0, nrec_local):
+        i_sta = i_sta_local * nproc + myrank
+        line_segs = lines[i_sta*4].strip().split(' ')
+        line_segs = [_ for _ in line_segs if _ != '']
+        nt = line_segs[0]
+        sta = line_segs[1]
+        for i_comp in range(0, 3):
+            line_segs = lines[i_sta*4+i_comp+1].strip().split(' ')
+            line_segs = [_ for _ in line_segs if _ != '']
+            nu[i_comp,0] = float(line_segs[0])
+            nu[i_comp,1] = float(line_segs[1])
+            nu[i_comp,2] = float(line_segs[2])
+        missing_file = False
+        nstep = -1
+        for i_comp in range(0, 3):
+            if (from_comp[i_comp] == '0'):
+                continue 
+            dname = from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp])
+            fn = os.path.join(from_dir, 
+                    from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp]))
+            if (not os.path.isfile(fn)):
+                print(fn)
+                print(f"{dname} does not exist but required by rotation, skipping this station")
+                #os.system(f"wc -l {fn}")
+                missing_file = True
+                break
+            if nstep < 0:
+                nstep = os.path.getsize(fn) // (2*4)
+        
+        if (missing_file):
+            continue
+        seis = np.zeros(shape=(nstep, 3), dtype=float)
+        for i_comp in range(0, 3):
+            if (from_comp[i_comp] == '0'):
+                continue
+            fn = os.path.join(from_dir, 
+                from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp]))
+            arr = np.load(fn)
+            seis[:,i_comp] = arr[:,1]
+        
+        seis = np.matmul(seis, nu)
+
+        for i_comp in range(0, 3):
+            if (to_comp[i_comp] == '0'):
+                continue
+            fn = os.path.join(to_dir, 
+                    to_template.substitute(nt=nt, sta=sta, comp=to_comp[i_comp]))
+            #print(fn)
+            arr[:,1] = seis[:,i_comp]
+            #print(f"writing to ${fn}")
+            #arr.tofile(fn)
+            np.savetxt(fname=fn, X=arr, fmt='%11.6f%19.7E')
+
+    comm.barrier()
+
 
 def rotate_seismo(fn_matrix:str,rotate:str,from_dir:str,
            to_dir:str,from_template_str:str,
-           to_template_str:str,infile='h5'):
+           to_template_str:str,itype='h5',otype='bin'):
     """
     Python script to rotate seismograms between the Cartesian system and the Geographic system
     Tianshi Liu - 2022.03.24
@@ -62,7 +222,7 @@ def rotate_seismo(fn_matrix:str,rotate:str,from_dir:str,
 
     ignoring N and E components
     """
-    assert(infile in ['h5','ascii'])
+    assert(itype in ['h5','npz'])
 
     #--MPI-
     comm = MPI.COMM_WORLD
@@ -84,7 +244,7 @@ def rotate_seismo(fn_matrix:str,rotate:str,from_dir:str,
         raise ValueError('invalid rotate parameter')
     
     # open h5py
-    if infile == 'h5':
+    if itype == 'h5':
         fio = h5py.File(from_dir + "/seismograms.h5","r")
 
     #arr = np.zeros(shape(nsteps, 2), dtype=float)
@@ -113,7 +273,7 @@ def rotate_seismo(fn_matrix:str,rotate:str,from_dir:str,
             if (from_comp[i_comp] == '0'):
                 continue 
             dname = from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp])
-            if infile == 'h5':
+            if itype == 'h5':
                 if dname not in fio.keys():
                     print(f"{dname} does not exist but required by rotation, skipping this station")
                     missing_file = True
@@ -139,7 +299,7 @@ def rotate_seismo(fn_matrix:str,rotate:str,from_dir:str,
         for i_comp in range(0, 3):
             if (from_comp[i_comp] == '0'):
                 continue
-            if infile == 'h5':
+            if itype == 'h5':
                 dname = from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp])
                 arr = fio[dname][:]
                 seis[:,i_comp] = arr[:,1]
@@ -164,7 +324,8 @@ def rotate_seismo(fn_matrix:str,rotate:str,from_dir:str,
             #print(fn)
             arr[:,1] = seis[:,i_comp]
             #print(f"writing to ${fn}")
+            #arr.tofile(fn)
             np.savetxt(fname=fn, X=arr, fmt='%11.6f%19.7E')
 
     comm.barrier()
-    if infile == 'h5': fio.close()
+    if itype == 'h5': fio.close()
