@@ -163,11 +163,35 @@ def cumtrapz1(data,dt):
 
     return data1
 
+def get_window_info(t0,dt,tstart,tend):
+    """
+    get window start/end sample index
+
+    Parameters
+    -----------
+    t0,dt: float
+        start time and sampling interval
+    tstart,tend: float
+        start/end time of this window
+
+    Returns
+    -----------
+    left_pt,right_pt: int
+        the window sample index [left_pt,right_pt)
+    """
+    assert tend >= tstart, "window is reversed!"
+
+    nlen = int((tend - tstart) / dt) + 1
+    left_pt = int(np.floor(tstart - t0) / dt)
+    right_pt = left_pt + nlen
+
+    return left_pt,right_pt 
+
 def get_source_loc(evtid:str,sourcefile:str):
     """
     get source location evla,evlo,evdp
 
-    Parameters:
+    Parameters
     ----------------
     evtid: str
         source tag

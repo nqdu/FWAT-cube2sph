@@ -242,12 +242,12 @@ class FwatPreOP:
         self.npt_obs = hd.npts 
 
     def _print_measure_info(self,bandname,tstart,tend,tr_chi,am_chi,window_chi):
-        from utils import alloc_mpi_jobs
-
         ncomp = tr_chi.shape[1]
-        istart,iend = alloc_mpi_jobs(self.nsta,self.nprocs,self.myrank)
-        nsta_loc = iend - istart + 1
+        nsta_loc = self.nsta_loc
         imeas = self.pdict['IMEAS']
+
+        # sync
+        MPI.COMM_WORLD.Barrier()
 
         # loop each proc to print info on the screen
         # and save files
@@ -262,7 +262,7 @@ class FwatPreOP:
                     fio = open(outfile,"a")
 
                 for ir in range(nsta_loc):
-                    i = ir + istart 
+                    i = ir + self._istart 
                     for ic in range(ncomp):
                         name = self._get_station_code(i,ic)
                         print(f'{name}')
@@ -760,6 +760,9 @@ class FwatPreOP:
                 data[:,1] = adj[ic,:]
                 np.save(f"{self.syndir}/SEM/{name}",data)
         
+        # wait for jobs finish
+        MPI.COMM_WORLD.Barrier()
+
         # rotate to XYZ
         self._rotate_ZNE_to_XYZ()
 
@@ -853,6 +856,7 @@ class FwatPreOP:
         self._get_obs_info()
         for ib in range(len(self.Tmax)):
             self.cal_adj_source(ib)
+            MPI.COMM_WORLD.Barrier()
         
         # sum adjoint source
         self.sum_adj_source()
@@ -880,6 +884,9 @@ def main():
 
     # run
     op.execute()
+
+    # finalize
+    MPI.Finalize()
 
 if __name__ == "__main__":
     main()
