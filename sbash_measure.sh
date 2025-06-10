@@ -137,10 +137,10 @@ for i in `seq 1 $NJOBS`; do
 
   # run measure
   echo ""
+  echo "measure adjoint source ..."
   cd $work_dir
   date
   mpirun -np $NPROC python $MEASURE_LIB/run_preprocess.py $simu_type $iter $evtid $run_opt >> $fwd
-  #bash $MEASURE_LIB/measure.$simu_type.sh $iter $evtid $run_opt >> $fwd 
   date
 
   # adjoint simulation

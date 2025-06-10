@@ -4,7 +4,7 @@ from mpi4py import MPI
 class FwatPreOP:
     def __init__(self,measure_type:str,iter:int,evtid:str,run_opt:int):
         # import packages
-        from utils import read_params
+        from utils import read_params,alloc_mpi_jobs
         from utils import get_source_loc
         import h5py 
         comm = MPI.COMM_WORLD
@@ -92,6 +92,11 @@ class FwatPreOP:
                 statxt,phase
             )
         
+        # allocate jobs for each proc 
+        istart,iend = alloc_mpi_jobs(self.nsta,self.nprocs,self.myrank)
+        self.nsta_loc = iend - istart + 1
+        self._istart = istart 
+
         # sanity check 
         self._sanity_check()
     
@@ -189,7 +194,8 @@ class FwatPreOP:
                     stf[ic,:] += tr.data 
         
         # loop every station to save sac
-        for i in range(myrank,self.nsta,nprocs):
+        for ir in range(self.nsta_loc):
+            i = self._istart + ir 
             for ic in range(ncomp):
                 ch = components[ic]
 
@@ -286,7 +292,6 @@ class FwatPreOP:
         from utils import interpolate_syn,dif1
         from utils import bandpass
         from measure import measure_adj
-        from utils import alloc_mpi_jobs
 
         freqmin = 1. / self.Tmax[ib]
         freqmax = 1. / self.Tmin[ib]
@@ -311,8 +316,7 @@ class FwatPreOP:
 
         # allocate mpi jobs
         nsta = self.nsta 
-        istart,iend = alloc_mpi_jobs(nsta,self.nprocs,self.myrank)
-        nsta_loc = iend - istart + 1
+        nsta_loc = self.nsta_loc
 
         # misfits
         ncomp = self.ncomp
@@ -324,7 +328,7 @@ class FwatPreOP:
 
         # loop every station to do preprocessing
         for ir in range(nsta_loc):
-            i = ir + istart
+            i = ir + self._istart
             for icomp in range(self.ncomp):
                 name = self._get_station_code(i,icomp)
                 obs_tr = SACTrace.read(f'{self.DATA_DIR}/{self.evtid}/{name}.sac')
@@ -404,7 +408,6 @@ class FwatPreOP:
         from utils import interpolate_syn
         from utils import bandpass
         from measure import measure_adj
-        from utils import alloc_mpi_jobs
         from scipy.signal import convolve,correlate
         from tele.tele import compute_stf,get_average_amplitude
         import os 
@@ -430,8 +433,7 @@ class FwatPreOP:
         
         # allocate global arrays 
         nsta = self.nsta 
-        istart,iend = alloc_mpi_jobs(nsta,self.nprocs,self.myrank)
-        nsta_loc = iend - istart + 1
+        nsta_loc = self.nsta_loc
 
         # misfits
         ncomp = self.ncomp
@@ -448,7 +450,7 @@ class FwatPreOP:
 
         # loop each station
         for ir in range(nsta_loc):
-            i = ir + istart
+            i = ir + self._istart
             for ic in range(ncomp):
                 name = self._get_station_code(i,ic)
 
@@ -500,17 +502,14 @@ class FwatPreOP:
                 if self.myrank ==0 : sac_head.write(stf_names[ic])
         
         # get average amplitude
-        ic = 0
-        for i in range(ncomp):
-            if self.components[i] == 'Z':
-                ic = i 
+        ic = self.components.index('Z')
         avgamp = get_average_amplitude(glob_obs,ic)
         if self.myrank == 0: 
             print("average amplitude for data gather: %g\n" %(avgamp))
     
         # call measure_adj for misfits
         for ir in range(nsta_loc):
-            i = ir + istart 
+            i = ir + self._istart 
             for ic in range(self.ncomp):
                 # convolve with stf
                 glob_syn[i,ic,:] = dt_syn * convolve(glob_syn[i,ic,:],stf[ic,:],'same')
@@ -567,7 +566,6 @@ class FwatPreOP:
         from obspy.io.sac import SACTrace
         from utils import interpolate_syn
         from utils import bandpass,dif1
-        from utils import alloc_mpi_jobs
 
         freqmin = 1. / self.Tmax[ib]
         freqmax = 1. / self.Tmin[ib]
@@ -590,8 +588,7 @@ class FwatPreOP:
         
         # allocate global arrays 
         nsta = self.nsta 
-        istart,iend = alloc_mpi_jobs(nsta,self.nprocs,self.myrank)
-        nsta_loc = iend - istart + 1
+        nsta_loc = self.nsta_loc
 
         # misfits
         tstart = np.zeros((nsta_loc))
@@ -602,7 +599,7 @@ class FwatPreOP:
 
         # loop each station
         for ir in range(nsta_loc):
-            i = ir + istart
+            i = ir + self._istart
             obs_data = np.zeros((2,npt_syn))
             syn_data = np.zeros((2,npt_syn))
 
@@ -654,23 +651,17 @@ class FwatPreOP:
             ic_t = self.components.index("T")
             dRobs = dif1(obs_data[ic_r,:],dt_syn)
             dRsyn = dif1(syn_data[ic_r,:],dt_syn)
-            norm_obs = np.sum(dRobs**2) * dt_syn
-            norm_syn = np.sum(dRsyn**2) * dt_syn
-            if norm_obs < 1.0e-15:
-                norm_obs = 0.
-            else:
-                norm_obs = 1. / norm_obs
-            if norm_syn < 1.0e-15:
-                norm_syn = 0. 
-            else:
-                norm_syn = 1. / norm_syn
+            norm_obs = np.sum(dRobs**2)
+            norm_syn = np.sum(dRsyn**2)
+            norm_obs = 1. / (norm_obs + 1.0e-30)
+            norm_syn = 1. / (norm_syn + 1.0e-30)
 
             # compute si 
             Tobs = obs_data[ic_t,:]
             Tsyn = syn_data[ic_t,:]
             dTcomp = dif1(Tsyn,dt_syn)
-            SI_obs = -2. * np.sum(dRobs * Tobs) * dt_syn * norm_obs 
-            SI_syn = -2. * np.sum(dRsyn * Tsyn) * dt_syn * norm_syn 
+            SI_obs = -2. * np.sum(dRobs * Tobs) * norm_obs 
+            SI_syn = -2. * np.sum(dRsyn * Tsyn) * norm_syn 
 
             # compute misfit function
             L = 0.5 * (SI_syn - SI_obs)**2
@@ -683,7 +674,7 @@ class FwatPreOP:
             ddRsyn = dif1(dRsyn,dt_syn)
             adjsrc_T = -2. * (SI_syn - SI_obs) * dRsyn * norm_syn
             adjsrc_R = -2. * (SI_syn - SI_obs) * (  
-                2. * np.sum(dRsyn * Tsyn) * dt_syn * norm_syn**2 * ddRsyn - 
+                2. * np.sum(dRsyn * Tsyn) * norm_syn**2 * ddRsyn - 
                 dTcomp * norm_syn
             )
 
@@ -715,6 +706,7 @@ class FwatPreOP:
         if self.myrank == 0:
             print(f"preprocessing for band {bandname} ...")
             os.makedirs(f"{self.syndir}/OUTPUT_FILES/{bandname}",exist_ok=True)
+        MPI.COMM_WORLD.Barrier()
 
         if self.meatype == "noise":
             self._cal_adjsrc_noise(ib,bandname)
@@ -733,7 +725,9 @@ class FwatPreOP:
         MPI.COMM_WORLD.Barrier()
 
         # loop each stations
-        for i in range(self.myrank,self.nsta,self.nprocs):
+        for ir in range(self.nsta_loc):
+            i = ir + self._istart
+
             # init adjoint source
             adj = np.zeros((3,self.npt_syn))
 
@@ -824,7 +818,8 @@ class FwatPreOP:
 
         # rotate to R/T if required
         if need_rt_rotate:
-            for i in range(self.myrank,self.nsta,self.nprocs):
+            for ir in range(self.nsta_loc):
+                i = ir + self._istart
                 temp_syn = np.zeros((2,self.npt_syn))
                 data = np.zeros((self.npt_syn,2))
                 for ic,ch in enumerate(['E','N']):
@@ -847,6 +842,7 @@ class FwatPreOP:
                     data[:,1] = temp_syn[ic,:] 
                     #data.tofile(filename)
                     np.save(filename,data)
+            MPI.COMM_WORLD.Barrier()
 
         # save current synthetics as observation if required
         if self.run_opt == 1:
