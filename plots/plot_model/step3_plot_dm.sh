@@ -19,6 +19,10 @@ fi
 # vertical 
 for param in $param_set; do 
 for iter in $run_indx; do 
+  if [ "$iter" == "0" ]; then 
+    continue 
+  fi 
+
   ii=`printf %02d $iter`
   idx=${ii}${lsflag}
   name=verti
@@ -63,6 +67,9 @@ done
 # vertical 
 for param in $param_set; do 
 for iter in $run_indx; do 
+  if [ "$iter" == "0" ]; then 
+    continue 
+  fi 
   ii=`printf %02d $iter`
   idx=${ii}${lsflag}
   name=horiz
@@ -87,13 +94,14 @@ for iter in $run_indx; do
     #   vmin=0
     #   vmax=0.05
     # fi
+    echo $filename $vmin $vmax $vmin $vmax
     gmt makecpt -T$vmin/$vmax/50+n -Z -D -Cpolar -I > out.cpt
     #gmt grd2cpt $filename -Z -D -Cpolar -I  > out.cpt
 
     # plot
     proj=-JM12c
 
-    gmt begin pics/$param.iter$idx.$name.$ip jpg 
+    gmt begin pics/$param.diff.iter$idx.$name.$ip jpg
       gmt basemap $bounds $proj  -Bxaf+l"Distance,km" -Byaf+l"Depth,km" -BWSet
       gmt grdimage $filename -Cout.cpt -E200
       gmt coast -A200 -W1p,black

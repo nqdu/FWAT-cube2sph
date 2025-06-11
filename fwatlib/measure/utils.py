@@ -187,6 +187,34 @@ def get_window_info(t0,dt,tstart,tend):
 
     return left_pt,right_pt 
 
+def taper_window(t0,dt,tstart,tend,p=0.05):
+    """
+    get window start/end sample index
+
+    Parameters
+    -----------
+    t0,dt: float
+        start time and sampling interval
+    tstart,tend: float
+        start/end time of this window
+    p: float
+        ratio of data to be tapered
+
+    Returns
+    -----------
+    left_pt,right_pt: int
+        the window sample index [left_pt,right_pt)
+    """
+    assert tend >= tstart, "window is reversed!"
+
+    nlen = int((tend - tstart) / dt) + 1
+    left_pt = int(np.floor(tstart - t0) / dt)
+    right_pt = left_pt + nlen
+
+    win = sac_cos_taper(nlen,p)
+
+    return left_pt,right_pt,win 
+
 def get_source_loc(evtid:str,sourcefile:str):
     """
     get source location evla,evlo,evdp

@@ -75,8 +75,7 @@ if [ "$flag" == "GRAD" ]; then
   for f in `ls misfits/ |grep ls |grep ${MODEL}`; 
   do     
       a=(`echo $f | awk -F'.ls_' '{print $1,$2}'`)
-      evtid=`echo ${a[0]} |awk -F'.' '{for (i=2; i<=NF; i++)  printf "%s%s", $i, (i<NF?FS:ORS)}'`
-      newf=M$inext.${evtid}_${a[1]}
+      newf=M${inext}_${a[1]}
       echo $f "=>" $newf
       mv misfits/$f misfits/$newf
 

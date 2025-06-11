@@ -56,14 +56,12 @@ def main():
     for i in range(len(all_bands)):
         band = all_bands[i]
         evts = np.loadtxt(f"src_rec/sources.dat.{simu_type}",usecols=0,dtype=str)
-        files = []
-        tempfiles = glob(f"./misfits/{mod}_*_{band}_{simu_type}_window_chi")
-        for f in tempfiles:
-            files.append(f)
+        files = glob(f"./misfits/{mod}_*_{band}_{simu_type}_window_chi")
         chi,n = compute_misfits(evts,files)
         sumf += chi 
         sumn += n
 
     print(sumf,sumn) 
 
-main()
+if __name__ == "__main__":
+    main()

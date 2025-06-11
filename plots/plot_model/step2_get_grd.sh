@@ -51,7 +51,7 @@ for name in verti horiz; do
       cat profiles/$param.iter$idx.$name.$ip.txt > tmp.3 
     fi
 
-    gmt surface tmp.3 -Ggrdfiles/$param.iter$idx.$name.$ip.grd -I$dx/$dz $bounds 
+    gmt surface tmp.3 -Ggrdfiles/$param.iter$idx.$name.$ip.grd -I$dx/$dz $bounds -Vq
     \rm tmp.3
     gmt grdinfo -C grdfiles/$param.iter$idx.$name.$ip.grd
   done 

@@ -6,7 +6,7 @@ value=$2
 file=$3
 
 # locate parameter
-oldstr=`grep "^$param" $file`
+oldstr=`grep "^$param " $file`
 newstr="$param           =     $value"
 
 sed -i "s?$oldstr?$newstr?g" $file 

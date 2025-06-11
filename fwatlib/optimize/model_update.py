@@ -62,10 +62,15 @@ def main():
     # first lbfgs step_fac = step_fac_in_per
     if opt['iter'] == opt['iter_start']:
         step_fac = -1
+    
+    if opt['iter'] == opt['iter_start'] + 1 and opt['iter_ls'] == 0:
+        # init step_fac is 1
+        step_fac = 1.
 
     if step_fac <= 0 or step_fac * direc_max > step_fac_in_per:
         step_fac = step_fac_in_per / direc_max
     print("step_fac dmax relvar = %g %g %g"%(step_fac,direc_max,step_fac * direc_max))
+    opt['alpha'] = float(step_fac) 
 
     # write new model
     for myrank in range(nprocs):

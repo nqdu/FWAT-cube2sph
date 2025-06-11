@@ -322,7 +322,7 @@ class FwatPreOP:
         ncomp = self.ncomp
         tstart = np.zeros((nsta_loc))
         tend = np.zeros((nsta_loc))
-        window = np.zeros((nsta_loc,ncomp,20))
+        win_chi = np.zeros((nsta_loc,ncomp,20))
         tr_chi = np.zeros((nsta_loc,ncomp))
         am_chi = np.zeros((nsta_loc,ncomp))
 
@@ -376,7 +376,7 @@ class FwatPreOP:
 
                 # compute misfits and adjoint source
                 verbose = (self.myrank == 0) and (ir == 0) and (icomp == 0)
-                tr_chi[ir,icomp],am_chi[ir,icomp],window[ir,icomp,:],adjsrc =   \
+                tr_chi[ir,icomp],am_chi[ir,icomp],win_chi[ir,icomp,:],adjsrc =   \
                     measure_adj(t0_inp,dt_inp,npt_cut,t0_syn,dt_syn,npt_syn,
                                 tstart[ir],tend[ir],imeas,self.Tmax[ib]*1.01,
                                 self.Tmin[ib]*0.99,verbose,dat_inp,
@@ -401,7 +401,7 @@ class FwatPreOP:
                 obs_tr.write(filename)
         
         # print info and save MEASUREMENTS file
-        self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,window)
+        self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,win_chi)
     
     def _cal_adjsrc_tele(self,ib:int,bandname:str):
         from obspy.io.sac import SACTrace
@@ -439,7 +439,7 @@ class FwatPreOP:
         ncomp = self.ncomp
         tstart = np.zeros((nsta_loc))
         tend = np.zeros((nsta_loc))
-        window = np.zeros((nsta_loc,ncomp,20))
+        win_chi = np.zeros((nsta_loc,ncomp,20))
         tr_chi = np.zeros((nsta_loc,ncomp))
         am_chi = np.zeros((nsta_loc,ncomp))
 
@@ -521,7 +521,7 @@ class FwatPreOP:
                 # verboase
                 verbose = (self.myrank == 0) and (ir == 0) and (ic == 0)
                 
-                tr_chi[ir,ic],am_chi[ir,ic],window[ir,ic,:],adjsrc =  \
+                tr_chi[ir,ic],am_chi[ir,ic],win_chi[ir,ic,:],adjsrc =  \
                     measure_adj(t0_syn,dt_syn,npt_syn,
                                 t0_syn,dt_syn,npt_syn,
                                 tstart[ir],tend[ir],2,
@@ -560,12 +560,12 @@ class FwatPreOP:
                 tr.write(f"{out_dir}/{bandname}/{name}.sac.syn")
 
         # print info and save MEASUREMENTS file
-        self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,window)
+        self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,win_chi)
     
     def _cal_adjsrc_sks(self,ib:int,bandname:str):
         from obspy.io.sac import SACTrace
         from utils import interpolate_syn
-        from utils import bandpass,dif1
+        from utils import bandpass,dif1,taper_window
 
         freqmin = 1. / self.Tmax[ib]
         freqmax = 1. / self.Tmin[ib]
@@ -582,18 +582,14 @@ class FwatPreOP:
 
         # get time window 
         win_tb,win_te = self.pdict['TIME_WINDOW']
-        npt2 = int((win_te + win_tb) / dt_syn)
-        if npt2 // 2 * 2 != npt2:
-            npt2 += 1
         
         # allocate global arrays 
-        nsta = self.nsta 
         nsta_loc = self.nsta_loc
 
         # misfits
         tstart = np.zeros((nsta_loc))
         tend = np.zeros((nsta_loc))
-        window = np.zeros((nsta_loc,1,20))
+        win_chi = np.zeros((nsta_loc,1,20))
         tr_chi = np.zeros((nsta_loc,1))
         am_chi = np.zeros((nsta_loc,1))
 
@@ -604,8 +600,11 @@ class FwatPreOP:
             syn_data = np.zeros((2,npt_syn))
 
             # time window
+            taper = np.zeros((npt_syn))
             tstart[ir] = self.t_ref[i] - t_inj - win_tb
             tend[ir] = self.t_ref[i] - t_inj + win_te
+            lpt,rpt,taper0 = taper_window(t_inj,dt_syn,tstart[ir],tend[ir])
+            taper[lpt:rpt] = taper0 * 1.
 
             for ic in range(self.ncomp):
                 name = self._get_station_code(i,ic)
@@ -613,22 +612,17 @@ class FwatPreOP:
                 # read data
                 sdata = np.load(f"{out_dir}/{name}.sem.npy")[:,1]
                 obs_tr = SACTrace.read(f"{self.DATA_DIR}/{self.evtid}/{name}.sac")
-                odata = obs_tr.data 
+                
+                # interpoate obs data to same series of synthetics
+                odata = interpolate_syn(obs_tr.data,t0_obs + self.t_ref[i],dt_obs,npt_obs,t0_syn,dt_syn,npt_syn)
 
-                # data processing
-                odata = bandpass(odata,dt_obs,freqmin,freqmax)
+                # filter
+                odata = bandpass(odata,dt_syn,freqmin,freqmax)
                 sdata = bandpass(sdata,dt_syn,freqmin,freqmax)
 
-                # interpolate the obs/syn data to the same sampling of syn data
-                t0_inp = self.t_ref[i] - win_tb
-                u1 = interpolate_syn(odata,t0_obs + self.t_ref[i],dt_obs,npt_obs,t0_inp,dt_syn,npt2)
-                w1 = interpolate_syn(sdata,t_inj,dt_syn,npt_syn,t0_inp,dt_syn,npt2)
-                u = interpolate_syn(u1,t0_inp,dt_syn,npt2,t_inj,dt_syn,npt_syn)
-                w = interpolate_syn(w1,t0_inp,dt_syn,npt2,t_inj,dt_syn,npt_syn)     
-
                 # save to global array   
-                obs_data[ic,:] = u
-                syn_data[ic,:] = w 
+                obs_data[ic,:] = odata * taper
+                syn_data[ic,:] = sdata * taper 
 
                 # save SAC
                 tr = SACTrace(
@@ -641,9 +635,9 @@ class FwatPreOP:
                     kstnm = self.stnm[i],
                     kcmpnm = self.chcode + self.components[ic]
                 )
-                tr.data = u
+                tr.data = obs_data[ic,:]
                 tr.write(f"{out_dir}/{bandname}/{name}.sac.obs")
-                tr.data = w
+                tr.data = syn_data[ic,:]
                 tr.write(f"{out_dir}/{bandname}/{name}.sac.syn")
 
             # compute normalization factor
@@ -667,8 +661,8 @@ class FwatPreOP:
             L = 0.5 * (SI_syn - SI_obs)**2
             tr_chi[ir,0] = L 
             am_chi[ir,0] = L
-            window[ir,0,6] = SI_syn
-            window[ir,0,7] = SI_obs
+            win_chi[ir,0,6] = SI_syn
+            win_chi[ir,0,7] = SI_obs
 
             # adjoint source
             ddRsyn = dif1(dRsyn,dt_syn)
@@ -678,15 +672,9 @@ class FwatPreOP:
                 dTcomp * norm_syn
             )
 
-            # filter adjoint source 
-            adjsrc_R = bandpass(adjsrc_R,dt_syn,freqmin,freqmax)
-            adjsrc_T = bandpass(adjsrc_T,dt_syn,freqmin,freqmax)
-
-            # only keep adjoint source inside time window
-            w = interpolate_syn(adjsrc_R,t_inj,dt_syn,npt_syn,t0_inp,dt_syn,npt2)
-            adjsrc_R = interpolate_syn(w,t0_inp,dt_syn,npt2,t_inj,dt_syn,npt_syn)
-            w = interpolate_syn(adjsrc_T,t_inj,dt_syn,npt_syn,t0_inp,dt_syn,npt2)
-            adjsrc_T = interpolate_syn(w,t0_inp,dt_syn,npt2,t_inj,dt_syn,npt_syn)
+            # filter adjoint source and taper it
+            adjsrc_R = bandpass(adjsrc_R,dt_syn,freqmin,freqmax) * taper 
+            adjsrc_T = bandpass(adjsrc_T,dt_syn,freqmin,freqmax) * taper 
 
             data = np.zeros((npt_syn,2))
             data[:,0] = t0_syn + np.arange(npt_syn) * dt_syn
@@ -698,7 +686,7 @@ class FwatPreOP:
             np.save(outname,data)
         
         # save measurement files
-        self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,window)
+        self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,win_chi)
         
     def cal_adj_source(self,ib:int):
         import os 
@@ -782,12 +770,15 @@ class FwatPreOP:
                 # all sac files
                 sacfiles = glob(f"{self.syndir}/OUTPUT_FILES/{bandname}/*.sac.{tag}")
                 fio = h5py.File(f"{self.syndir}/OUTPUT_FILES/seismogram.{tag}.{bandname}.h5","w")
-                fio.attrs['dt'] = self.dt_syn 
-                fio.attrs['t0'] = self.t0_syn
-                fio.attrs['npts'] = self.npt_syn
+
 
                 for i in range(len(sacfiles)):
                     tr = SACTrace.read(sacfiles[i])
+                    if i == 0:
+                        fio.attrs['dt'] = tr.delta  
+                        fio.attrs['t0'] = tr.b 
+                        fio.attrs['npts'] = tr.npts
+                    
                     dsetname = tr.knetwk + "." + tr.kstnm + "." + tr.kcmpnm
                     fio.create_dataset(dsetname,shape=tr.data.shape,dtype='f4')
                     fio[dsetname][:] = tr.data 
