@@ -24,35 +24,6 @@ def read_params(paramfile="fwat_params/FWAT.PAR.yaml"):
     
     return pdict
 
-def measure_adj_file(t0:float,dt:float,nt:int,Tmin:float,Tmax:float,imeas:int,ccode:str):
-    itaper = 1
-    if imeas == 5:
-        itaper = 2
-    template = """ \
-  %f %f   %d  # tstart, DT, npts: time vector for simulations
-                      %d  # imeas (1-8; see manual)
-                     %s  # channel: BH or LH
-      %f      %f  # TLONG and TSHORT: band-pass periods for records
-                .false.  # RUN_BANDPASS: use band-pass on records
-                .false.  # DISPLAY_DETAILS
-                .false.  # OUTPUT_MEASUREMENT_FILES
-                 .true.  # COMPUTE_ADJOINT_SOURCE
-     -4.5000     4.5000  # TSHIFT_MIN; TSHIFT_MAX
-     -1.5000     1.5000  # DLNA_MIN; DLNA_MAX
-                  0.800  # CC_MIN
-                      1  # ERROR_TYPE -- 0 none; 1 CC, MT-CC; 2 MT-jack-knife
-                  1.000  # DT_SIGMA_MIN
-                  0.500  # DLNA_SIGMA_MIN
-                      %d  # ITAPER -- taper type: 1 multi-taper; 2 cosine; 3 boxcar
-            0.020  2.50  # WTR, NPI (ntaper = 2*NPI)
-                  2.000  # DT_FAC
-                  2.500  # ERR_FAC
-                  3.500  # DT_MAX_SCALE
-                  1.500  # NCYCLE_IN_WINDOW
-		 .false. # USE_PHYSICAL_DISPERSION """% (t0,dt,nt,imeas,ccode,Tmax,Tmin,itaper)
-    
-    return template
-
 def sac_cos_taper(npts,p):
     if p == 0.0 or p == 1.0:
         frac = int(npts * p / 2.0)
@@ -90,23 +61,23 @@ def sac_cos_taper(npts,p):
         cos_win[idx3] = 0.0
     return cos_win
 
-def interpolate_syn(data,t1,dt1,npt1,t2,dt2,npt2,taper=0.05):
+def interpolate_syn(data,t1,dt1,npt1,t2,dt2,npt2,max_percentage=0.05):
     """
     interpolate data from (t1, dt1, npt1) to a new data (t2,dt2,npt2)
 
     data: np.ndarray
         input data, shape(npt1) with starttime t1 and interval dt1 
-    taper: float
-        taper input data if required, taper * len(data) * 2 is the window used 
+    max_percentage: float
+        max_percentage of taper on one side, if required, taper * len(data) * 2 is the window used 
     
     """
     # taper input data if required
     data1 = np.float32(data)
-    if taper > 0.:
-        cos_tp = sac_cos_taper(npt1,taper)
+    if max_percentage > 0.:
+        cos_tp = sac_cos_taper(npt1,max_percentage*2)
         data1 = data1 * cos_tp
 
-    temp = np.zeros((npt2),'f4')
+    temp = np.zeros((npt2))
     time = t2 + np.arange(npt2) * dt2 
     idx = np.logical_and(time > t1,time < t1 + (npt1-1) * dt1)
     ii = np.int64((time[idx] - t1) / dt1)
@@ -115,26 +86,10 @@ def interpolate_syn(data,t1,dt1,npt1,t2,dt2,npt2,taper=0.05):
     
     return temp
 
-def preprocess(u,dt,freqmin,freqmax):
-    import obspy
-    tr = obspy.Trace(data = u)
-    tr.stats.delta = dt 
-
-    tr.detrend("demean")
-    tr.detrend("linear")
-    tr.taper(0.05)
-    tr.filter("bandpass",freqmin=freqmin,freqmax=freqmax,zerophase=True,corners=4)
-    tr.detrend("demean")
-    tr.detrend("linear")
-    tr.taper(0.05)
-
-    w = np.float32(tr.data)
-
-    return w
 
 def bandpass(u,dt,freqmin,freqmax):
     import obspy
-    tr = obspy.Trace(data = u)
+    tr = obspy.Trace(data = u * 1.)
     tr.stats.delta = dt 
 
     tr.detrend("demean")
@@ -145,9 +100,7 @@ def bandpass(u,dt,freqmin,freqmax):
     tr.detrend("linear")
     tr.taper(0.05)
 
-    w = np.float32(tr.data)
-
-    return w
+    return tr.data
 
 # diff function,central difference 1-st order 
 def dif1(data,dt):
@@ -198,7 +151,7 @@ def taper_window(t0,dt,tstart,tend,p=0.05):
     tstart,tend: float
         start/end time of this window
     p: float
-        ratio of data to be tapered
+        ratio of data to be tapered on one side
 
     Returns
     -----------
@@ -211,7 +164,7 @@ def taper_window(t0,dt,tstart,tend,p=0.05):
     left_pt = int(np.floor(tstart - t0) / dt)
     right_pt = left_pt + nlen
 
-    win = sac_cos_taper(nlen,p)
+    win = sac_cos_taper(nlen,p*2)
 
     return left_pt,right_pt,win 
 
