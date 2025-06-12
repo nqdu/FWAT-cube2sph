@@ -5,8 +5,8 @@ from tools import FwatModel
 
 def main():
     if len(sys.argv) !=5 :
-        print("need 4 parameters: MODEL_DIR paramfile nprocs")
-        print("example: python write_user_model M06 mdtype kltype nprocs")
+        print("need 4 parameters: MODEL_DIR model_type kernel_type nprocs")
+        print("example: python write_user_model.py M06 mdtype kltype nprocs")
         exit(1)
 
     # get params
