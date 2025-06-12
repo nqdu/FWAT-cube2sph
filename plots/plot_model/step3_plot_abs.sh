@@ -35,10 +35,6 @@ for iter in $run_indx; do
     vmin=`echo $info| awk '{print $6}'`
     vmax=`echo $info| awk '{print $7}'`
     echo $filename $vmin $vmax $vmin $vmax
-    # if [ "$param" == "G0" ];  then 
-    #   vmin=0
-    #   vmax=0.05
-    # fi
     gmt makecpt -T$vmin/$vmax/50+n -Z -D -Cpolar -I > out.cpt
     #gmt grd2cpt $filename -Z -D -Cpolar -I  > out.cpt
 
@@ -52,15 +48,7 @@ for iter in $run_indx; do
     gmt end 
 
   done 
-done
-done 
 
-
-# vertical 
-for param in $param_set; do 
-for iter in $run_indx; do 
-  ii=`printf %02d $iter`
-  idx=${ii}${lsflag}
   name=horiz
   nfiles=`ls input/ |grep $name.*.loc |wc -l`
   for ip in `seq 1 $nfiles`; do
@@ -74,11 +62,6 @@ for iter in $run_indx; do
     info=`gmt grdinfo $filename -C`
     vmin=`echo $info| awk '{print $6}'`
     vmax=`echo $info| awk '{print $7}'`
-    # echo $filename $vmin $vmax
-    # if [ "$param" == "G0" ];  then 
-    #   vmin=0
-    #   vmax=0.05
-    # fi
     echo $filename $vmin $vmax $vmin $vmax
     gmt makecpt -T$vmin/$vmax/50+n -Z -D -Cpolar -I > out.cpt
     #gmt grd2cpt $filename -Z -D -Cpolar -I  > out.cpt
