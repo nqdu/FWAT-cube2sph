@@ -558,6 +558,11 @@ class FwatPreOP:
                 tr.write(f"{out_dir}/{bandname}/{name}.sac.obs")
                 tr.data = glob_syn[i,ic,:]
                 tr.write(f"{out_dir}/{bandname}/{name}.sac.syn")
+        
+        # normalize misfit function 
+        tr_chi *= dt_syn / avgamp**2 
+        am_chi *= dt_syn / avgamp**2
+        win_chi[:,:,14] *= dt_syn / avgamp**2
 
         # print info and save MEASUREMENTS file
         self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,win_chi)
@@ -603,7 +608,7 @@ class FwatPreOP:
             taper = np.zeros((npt_syn))
             tstart[ir] = self.t_ref[i] - t_inj - win_tb
             tend[ir] = self.t_ref[i] - t_inj + win_te
-            lpt,rpt,taper0 = taper_window(t_inj,dt_syn,tstart[ir],tend[ir])
+            lpt,rpt,taper0 = taper_window(0,dt_syn,tstart[ir],tend[ir])
             taper[lpt:rpt] = taper0 * 1.
 
             for ic in range(self.ncomp):
@@ -614,7 +619,7 @@ class FwatPreOP:
                 obs_tr = SACTrace.read(f"{self.DATA_DIR}/{self.evtid}/{name}.sac")
                 
                 # interpoate obs data to same series of synthetics
-                odata = interpolate_syn(obs_tr.data,t0_obs + self.t_ref[i],dt_obs,npt_obs,t0_syn,dt_syn,npt_syn)
+                odata = interpolate_syn(obs_tr.data,t0_obs + self.t_ref[i],dt_obs,npt_obs,t_inj,dt_syn,npt_syn)
 
                 # filter
                 odata = bandpass(odata,dt_syn,freqmin,freqmax)
