@@ -146,7 +146,7 @@ for ii in `seq 1 2`;do
     set_fwat2 $simu_type1 $simu_type22
     fwd=tmp.fwat2.sh
     sed -i "/SOURCE_FILE=/c\SOURCE_FILE=./src_rec/sources.dat.joint" $fwd
-    job_post=$(sbatch --dependency=afterok:${job_adj} $fwd | cut -d ' ' -f4)
+    job_post=$(sbatch --dependency=afterok:${job_adj1}:${job_adj2} $fwd | cut -d ' ' -f4)
     
   elif [ $flag == "GRAD"  ];then 
     # get search direction, generate trial model 
