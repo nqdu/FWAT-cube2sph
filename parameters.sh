@@ -4,10 +4,13 @@
 fksem='/home/l/liuqy/nqdu//specfem3d-cube2sph/'    # solver location
 FWATLIB_PATH=`pwd`
 
-# STOP HERE ###################
+# simulation types
+SIMU_TYPES=("tele" "noise")
+SIMU_TYPES_USER_WEIGHT=(1. 1.)
+
+############## STOP HERE ###################
 FWATPARAM=`pwd`/fwat_params
 FWATLIB=$FWATLIB_PATH/fwatlib    # fwatlib location
-
 MEASURE_LIB=$FWATLIB/measure 
 OPT_LIB=$FWATLIB/optimize
 

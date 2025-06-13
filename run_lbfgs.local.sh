@@ -1,76 +1,62 @@
 #!/bin/bash
-set_fwat1()
+set -e
+
+SET_FWAT()
 {
-  local simu_type=$1
-  local njobs=$2
-  local start_set=$3
-  local nevts=`cat src_rec/sources.dat.$simu_type|wc -l`
-  local narray=`echo "($nevts + $njobs - 1) / $njobs"|bc`
+  # local vars
+  local njobs=$1
+  local flag=$2
+  local mod=$3
 
-  # if [[ $iter == 0 || $iter == $iter_end ]]; then
-  #   sed -i "/SHOW_DETAILS:/c\SHOW_DETAILS: .true." fwat_params/FWAT.PAR
-  # fi
+  nsimtypes="${#SIMU_TYPES[@]}"
+  for ((isim=0;isim<$nsimtypes;isim++)); 
+  do 
+    local simu_type=${SIMU_TYPES[$isim]}
+    local nevts=`cat src_rec/sources.dat.$simu_type|wc -l`
+    local narray=`echo "($nevts + $njobs - 1) / $njobs"|bc`
 
-  # substitute 
-  cp sbash_measure.sh tmp.fwat1.$simu_type.sh
-  \cp DATA/Par_file.$simu_type DATA/Par_file
-  local fwd=tmp.fwat1.$simu_type.sh
-  sed -i "/#SBATCH --array=/c\#SBATCH --array=1-$narray%5" $fwd
-  sed -i "/MODEL=/c\MODEL=${mod}" $fwd
-  sed -i "/NJOBS=/c\NJOBS=$njobs" $fwd
-  sed -i "/START_SET=/c\START_SET=$start_set" $fwd
-  sed -i "/simu_type=/c\simu_type=$simu_type" $fwd
-  sed -i "/LOCAL_PC=/c\LOCAL_PC=1" $fwd
+    # copy files
+    if [ "$flag" == "INIT" ]; then 
+      local fwd=tmp.fwat1.$simu_type.sh
+    else
+      local fwd=tmp.fwat3.$simu_type.sh
+    fi
+    \cp sbash_measure.sh $fwd
 
-  if [[ $simu_type == "noise" ]]; then
-    sed -i "/#SBATCH --time=/c\#SBATCH --time=00:25:00" $fwd
-  else
-    sed -i "/#SBATCH --time=/c\#SBATCH --time=00:25:00" $fwd
-  fi
+    # substitute 
+    \cp DATA/Par_file.$simu_type DATA/Par_file
+    sed -i "/#SBATCH --array=/c\#SBATCH --array=1-$narray%5" $fwd
+    sed -i "/MODEL=/c\MODEL=${mod}" $fwd
+    sed -i "/NJOBS=/c\NJOBS=$njobs" $fwd
+    sed -i "/START_SET=/c\START_SET=1" $fwd
+    sed -i "/simu_type=/c\simu_type=$simu_type" $fwd
+    sed -i "/LOCAL_PC=/c\LOCAL_PC=1" $fwd
+    if [ "$flag" == "INIT" ]; then 
+      sed -i "/#SBATCH --job-name=/c\#SBATCH --job-name=FWD_ADJ" $fwd
+      sed -i "/#SBATCH --output=/c\#SBATCH --output=FWD_ADJ-%j_set%a.txt" $fwd
+    else
+      sed -i "/#SBATCH --job-name=/c\#SBATCH --job-name=LS" $fwd
+      sed -i "/#SBATCH --output=/c\#SBATCH --output=LS-%j_set%a.txt" $fwd
+    fi
 
-  # run forward/adjoint simulation
-  echo "forward/adjoint $simu_type simulation for new model  ..."
-}
+    if [[ $simu_type == "noise" ]]; then
+      sed -i "/#SBATCH --time=/c\#SBATCH --time=00:25:00" $fwd
+    else
+      sed -i "/#SBATCH --time=/c\#SBATCH --time=00:25:00" $fwd
+    fi
 
-#!/bin/bash
-set_fwat3()
-{
-  local simu_type=$1
-  local njobs=$2
-  local start_set=$3
-  local nevts=`cat src_rec/sources.dat.$simu_type|wc -l`
-  local narray=`echo "($nevts + $njobs - 1) / $njobs"|bc`
-
-  # substitute 
-  cp sbash_measure.sh tmp.fwat3.$simu_type.sh
-  \cp DATA/Par_file.$simu_type DATA/Par_file
-  local fwd=tmp.fwat3.$simu_type.sh
-  sed -i "/#SBATCH --array=/c\#SBATCH --array=1-$narray%5" $fwd
-  sed -i "/#SBATCH --job-name=/c\#SBATCH --job-name=LS" $fwd
-  sed -i "/#SBATCH --output=/c\#SBATCH --output=LS-%j_set%a.txt" $fwd
-  sed -i "/MODEL=/c\MODEL=${mod}" $fwd
-  sed -i "/NJOBS=/c\NJOBS=$njobs" $fwd
-  sed -i "/START_SET=/c\START_SET=$start_set" $fwd
-  sed -i "/simu_type=/c\simu_type=$simu_type" $fwd
-  sed -i "/LOCAL_PC=/c\LOCAL_PC=1" $fwd
-
-
-  if [[ $simu_type == "noise" ]]; then
-    sed -i "/#SBATCH --time=/c\#SBATCH --time=00:25:00" $fwd
-  else
-    sed -i "/#SBATCH --time=/c\#SBATCH --time=00:25:00" $fwd
-  fi
-
-  # run forward/adjoint simulation
-  echo "forward/adjoint $simu_type simulation for new model  ..."
+    # run forward/adjoint simulation
+    echo "forward/adjoint $simu_type simulation for new model  ..."
+  done 
 }
 
 set -e 
 . parameters.sh
 
-# simu_type
-simu_type=noise
-NJOBS=8
+######### USER PARAMETERS
+# parameters
+NJOBS=1
+####### STOP HERE #########
 
 # mkdir 
 mkdir -p misfits optimize solver
@@ -82,11 +68,7 @@ job_step=0
 job_line=0
 job_wait=0
 
-# set number
-# initialize set number
-setb=1
-date 
-
+date
 for ii in `seq 1 4`;do 
 
   # current model
@@ -106,29 +88,25 @@ for ii in `seq 1 4`;do
 
   # check flag type and run 
   if [ $flag == "INIT" ]; then 
-    set_fwat1 $simu_type $NJOBS $setb
+    SET_FWAT $NJOBS $flag $mod
     bash tmp.fwat1.$simu_type.sh > FWD_ADJ.$iter.txt
     
     # sum kernels, get search direction, generate trial model 
     fwd=sbash_postproc_kl.sh
-    sed -i "/SOURCE_FILE=/c\SOURCE_FILE=./src_rec/sources.dat.$simu_type" $fwd
     bash $fwd > POST.$iter.txt 
     
   elif [ $flag == "GRAD"  ];then 
     # get search direction, generate trial model 
     fwd=sbash_postproc_kl.sh
-    sed -i "/SOURCE_FILE=/c\SOURCE_FILE=./src_rec/sources.dat.$simu_type" $fwd
     echo "Post processing ..."
     bash $fwd > POST.$iter.txt 
 
   else  # line search
-    set_fwat3 $simu_type $NJOBS $setb 
+    SET_FWAT $NJOBS $flag $mod
     bash tmp.fwat3.$simu_type.sh > LS.$iter.txt
 
     # check wolfe condition
     fwd=sbash_wolfe.sh
-    sed -i "/SIMU_TYPE=/c\SIMU_TYPE=$simu_type" $fwd
-    sed -i "/SOURCE_FILE=/c\SOURCE_FILE=./src_rec/sources.dat.$simu_type" $fwd
     echo "checking wolfe condition ..."
     bash $fwd > WOLFE.$iter.txt 
   fi

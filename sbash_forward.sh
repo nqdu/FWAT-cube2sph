@@ -5,9 +5,8 @@
 #SBATCH --time=00:35:59
 #SBATCH --job-name=FWD
 #SBATCH --output=FWD-%j_set%a.txt
-#SBATCH --account=def-liuqy
+#SBATCH --account=rrg-liuqy
 #SBATCH --mem=12G
-#SBATCH --gpus-per-node=1
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=nanqiao.du@mail.utoronto.ca
 

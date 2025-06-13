@@ -4,17 +4,15 @@
 #SBATCH --time=00:20:59
 #SBATCH --job-name=POST
 #SBATCH --output=POST_%j.txt
-#SBATCH --account=def-liuqy
+#SBATCH --account=rrg-liuqy
 #SBATCH --mem=12G
 
 set -e 
 # include file
-. parameters.sh
-# load modules 
-source module_env 
+source module_env
+source parameters.sh
 
 # input vars
-SOURCE_FILE=./src_rec/sources.dat.noise
 NPROC=`grep ^"NPROC" DATA/Par_file | cut -d'=' -f2`
 
 # parfile changer script
@@ -25,6 +23,40 @@ iter=`python $FWATLIB/get_param.py iter $FWATPARAM/lbfgs.yaml`
 FLAG=`python $FWATLIB/get_param.py flag $FWATPARAM/lbfgs.yaml`
 MODEL=M`echo "$iter" |awk '{printf "%02d",$1}'`
 PRECOND=`python $FWATLIB/get_param.py optimize/PRECOND_TYPE`
+
+# check how many simu types required
+nsimtypes="${#SIMU_TYPES[@]}"
+if [ "$nsimutypes" == "1" ]; then 
+  SOURCE_FILE=./src_rec/sources.dat.${SIMU_TYPES[0]}
+else
+  # generate files if requireds
+  iter_start=`python $FWATLIB/get_param.py iter_start $FWATPARAM/lbfgs.yaml`
+  if [ "$iter" == "0" ]; then
+    # init source file
+    SOURCE_FILE=./src_rec/sources.dat.joint
+    cat ./src_rec/sources.dat.${SIMU_TYPES[0]} > $SOURCE_FILE
+
+    # compute misfit 
+    info=`python $MEASURE_LIB/cal_misfit.py $MODEL ${SIMU_TYPES[0]}`
+    chi0=`echo $info |awk '{print $1/$2}'`
+    chi1=`echo $chi0 $chi0 ${SIMU_TYPES_USER_WEIGHT[0]} |awk '{print $1/$2*$3}'`
+
+    # init weight_kl.txt 
+    :> ./optimize/weight_kl.txt
+    awk -v a=$chi1 '{print $2*0+a}' ./src_rec/sources.dat.${SIMU_TYPES[0]} >> ./optimize/weight_kl.txt
+
+    # for other simulation types
+    # misfit = L0 + L1 * s0/s1 + L2 * s0/s2 + L_i s0/s_i
+    for((i=1;i<$nsimtypes;i++)); 
+    do 
+      cat ./src/sources.dat.${SIMU_TYPES[$i]} >> $SOURCE_FILE
+      info=`python $MEASURE_LIB/cal_misfit.py $MODEL ${SIMU_TYPES[$i]}`
+      chi1=`echo $info |awk '{print $1/$2}'`
+      chi1=`echo $chi0 $chi1 ${SIMU_TYPES_USER_WEIGHT[$i]} |awk '{print $1/$2*$3}'`
+      awk -v a=$chi1 '{print $2*0+a}' ./src_rec/sources.dat.${SIMU_TYPES[$i]} >> ./optimize/weight_kl.txt
+    done 
+  fi
+fi 
 
 # create log file
 logfile=output_fwat2_post_log_${MODEL}.txt

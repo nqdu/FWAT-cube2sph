@@ -4,7 +4,7 @@
 #SBATCH --time=00:15:59
 #SBATCH --job-name WOLFE
 #SBATCH --output=WOLFE_%j.txt
-#SBATCH --account=def-liuqy
+#SBATCH --account=rrg-liuqy
 #SBATCH --mem=12G
 
 set -e 
@@ -12,8 +12,7 @@ set -e
 # load parameters 
 . parameters.sh 
 source module_env
-SIMU_TYPE=noise
-NPROC=`grep ^"NPROC" DATA/Par_file.$SIMU_TYPE | cut -d'=' -f2`
+NPROC=`grep ^"NPROC" DATA/Par_file | cut -d'=' -f2`
 
 # get search direction
 iter=`python $FWATLIB/get_param.py iter $FWATPARAM/lbfgs.yaml`
@@ -21,16 +20,50 @@ FLAG=`python $FWATLIB/get_param.py flag $FWATPARAM/lbfgs.yaml`
 MODEL=M`echo "$iter" |awk '{printf "%02d",$1}'`
 
 # compute misfit
-info=`python $MEASURE_LIB/cal_misfit.py $MODEL $SIMU_TYPE`
-chi=`echo $info |awk '{print $1}'`
-info=`python $MEASURE_LIB/cal_misfit.py $MODEL.ls $SIMU_TYPE`
-chi1=`echo $info |awk '{print $1}'`
+# check how many simu types required
+nsimtypes="${#SIMU_TYPES[@]}"
+if [ "$nsimutypes" == "1" ]; then 
+  SOURCE_FILE_LS=./src_rec/sources.dat.${SIMU_TYPES[0]}
+
+  # compute misfits
+  info=`python $MEASURE_LIB/cal_misfit.py $MODEL ${SIMU_TYPES[0]}`
+  chi=`echo $info |awk '{print $1}'`
+  info=`python $MEASURE_LIB/cal_misfit.py $MODEL.ls ${SIMU_TYPES[0]}`
+  chi1=`echo $info |awk '{print $1}'`
+else
+
+  SOURCE_FILE_LS=./src_rec/sources.dat.joint
+
+  #init misifits
+  chi=0.
+  chi1=0.
+
+  # get first model
+  iter_start=`python $FWATLIB/get_param.py iter_start $FWATPARAM/lbfgs.yaml`
+  MSTART=M`echo "$iter_start" |awk '{printf "%02d",$1}'`
+  MSTART=M00
+
+  # for all simulation types, compute weighted misfits
+  for((i=0;i<$nsimtypes;i++)); 
+  do 
+    info=`python $MEASURE_LIB/cal_misfit.py $MSTART ${SIMU_TYPES[$i]}`
+    l0=`echo $info |awk '{print $1/$2}'`
+    info=`python $MEASURE_LIB/cal_misfit.py $MODEL ${SIMU_TYPES[$i]}`
+    l1=`echo $info |awk '{print $1/$2}'`
+    info=`python $MEASURE_LIB/cal_misfit.py $MODEL.ls ${SIMU_TYPES[$i]}`
+    l2=`echo $info |awk '{print $1/$2}'`
+
+    # weighted sum
+    # L'_i = L_i / L_0 * user_weight
+    chi=`echo $chi $l1 $l0 ${SIMU_TYPES_USER_WEIGHT[$i]} |awk '{print $1+$2/$3*$4}'`
+    chi1=`echo $chi1 $l2 $l0 ${SIMU_TYPES_USER_WEIGHT[$i]}|awk '{print $1+$2/$3*$4}'`
+  done 
+fi 
 
 echo "misfit current/next = $chi $chi1"
 echo " "
 
 # sum kernels for line search, save to optimize/sum_kernels_$MODEL.ls
-SOURCE_FILE_LS=./src_rec/sources.dat.$SIMU_TYPE
 PRECOND=`python $FWATLIB/get_param.py optimize/PRECOND_TYPE`
 
 echo "sum kernels for new model ..."
