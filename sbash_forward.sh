@@ -138,9 +138,10 @@ for i in `seq 1 $NJOBS`; do
 
   # run measure
   echo ""
+  echo "saving forward seismograms ..."
   cd $work_dir
   date
-  bash $MEASURE_LIB/measure.$simu_type.sh $iter $evtid 1 >> $fwd 
+  mpirun -np $NPROC python $MEASURE_LIB/run_preprocess.py $simu_type $iter $evtid 1 >> $fwd 
   date
 
   # delete useless information

@@ -4,9 +4,6 @@
 fksem='/home/l/liuqy/nqdu//specfem3d-cube2sph/'    # solver location
 FWATLIB_PATH=`pwd`
 
-# nprocs for preprocessing
-NPROC_PRE=4
-
 # STOP HERE ###################
 FWATPARAM=`pwd`/fwat_params
 FWATLIB=$FWATLIB_PATH/fwatlib    # fwatlib location

@@ -2,12 +2,12 @@
 set -e 
 
 # gcc 
-# F90="gfortran"
-# CXX="g++"
+F90="gfortran"
+CXX="g++"
 
 # intel 
-CXX="icc"
-F90="ifort"
+# CXX="icc"
+# F90="ifort"
 
 # SAC HOME
 SACHOME=${HOME}/software//sac/

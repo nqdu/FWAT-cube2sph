@@ -70,3 +70,4 @@ optimize:
     # = 2 vpvs_vs_rho  
   MODEL_TYPE: iso 
   KERNEL_SET: 2
+  MASK_VARS: []

@@ -150,6 +150,7 @@ def main():
     if cond1 and cond2: # wolfe condition is satisfied 
         opt['flag'] = 'GRAD'
         opt['iter'] += 1
+        opt['iter_ls'] = 0
 
     elif not cond1:
         opt['alpha_R'] = opt['alpha']

@@ -76,7 +76,13 @@ def seis_pca(stf_collect:np.ndarray):
     rec = stf_collect - np.mean(stf_collect,axis=1,keepdims=True)
 
     # compute eigenvalue/eigenvector
-    _,v = np.linalg.eig(rec @ rec.T / nt)
+    w,v = np.linalg.eig(rec @ rec.T / nt)
+
+    # sort eigenvalues
+    w = w.real 
+    idx = np.argsort(w)[::-1]
+    w = w[idx]
+    v = v[:,idx]
 
     # first Principle component is what we need
     stf = (rec.T @ v[:,0]).real
@@ -89,7 +95,7 @@ def seis_pca(stf_collect:np.ndarray):
     # rescale
     stf = stf * sig1 * sig2 
 
-    return stf
+    return stf,w
 
 def compute_stf(glob_syn,glob_obs,dt_syn,freqmin,freqmax,components):
     # load stf function
@@ -131,11 +137,14 @@ def compute_stf(glob_syn,glob_obs,dt_syn,freqmin,freqmax,components):
 
     # now get stf  by using PCA/ average    
     stf = np.zeros((2,glob_syn.shape[2]),'f4')
-    temp = seis_pca(stf_collect)
+    temp,w = seis_pca(stf_collect)
     # temp = np.mean(stf_collect,axis=0)
     #temp = temp / np.max(np.abs(temp))
     stf[0,:] = temp
     stf[1,:] = temp * 1.
+
+    if myrank == 0:
+        print("\nPCA first component ratio = {}% ",w[0] / np.sum(w))
     
     # compute time shift between syn and obs
     time_shift = np.zeros((nsta))

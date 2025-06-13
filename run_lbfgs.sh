@@ -61,13 +61,6 @@ set_fwat3()
   echo "forward/adjoint $simu_type simulation for new model  ..."
 }
 
-set -e 
-. parameters.sh
-
-# simu_type
-simu_type=noise
-NJOBS=8
-
 # mkdir 
 mkdir -p misfits optimize solver
 \cp DATA/Par_file.$simu_type  DATA/Par_file
@@ -119,14 +112,14 @@ for ii in `seq 1 4`;do
 
   else  # line search
     set_fwat3 $simu_type $NJOBS $setb 
-    job_line=$(sbatch tmp.fwat3.$simu_type.sh|cut -d ' ' -f4 )
+    job_line=$(sbatch tmp.fwat3.$simu_type.sh)
 
     # check wolfe condition
     fwd=sbash_wolfe.sh
     sed -i "/SIMU_TYPE=/c\SIMU_TYPE=$simu_type" $fwd
     sed -i "/SOURCE_FILE=/c\SOURCE_FILE=./src_rec/sources.dat.$simu_type" $fwd
     echo "checking wolfe condition ..."
-    job_post=$(sbatch --dependency=afterok:${job_line} $fwd | cut -d ' ' -f4)
+    job_post=$(sbatch --dependency=afterok:${job_line} $fwd)
   fi
 
   # wait to finish

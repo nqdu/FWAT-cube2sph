@@ -59,7 +59,7 @@ sigma_v=`echo $info | awk  '{print $2}'`
 if [ $PRECOND == "default" ] && [ $MODEL == "M00"  ];then 
   param=hess_kernel
   mv optimize/SUM_KERNELS_${MODEL}/*_$param.bin $LOCAL_PATH
-  mpirun -np $NPROC $fksem/bin/xsmooth_sem_sph_pde 50000 25000 $param $LOCAL_PATH optimize/SUM_KERNELS_$MODEL/ .false.
+  mpirun -np $NPROC $fksem/bin/xsmooth_sem_sph_pde 50000 25000 $param $LOCAL_PATH optimize/SUM_KERNELS_$MODEL/ .false. >> $logfile
   \rm $LOCAL_PATH/*_$param.bin
   for i in `seq 1 $NPROC`;
   do
@@ -84,7 +84,7 @@ kl_list=`GET_DIREC_NAME`
 for param in $kl_list; 
 do 
   mv optimize/SUM_KERNELS_$MODEL/*_$param.bin $LOCAL_PATH
-  mpirun -np $NPROC $fksem/bin/xsmooth_sem_sph_pde $sigma_h $sigma_v $param $LOCAL_PATH optimize/SUM_KERNELS_$MODEL/ .false.
+  mpirun -np $NPROC $fksem/bin/xsmooth_sem_sph_pde $sigma_h $sigma_v $param $LOCAL_PATH optimize/SUM_KERNELS_$MODEL/ .false. >> $logfile
   \rm $LOCAL_PATH/*_$param.bin
   for i in `seq 1 $NPROC`;
   do
