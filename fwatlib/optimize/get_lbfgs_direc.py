@@ -197,7 +197,9 @@ def get_lbfgs_direc(iter:int,paramfile:str,M:FwatModel):
     theta = np.arccos(a) * 180 / np.pi 
 
     if theta <= 92.:
-        if myrank == 0: print("The search direction is accepted!")
+        if myrank == 0: 
+            print("The search direction is accepted!")
+            print("angle between search direction and -grad  = {theta}")
     else:
         if myrank == 0: 
             print("The search direction is not accepted!")
