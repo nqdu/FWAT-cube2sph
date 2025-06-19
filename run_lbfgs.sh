@@ -8,19 +8,17 @@ SET_FWAT()
   local flag=$2
   local mod=$3
 
+  local job_ids=()
+
   nsimtypes="${#SIMU_TYPES[@]}"
   for ((isim=0;isim<$nsimtypes;isim++)); 
   do 
     local simu_type=${SIMU_TYPES[$isim]}
-    local nevts=`cat src_rec/sources.dat.$simu_type|wc -l`
+    local nevts=`awk 'END { print NR }' src_rec/sources.dat.$simu_type`
     local narray=`echo "($nevts + $njobs - 1) / $njobs"|bc`
 
     # copy files
-    if [ "$flag" == "INIT" ]; then 
-      local fwd=tmp.fwat1.$simu_type.sh
-    else
-      local fwd=tmp.fwat3.$simu_type.sh
-    fi
+    fwd=tmp.adj.$simu_type.sh
     \cp sbash_measure.sh $fwd
 
     # substitute 
@@ -47,7 +45,15 @@ SET_FWAT()
 
     # run forward/adjoint simulation
     echo "forward/adjoint $simu_type simulation for new model  ..."
+
+    # submit and get job id
+    local jid=$(sbatch $fwd |cut -d ' ' -f4 ) 
+    job_ids+=($jid)
   done 
+
+  # return dependency strings
+  local depend_string=$(IFS=:; echo "${job_ids[*]}")
+  echo $depend_string
 }
 
 ######### USER PARAMETERS
@@ -63,9 +69,7 @@ mkdir -p misfits optimize solver
 # some jobid 
 job_adj=0
 job_post=0
-job_step=0
 job_line=0
-job_wait=0
 
 for ii in `seq 1 4`;do 
 
@@ -83,8 +87,7 @@ for ii in `seq 1 4`;do
 
   # check flag type and run 
   if [ $flag == "INIT" ]; then 
-    SET_FWAT $NJOBS $flag $mod
-    job_adj=$(sbatch tmp.fwat1.$simu_type.sh|cut -d ' ' -f4 )
+    job_adj=`SET_FWAT $NJOBS $flag $mod`
     
     # sum kernels, get search direction, generate trial model 
     fwd=sbash_postproc_kl.sh
@@ -97,8 +100,7 @@ for ii in `seq 1 4`;do
     job_post=$(sbatch $fwd | cut -d ' ' -f4)
 
   else  # line search
-    SET_FWAT $NJOBS $flag $mod
-    job_line=$(sbatch tmp.fwat3.$simu_type.sh | cut -d ' ' -f4)
+    job_lie=`SET_FWAT $NJOBS $flag $mod`
 
     # check wolfe condition
     fwd=sbash_wolfe.sh

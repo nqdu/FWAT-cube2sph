@@ -31,7 +31,7 @@ change_par=$FWATLIB/change_par_file.sh
 
 SOURCE_FILE=src_rec/sources.dat.$simu_type
 iter=`echo $MODEL |cut -d"M" -f2 |awk '{printf "%d", $1}'`
-nevts=`cat $SOURCE_FILE |wc -l`
+nevts=`awk 'END { print NR }' src_rec/sources.dat.$simu_type`
 work_dir=`pwd`
 mod=$MODEL
 
@@ -79,7 +79,6 @@ for i in `seq 1 $NJOBS`; do
   
   # copy common parameters
   \cp DATA/Par_file.$simu_type $evtdir/DATA/Par_file
-  \cp fwat_params/FWAT.PAR.yaml $evtdir/DATA/FWAT.PAR.yaml
   \cp OUTPUT_FILES/*.h $evtdir/OUTPUT_FILES
   \rm -rf $evtdir/DATA/meshfem3D_files/*
   ln -s $work_dir/DATA/meshfem3D_files/* $evtdir/DATA/meshfem3D_files/

@@ -12,15 +12,11 @@ SET_FWAT()
   for ((isim=0;isim<$nsimtypes;isim++)); 
   do 
     local simu_type=${SIMU_TYPES[$isim]}
-    local nevts=`cat src_rec/sources.dat.$simu_type|wc -l`
+    local nevts=`awk 'END { print NR }' src_rec/sources.dat.$simu_type`
     local narray=`echo "($nevts + $njobs - 1) / $njobs"|bc`
 
     # copy files
-    if [ "$flag" == "INIT" ]; then 
-      local fwd=tmp.fwat1.$simu_type.sh
-    else
-      local fwd=tmp.fwat3.$simu_type.sh
-    fi
+    fwd=tmp.adj.$simu_type.sh
     \cp sbash_measure.sh $fwd
 
     # substitute 
@@ -47,6 +43,12 @@ SET_FWAT()
 
     # run forward/adjoint simulation
     echo "forward/adjoint $simu_type simulation for new model  ..."
+
+    #  run simulation
+    if [ "$flag" == "INIT" ]; then 
+      bash $fwd > FWD_ADJ.$simu_type.$iter.txt
+    else
+      bash $fwd > LS.$simu_type.$iter.txt
   done 
 }
 
@@ -89,7 +91,6 @@ for ii in `seq 1 4`;do
   # check flag type and run 
   if [ $flag == "INIT" ]; then 
     SET_FWAT $NJOBS $flag $mod
-    bash tmp.fwat1.$simu_type.sh > FWD_ADJ.$iter.txt
     
     # sum kernels, get search direction, generate trial model 
     fwd=sbash_postproc_kl.sh
@@ -103,7 +104,6 @@ for ii in `seq 1 4`;do
 
   else  # line search
     SET_FWAT $NJOBS $flag $mod
-    bash tmp.fwat3.$simu_type.sh > LS.$iter.txt
 
     # check wolfe condition
     fwd=sbash_wolfe.sh
