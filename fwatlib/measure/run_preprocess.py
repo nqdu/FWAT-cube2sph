@@ -62,8 +62,8 @@ class FwatPreOP:
         self.nsta = statxt.shape[0]
         self.netwk = statxt[:,1]
         self.stnm = statxt[:,0]
-        self.stla = np.float64(statxt[:,2])
-        self.stlo = np.float64(statxt[:,3])
+        self.stla = statxt[:,2].astype(float)
+        self.stlo = statxt[:,3].astype(float)
         self.bazd = np.zeros((self.nsta))
 
         # read simulation info dt,t0,npts
