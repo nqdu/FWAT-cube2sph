@@ -9,5 +9,5 @@ file=$3
 oldstr=`grep "^$param " $file`
 newstr="$param           =     $value"
 
-sed  "s?$oldstr?$newstr?g" $file  > .$file.temporary
-mv .$file.temporary $file
+sed  "s?$oldstr?$newstr?g" $file  > $file.temporary
+mv $file.temporary $file
