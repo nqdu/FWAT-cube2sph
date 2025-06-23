@@ -79,6 +79,7 @@ for i in `seq 1 $NJOBS`; do
   
   # copy common parameters
   \cp DATA/Par_file.$simu_type $evtdir/DATA/Par_file
+  \cp fwat_params/FWAT.PAR.yaml $evtdir/DATA/FWAT.PAR.yaml
   \cp OUTPUT_FILES/*.h $evtdir/OUTPUT_FILES
   \rm -rf $evtdir/DATA/meshfem3D_files/*
   ln -s $work_dir/DATA/meshfem3D_files/* $evtdir/DATA/meshfem3D_files/
@@ -125,7 +126,7 @@ for i in `seq 1 $NJOBS`; do
   $change_par APPROXIMATE_HESS_KL .false. $evtdir/DATA/Par_file
   cd $evtdir/
   date
-  mpirun -np $NPROC $fksem/bin/xspecfem3D
+  $MPIRUN -np $NPROC $fksem/bin/xspecfem3D
   date
 
   # merge all seismograms to one big file
@@ -138,7 +139,7 @@ for i in `seq 1 $NJOBS`; do
   echo "measure adjoint source ..."
   cd $work_dir
   date
-  mpirun -np $NPROC python $MEASURE_LIB/run_preprocess.py $simu_type $iter $evtid $run_opt >> $fwd
+  $MPIRUN -np $NPROC python $MEASURE_LIB/run_preprocess.py $simu_type $iter $evtid $run_opt >> $fwd
   date
 
   # adjoint simulation
@@ -150,7 +151,7 @@ for i in `seq 1 $NJOBS`; do
   echo ""
   echo "adjoint simulation ..."
   date
-  mpirun -np $NPROC $fksem/bin/xspecfem3D
+  $MPIRUN -np $NPROC $fksem/bin/xspecfem3D
   date
 
   # copy kernels to GRADIENT

@@ -22,7 +22,7 @@ MODEL=M`echo "$iter" |awk '{printf "%02d",$1}'`
 # compute misfit
 # check how many simu types required
 nsimtypes="${#SIMU_TYPES[@]}"
-if [ "$nsimutypes" == "1" ]; then 
+if [ "$nsimtypes" == "1" ]; then 
   SOURCE_FILE_LS=./src_rec/sources.dat.${SIMU_TYPES[0]}
 
   # compute misfits
@@ -67,7 +67,7 @@ echo " "
 PRECOND=`python $FWATLIB/get_param.py optimize/PRECOND_TYPE`
 
 echo "sum kernels for new model ..."
-mpirun -np $NPROC python $OPT_LIB/sum_kernel.py $SOURCE_FILE_LS $iter $PRECOND $MODEL.ls
+$MPIRUN -np $NPROC python $OPT_LIB/sum_kernel.py $SOURCE_FILE_LS $iter $PRECOND $MODEL.ls
 kl_list=`GET_GRAD_NAME`
 for param in $kl_list hess_kernel;
 do 
@@ -79,7 +79,7 @@ echo " "
 
 # check wolfe condition
 echo "line search ..."
-mpirun -np $NPROC python $OPT_LIB/std_linesearch.py $MODEL $FWATPARAM/lbfgs.yaml $chi $chi1 
+$MPIRUN -np $NPROC python $OPT_LIB/std_linesearch.py $MODEL $FWATPARAM/lbfgs.yaml $chi $chi1 
 
 logfile=output_fwat4_log_$MODEL.txt
 echo "******************************************************" > $logfile
@@ -158,7 +158,7 @@ else
   \cp  $LOCAL_PATH/*Database $LSDIR/
   \cp  $LOCAL_PATH/*adepml* $LSDIR/
   \cp  $LOCAL_PATH/*undeformed_xyz.bin $LSDIR/
-  mpirun -np $NPROC $fksem/bin/xgenerate_databases 
+  $MPIRUN -np $NPROC $fksem/bin/xgenerate_databases 
 
   \rm adepml_*
 

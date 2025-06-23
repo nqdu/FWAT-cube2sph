@@ -8,6 +8,10 @@ FWATLIB_PATH=`pwd`
 SIMU_TYPES=("tele" "noise")
 SIMU_TYPES_USER_WEIGHT=(1. 1.)
 
+# mpirun command 
+# use mpirun -oversubscribe if hyper-threading are enabled
+MPIRUN="mpirun"
+
 ############## STOP HERE ###################
 FWATPARAM=`pwd`/fwat_params
 FWATLIB=$FWATLIB_PATH/fwatlib    # fwatlib location
