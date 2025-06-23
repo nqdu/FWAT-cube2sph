@@ -53,7 +53,7 @@ SET_FWAT()
 
   # return dependency strings
   local depend_string=$(IFS=:; echo "${job_ids[*]}")
-  echo $depend_string
+  job_adj=$depend_string
 }
 
 ######### USER PARAMETERS
@@ -69,7 +69,6 @@ mkdir -p misfits optimize solver
 # some jobid 
 job_adj=0
 job_post=0
-job_line=0
 
 for ii in `seq 1 4`;do 
 
@@ -87,7 +86,7 @@ for ii in `seq 1 4`;do
 
   # check flag type and run 
   if [ $flag == "INIT" ]; then 
-    job_adj=`SET_FWAT $NJOBS $flag $mod`
+    SET_FWAT $NJOBS $flag $mod
     
     # sum kernels, get search direction, generate trial model 
     fwd=sbash_postproc_kl.sh
@@ -100,12 +99,12 @@ for ii in `seq 1 4`;do
     job_post=$(sbatch $fwd | cut -d ' ' -f4)
 
   else  # line search
-    job_lie=`SET_FWAT $NJOBS $flag $mod`
+    SET_FWAT $NJOBS $flag $mod
 
     # check wolfe condition
     fwd=sbash_wolfe.sh
     echo "checking wolfe condition ..."
-    job_post=$(sbatch --dependency=afterok:${job_line} $fwd)
+    job_post=$(sbatch --dependency=afterok:${job_adj} $fwd | cut -d ' ' -f4)
   fi
 
   # wait to finish

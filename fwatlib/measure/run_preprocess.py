@@ -217,6 +217,8 @@ class FwatPreOP:
                         if i == myrank and myrank == 0 and ic == 0:
                             print("EGF => CCF ...")
                         tr.data = -cumtrapz1(data[:,1],dt_syn)
+                    else:
+                        tr.data = data[:,1] * 1.
                     tr.b = t0_syn
                 else:
                     print(f"{self.meatype} is not implemeted!")
