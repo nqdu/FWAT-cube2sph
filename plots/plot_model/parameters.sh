@@ -12,7 +12,7 @@ LAT0_H=41; LAT1_H=46
 
 # vertical slice
 NSLICE_VERTI=1
-MAX_DEP=-400
+MAX_DEP=400
 
 # start points
 LON0_V=(115 )

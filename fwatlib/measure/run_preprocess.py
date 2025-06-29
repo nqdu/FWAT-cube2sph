@@ -244,9 +244,14 @@ class FwatPreOP:
         self.npt_obs = hd.npts 
 
     def _print_measure_info(self,bandname,tstart,tend,tr_chi,am_chi,window_chi):
+        import os 
         ncomp = tr_chi.shape[1]
         nsta_loc = self.nsta_loc
         imeas = self.pdict['IMEAS']
+
+        # create directory
+        if self.myrank == 0:
+            os.makedirs(f"{self.MISFIT}/{self.mod}",exist_ok=True)
 
         # sync
         MPI.COMM_WORLD.Barrier()
@@ -257,7 +262,7 @@ class FwatPreOP:
             if irank == self.myrank:
 
                 # open outfile
-                outfile = f"{self.MISFIT}/{self.mod}_{self.evtid}_{bandname}_{self.meatype}_window_chi"
+                outfile = f"{self.MISFIT}/{self.mod}/{self.evtid}_{bandname}_{self.meatype}_window_chi"
                 if irank == 0:
                     fio = open(outfile,"w")
                 else:

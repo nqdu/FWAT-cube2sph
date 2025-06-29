@@ -68,7 +68,7 @@ def plot_event(line:str,M1:str,solver:str,outdir:str,paramfile:str):
         # find all station names
         names = []
         for ista in range(statxt.shape[0]):
-            names.append(statxt[ista,1] + '.' + statxt[ista,0] + '.BH')
+            names.append(statxt[ista,1] + '.' + statxt[ista,0] + '.BX')
         if ib == 0:
             print(f"Plotting {evtid}, no. of stations = {len(names)} ...")
 

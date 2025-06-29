@@ -32,9 +32,11 @@ SET_FWAT()
     if [ "$flag" == "INIT" ]; then 
       sed -i "/#SBATCH --job-name=/c\#SBATCH --job-name=FWD_ADJ" $fwd
       sed -i "/#SBATCH --output=/c\#SBATCH --output=FWD_ADJ-%j_set%a.txt" $fwd
+      #sed -i "/#SBATCH --output=/c\#SBATCH --output=LOG/${mod}/FWD_ADJ-%j_set%a.txt" $fwd
     else
       sed -i "/#SBATCH --job-name=/c\#SBATCH --job-name=LS" $fwd
       sed -i "/#SBATCH --output=/c\#SBATCH --output=LS-%j_set%a.txt" $fwd
+      #sed -i "/#SBATCH --output=/c\#SBATCH --output=LOG/${mod}/LS-%j_set%a.txt" $fwd
     fi
 
     if [[ $simu_type == "noise" ]]; then
@@ -76,6 +78,7 @@ for ii in `seq 1 4`;do
   iter=`python $FWATLIB/get_param.py iter $FWATPARAM/lbfgs.yaml`
   flag=`python $FWATLIB/get_param.py flag $FWATPARAM/lbfgs.yaml`
   mod=M`printf %02d $iter`
+  #mkdir -p LOG/${mod}
   echo "iteration $iter $mod $flag"
 
   # copy first model to MODEL_M00
@@ -90,11 +93,13 @@ for ii in `seq 1 4`;do
     
     # sum kernels, get search direction, generate trial model 
     fwd=sbash_postproc_kl.sh
+    #sed -i "/#SBATCH --output=/c\#SBATCH --output=LOG/${mod}/POST_%j.txt" $fwd
     job_post=$(sbatch --dependency=afterok:${job_adj} $fwd | cut -d ' ' -f4)
     
   elif [ $flag == "GRAD"  ];then 
     # get search direction, generate trial model 
     fwd=sbash_postproc_kl.sh
+    #sed -i "/#SBATCH --output=/c\#SBATCH --output=LOG/${mod}/POST_%j.txt" $fwd
     echo "Post processing ..."
     job_post=$(sbatch $fwd | cut -d ' ' -f4)
 
@@ -103,10 +108,11 @@ for ii in `seq 1 4`;do
 
     # check wolfe condition
     fwd=sbash_wolfe.sh
+    #sed -i "/#SBATCH --output=/c\#SBATCH --output=LOG//WOLFE_%j.txt" $fwd
     echo "checking wolfe condition ..."
     job_post=$(sbatch --dependency=afterok:${job_adj} $fwd | cut -d ' ' -f4)
   fi
 
   # wait to finish
-  srun --dependency=afterok:${job_post} --nodes=1 --time=00:00:10 --ntasks=1 --job-name=wait  ./wait.sh
+  srun --dependency=afterok:${job_post} --nodes=1 --time=00:01:05 --ntasks=1 --job-name=wait  ./wait.sh
 done

@@ -104,15 +104,9 @@ if [ "$flag" == "GRAD" ]; then
   rm -rf ./solver/M$inext
   mv ./solver/${MODEL}.ls solver/M$inext
 
-  # misfit file
-  for f in `ls misfits/ |grep ls |grep ${MODEL}`; 
-  do     
-      a=(`echo $f | awk -F'.ls_' '{print $1,$2}'`)
-      newf=M${inext}_${a[1]}
-      echo $f "=>" $newf
-      mv misfits/$f misfits/$newf
-
-  done
+  # misfits
+  rm -rf ./misfits/M$inext 
+  mv ./misfits/${MODEL}.ls  ./misfits/M$inext 
 
   # save LOGS
   mkdir -p LOG/$MODEL LOG/M$inext
@@ -132,7 +126,7 @@ if [ "$flag" == "GRAD" ]; then
   # clean useless information
   for d in $MODEL M$inext;
   do 
-    for CDIR in SEM GRAD;do 
+    for CDIR in SEM GRADIENT;do 
       for f in solver/$d/*/*$CDIR;
       do 
         rm -rf $f 
