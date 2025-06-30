@@ -32,8 +32,8 @@ change_par=$FWATLIB/change_par_file.sh
 SOURCE_FILE=src_rec/sources.dat.$simu_type
 iter=`echo $MODEL |cut -d"M" -f2 |awk '{printf "%d", $1}'`
 nevts=`awk 'END { print NR }' src_rec/sources.dat.$simu_type`
-work_dir=`pwd`
 mod=$MODEL
+work_dir=`pwd`
 
 # assign job id
 TASK_ID=1
@@ -56,9 +56,9 @@ fi
 
 for i in `seq 1 $NJOBS`; do
   cd $work_dir
-  ievt=`echo "($TASK_ID-1) * $NJOBS + $i" |bc`
-  ievt_ed=`echo "($TASK_ID-1) * $NJOBS + $NJOBS" |bc`
-  id=`echo "$START_SET + $ievt -1" |bc`
+  local ievt=`echo "($TASK_ID-1) * $NJOBS + $i" |bc`
+  local ievt_ed=`echo "($TASK_ID-1) * $NJOBS + $NJOBS" |bc`
+  local id=`echo "$START_SET + $ievt -1" |bc`
 
   # check if job is not included
   if [ "$ievt" -gt  "$nevts" ];then
@@ -124,6 +124,10 @@ for i in `seq 1 $NJOBS`; do
   $change_par SUBSAMPLE_FORWARD_WAVEFIELD .true. $evtdir/DATA/Par_file
   $change_par SIMULATION_TYPE 1 $evtdir/DATA/Par_file
   $change_par APPROXIMATE_HESS_KL .false. $evtdir/DATA/Par_file
+  $change_par WRITE_SEISMOGRAMS_BY_MASTER .true. $evtdir/DATA/Par_file
+  $change_par SAVE_ALL_SEISMOS_IN_ONE_FILE .true. $evtdir/DATA/Par_file
+  local NSTEP=`grep '^NSTEP ' $evtdir/DATA/Par_file |awk -F'=' '{print $2}'`
+  $change_par NTSTEP_BETWEEN_OUTPUT_SEISMOS $NSTEP $evtdir/DATA/Par_file
   cd $evtdir/
   date
   $MPIRUN -np $NPROC $fksem/bin/xspecfem3D
@@ -131,8 +135,8 @@ for i in `seq 1 $NJOBS`; do
 
   # merge all seismograms to one big file
   echo "packing seismograms ..."
-  python $MEASURE_LIB/pack_seismogram.py OUTPUT_FILES/seismograms.h5 OUTPUT_FILES/*.semd
-  \rm -rf OUTPUT_FILES/*.semd
+  python $MEASURE_LIB/pack_seismogram.py OUTPUT_FILES/seismograms.h5 OUTPUT_FILES/all_seismograms.ascii
+  \rm -rf OUTPUT_FILES/all_seismograms.ascii
 
   # run measure
   echo ""
