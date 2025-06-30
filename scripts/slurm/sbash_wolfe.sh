@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --nodes=1
-#SBATCH --ntasks=8
+#SBATCH --nodes=4
+#SBATCH --ntasks-per-node=40
 #SBATCH --time=00:15:59
 #SBATCH --job-name WOLFE
 #SBATCH --output=WOLFE_%j.txt

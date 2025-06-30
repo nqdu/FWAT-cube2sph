@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --nodes=1
-#SBATCH --ntasks=8
+#SBATCH --nodes=4
+#SBATCH --ntasks-per-node=40
 #SBATCH --array=21-28%5
 #SBATCH --time=00:35:59
 #SBATCH --job-name=FWD_ADJ
