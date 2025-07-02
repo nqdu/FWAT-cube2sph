@@ -127,7 +127,7 @@ for i in `seq 1 $NJOBS`; do
   $change_par APPROXIMATE_HESS_KL .false. $evtdir/DATA/Par_file
   $change_par WRITE_SEISMOGRAMS_BY_MASTER .true. $evtdir/DATA/Par_file
   $change_par SAVE_ALL_SEISMOS_IN_ONE_FILE .true. $evtdir/DATA/Par_file
-  local NSTEP=`grep '^NSTEP ' $evtdir/DATA/Par_file |awk -F'=' '{print $2}'`
+  NSTEP=`grep '^NSTEP ' $evtdir/DATA/Par_file |awk -F'=' '{print $2}'`
   $change_par NTSTEP_BETWEEN_OUTPUT_SEISMOS $NSTEP $evtdir/DATA/Par_file
   cd $evtdir/
   date

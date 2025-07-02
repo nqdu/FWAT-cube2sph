@@ -186,7 +186,7 @@ class FwatPreOP:
             stf = np.zeros((ncomp,npt_syn))
 
             # sum stf from all bands
-            for ib in range(self.Tmax):
+            for ib in range(len(self.Tmax)):
                 bandname = 'T%03g_T%03g' %(self.Tmin[ib],self.Tmax[ib])
                 for ic in range(self.ncomp):
                     ch = self.components[ic]
