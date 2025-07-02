@@ -4,7 +4,7 @@
 #SBATCH --array=1-4%5
 #SBATCH --time=00:35:59
 #SBATCH --job-name=FWD
-#SBATCH --output=FWD-%j_set%a.txt
+#SBATCH --output=LOG/FWD-%j_set%a.txt
 #SBATCH --account=rrg-liuqy
 #SBATCH --mem=12G
 #SBATCH --mail-type=FAIL
@@ -48,7 +48,8 @@ if [ "$LOCAL_PC" == "0" ]; then
 fi
 
 #logfile
-fwd=output_fwat0_log.$MODEL.$simu_type.job$TASK_ID.txt
+mkdir -p LOG
+fwd=LOG/output_fwat0_log.$MODEL.$simu_type.job$TASK_ID.txt
 :> $fwd
 
 for i in `seq 1 $NJOBS`; do

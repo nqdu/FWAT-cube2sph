@@ -3,7 +3,7 @@
 #SBATCH --ntasks-per-node=40
 #SBATCH --time=00:20:59
 #SBATCH --job-name=POST
-#SBATCH --output=POST_%j.txt
+#SBATCH --output=LOG/POST_%j.txt
 #SBATCH --account=rrg-liuqy
 #SBATCH --mem=12G
 
@@ -59,7 +59,7 @@ else
 fi 
 
 # create log file
-logfile=output_fwat2_post_log_${MODEL}.txt
+logfile=LOG/output_fwat2_post_log_${MODEL}.txt
 :> $logfile
 echo "running POST " >> $logfile 
 

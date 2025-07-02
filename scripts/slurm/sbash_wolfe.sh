@@ -3,7 +3,7 @@
 #SBATCH --ntasks-per-node=40
 #SBATCH --time=00:15:59
 #SBATCH --job-name WOLFE
-#SBATCH --output=WOLFE_%j.txt
+#SBATCH --output=LOG/WOLFE_%j.txt
 #SBATCH --account=rrg-liuqy
 #SBATCH --mem=12G
 
@@ -81,7 +81,7 @@ echo " "
 echo "line search ..."
 $MPIRUN -np $NPROC python $OPT_LIB/std_linesearch.py $MODEL $FWATPARAM/lbfgs.yaml $chi $chi1 
 
-logfile=output_fwat4_log_$MODEL.txt
+logfile=LOG/output_fwat4_log_$MODEL.txt
 echo "******************************************************" > $logfile
 
 # check if this line search is accepted
@@ -110,18 +110,20 @@ if [ "$flag" == "GRAD" ]; then
 
   # save LOGS
   mkdir -p LOG/$MODEL LOG/M$inext
+  cd LOG
   for f in  FWD_ADJ* POST* output_fwat[1,2]*;
   do 
     if [   -f $f ]; then 
-      mv $f LOG/$MODEL/
+      mv $f $MODEL/
     fi
   done 
   for f in LS* WOLFE* output_fwat[3,4]*;
   do 
     if [   -f $f ]; then 
-      mv $f LOG/M$inext/
+      mv $f M$inext/
     fi
   done 
+  cd ..
 
   # clean useless information
   for d in $MODEL M$inext;

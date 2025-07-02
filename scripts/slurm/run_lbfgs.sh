@@ -31,12 +31,12 @@ SET_FWAT()
     sed -i "/LOCAL_PC=/c\LOCAL_PC=0" $fwd
     if [ "$flag" == "INIT" ]; then 
       sed -i "/#SBATCH --job-name=/c\#SBATCH --job-name=FWD_ADJ" $fwd
-      sed -i "/#SBATCH --output=/c\#SBATCH --output=FWD_ADJ-%j_set%a.txt" $fwd
-      #sed -i "/#SBATCH --output=/c\#SBATCH --output=LOG/${mod}/FWD_ADJ-%j_set%a.txt" $fwd
+      #sed -i "/#SBATCH --output=/c\#SBATCH --output=FWD_ADJ-%j_set%a.txt" $fwd
+      sed -i "/#SBATCH --output=/c\#SBATCH --output=LOG/FWD_ADJ-%j_set%a.txt" $fwd
     else
       sed -i "/#SBATCH --job-name=/c\#SBATCH --job-name=LS" $fwd
-      sed -i "/#SBATCH --output=/c\#SBATCH --output=LS-%j_set%a.txt" $fwd
-      #sed -i "/#SBATCH --output=/c\#SBATCH --output=LOG/${mod}/LS-%j_set%a.txt" $fwd
+      #sed -i "/#SBATCH --output=/c\#SBATCH --output=LS-%j_set%a.txt" $fwd
+      sed -i "/#SBATCH --output=/c\#SBATCH --output=LOG/LS-%j_set%a.txt" $fwd
     fi
 
     if [[ $simu_type == "noise" ]]; then
@@ -66,7 +66,7 @@ NJOBS=1
 source parameters.sh
 
 # mkdir 
-mkdir -p misfits optimize solver
+mkdir -p misfits optimize solver LOG
 
 # some jobid 
 job_adj=0

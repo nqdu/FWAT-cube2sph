@@ -42,14 +42,14 @@ if [ "$LOCAL_PC" == "0" ]; then
 fi
 
 #logfile
-fwd=output_fwat1_log.$MODEL.$simu_type.job$TASK_ID.txt
+fwd=LOG/output_fwat1_log.$MODEL.$simu_type.job$TASK_ID.txt
 
 # check for LS or INIT
 FLAG=`python $FWATLIB/get_param.py flag $FWATPARAM/lbfgs.yaml`
 run_opt=3
 if [  "$FLAG" == "LS" ]; then 
   run_opt=2
-  fwd=output_fwat3_log.$MODEL.$simu_type.job$TASK_ID.txt
+  fwd=LOG/output_fwat3_log.$MODEL.$simu_type.job$TASK_ID.txt
   mod=$MODEL.ls
 fi
 :> $fwd
