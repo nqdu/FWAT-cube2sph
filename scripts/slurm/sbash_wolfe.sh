@@ -91,6 +91,9 @@ if [ "$flag" == "GRAD" ]; then
   icur=$(echo $MODEL |awk -F'M' '{print $2}')
   inext=$(printf "%02d" `echo $MODEL |awk -F'M' '{print $2+1}'`)
   echo misfit for iteration $icur and $inext $chi $chi1 >> misfit.log
+
+  echo " " >> $logfile
+  echo "rename  MODEL_${MODEL}.ls =>  MODEL_M$inext" >> $logfile
   
   # move new model to optimize/MODEL_M$inext
   rm -rf ./optimize/MODEL_M$inext 
@@ -126,11 +129,14 @@ if [ "$flag" == "GRAD" ]; then
   cd ..
 
   # clean useless information
+  echo " " >> $logfile
+  echo "clean useless files" >> $logfile
   for d in $MODEL M$inext;
   do 
     for CDIR in SEM GRADIENT;do 
       for f in solver/$d/*/*$CDIR;
       do 
+        echo "clean $f" >> $logfile 
         rm -rf $f 
       done 
     done
