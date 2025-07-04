@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH --nodes=1
-#SBATCH --ntasks=8
+#SBATCH --nodes=4
+#SBATCH --ntasks-per-node=40
 #SBATCH --time=00:15:59
 #SBATCH --job-name WOLFE
-#SBATCH --output=WOLFE_%j.txt
-#SBATCH --account=def-liuqy
+#SBATCH --output=LOG/WOLFE_%j.txt
+#SBATCH --account=rrg-liuqy
 #SBATCH --mem=12G
 
 set -e 
@@ -12,8 +12,7 @@ set -e
 # load parameters 
 . parameters.sh 
 source module_env
-SIMU_TYPE=noise
-NPROC=`grep ^"NPROC" DATA/Par_file.$SIMU_TYPE | cut -d'=' -f2`
+NPROC=`grep ^"NPROC" DATA/Par_file | cut -d'=' -f2`
 
 # get search direction
 iter=`python $FWATLIB/get_param.py iter $FWATPARAM/lbfgs.yaml`
@@ -21,20 +20,54 @@ FLAG=`python $FWATLIB/get_param.py flag $FWATPARAM/lbfgs.yaml`
 MODEL=M`echo "$iter" |awk '{printf "%02d",$1}'`
 
 # compute misfit
-info=`python $MEASURE_LIB/cal_misfit.py $MODEL $SIMU_TYPE`
-chi=`echo $info |awk '{print $1}'`
-info=`python $MEASURE_LIB/cal_misfit.py $MODEL.ls $SIMU_TYPE`
-chi1=`echo $info |awk '{print $1}'`
+# check how many simu types required
+nsimtypes="${#SIMU_TYPES[@]}"
+if [ "$nsimtypes" == "1" ]; then 
+  SOURCE_FILE_LS=./src_rec/sources.dat.${SIMU_TYPES[0]}
+
+  # compute misfits
+  info=`python $MEASURE_LIB/cal_misfit.py $MODEL ${SIMU_TYPES[0]}`
+  chi=`echo $info |awk '{print $1}'`
+  info=`python $MEASURE_LIB/cal_misfit.py $MODEL.ls ${SIMU_TYPES[0]}`
+  chi1=`echo $info |awk '{print $1}'`
+else
+
+  SOURCE_FILE_LS=./src_rec/sources.dat.joint
+
+  #init misifits
+  chi=0.
+  chi1=0.
+
+  # get first model
+  iter_start=`python $FWATLIB/get_param.py iter_start $FWATPARAM/lbfgs.yaml`
+  MSTART=M`echo "$iter_start" |awk '{printf "%02d",$1}'`
+  MSTART=M00
+
+  # for all simulation types, compute weighted misfits
+  for((i=0;i<$nsimtypes;i++)); 
+  do 
+    info=`python $MEASURE_LIB/cal_misfit.py $MSTART ${SIMU_TYPES[$i]}`
+    l0=`echo $info |awk '{print $1/$2}'`
+    info=`python $MEASURE_LIB/cal_misfit.py $MODEL ${SIMU_TYPES[$i]}`
+    l1=`echo $info |awk '{print $1/$2}'`
+    info=`python $MEASURE_LIB/cal_misfit.py $MODEL.ls ${SIMU_TYPES[$i]}`
+    l2=`echo $info |awk '{print $1/$2}'`
+
+    # weighted sum
+    # L'_i = L_i / L_0 * user_weight
+    chi=`echo $chi $l1 $l0 ${SIMU_TYPES_USER_WEIGHT[$i]} |awk '{print $1+$2/$3*$4}'`
+    chi1=`echo $chi1 $l2 $l0 ${SIMU_TYPES_USER_WEIGHT[$i]}|awk '{print $1+$2/$3*$4}'`
+  done 
+fi 
 
 echo "misfit current/next = $chi $chi1"
 echo " "
 
 # sum kernels for line search, save to optimize/sum_kernels_$MODEL.ls
-SOURCE_FILE_LS=./src_rec/sources.dat.$SIMU_TYPE
 PRECOND=`python $FWATLIB/get_param.py optimize/PRECOND_TYPE`
 
 echo "sum kernels for new model ..."
-mpirun -np $NPROC python $OPT_LIB/sum_kernel.py $SOURCE_FILE_LS $iter $PRECOND $MODEL.ls
+$MPIRUN -np $NPROC python $OPT_LIB/sum_kernel.py $SOURCE_FILE_LS $iter $PRECOND $MODEL.ls
 kl_list=`GET_GRAD_NAME`
 for param in $kl_list hess_kernel;
 do 
@@ -46,9 +79,9 @@ echo " "
 
 # check wolfe condition
 echo "line search ..."
-mpirun -np $NPROC python $OPT_LIB/std_linesearch.py $MODEL $FWATPARAM/lbfgs.yaml $chi $chi1 
+$MPIRUN -np $NPROC python $OPT_LIB/std_linesearch.py $MODEL $FWATPARAM/lbfgs.yaml $chi $chi1 
 
-logfile=output_fwat4_log_$MODEL.txt
+logfile=LOG/output_fwat4_log_$MODEL.txt
 echo "******************************************************" > $logfile
 
 # check if this line search is accepted
@@ -58,6 +91,9 @@ if [ "$flag" == "GRAD" ]; then
   icur=$(echo $MODEL |awk -F'M' '{print $2}')
   inext=$(printf "%02d" `echo $MODEL |awk -F'M' '{print $2+1}'`)
   echo misfit for iteration $icur and $inext $chi $chi1 >> misfit.log
+
+  echo " " >> $logfile
+  echo "rename  MODEL_${MODEL}.ls =>  MODEL_M$inext" >> $logfile
   
   # move new model to optimize/MODEL_M$inext
   rm -rf ./optimize/MODEL_M$inext 
@@ -71,37 +107,36 @@ if [ "$flag" == "GRAD" ]; then
   rm -rf ./solver/M$inext
   mv ./solver/${MODEL}.ls solver/M$inext
 
-  # misfit file
-  for f in `ls misfits/ |grep ls |grep ${MODEL}`; 
-  do     
-      a=(`echo $f | awk -F'.ls_' '{print $1,$2}'`)
-      newf=M${inext}_${a[1]}
-      echo $f "=>" $newf
-      mv misfits/$f misfits/$newf
-
-  done
+  # misfits
+  rm -rf ./misfits/M$inext 
+  mv ./misfits/${MODEL}.ls  ./misfits/M$inext 
 
   # save LOGS
   mkdir -p LOG/$MODEL LOG/M$inext
+  cd LOG
   for f in  FWD_ADJ* POST* output_fwat[1,2]*;
   do 
     if [   -f $f ]; then 
-      mv $f LOG/$MODEL/
+      mv $f $MODEL/
     fi
   done 
   for f in LS* WOLFE* output_fwat[3,4]*;
   do 
     if [   -f $f ]; then 
-      mv $f LOG/M$inext/
+      mv $f M$inext/
     fi
   done 
+  cd ..
 
   # clean useless information
+  echo " " >> $logfile
+  echo "clean useless files" >> $logfile
   for d in $MODEL M$inext;
   do 
-    for CDIR in SEM GRAD;do 
+    for CDIR in SEM GRADIENT;do 
       for f in solver/$d/*/*$CDIR;
       do 
+        echo "clean $f" >> $logfile 
         rm -rf $f 
       done 
     done
@@ -125,7 +160,7 @@ else
   \cp  $LOCAL_PATH/*Database $LSDIR/
   \cp  $LOCAL_PATH/*adepml* $LSDIR/
   \cp  $LOCAL_PATH/*undeformed_xyz.bin $LSDIR/
-  mpirun -np $NPROC $fksem/bin/xgenerate_databases 
+  $MPIRUN -np $NPROC $fksem/bin/xgenerate_databases 
 
   \rm adepml_*
 

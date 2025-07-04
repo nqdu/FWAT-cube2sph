@@ -20,6 +20,11 @@ file (GLOB SOURCE "${PROJECT_SOURCE_DIR}/src/*.f90")
 find_package(pybind11 CONFIG REQUIRED)
 pybind11_add_module(libmeas src/main.cpp ${SOURCE})
 
+if(CMAKE_CXX_COMPILER_ID STREQUAL "IntelLLVM")
+  message(STATUS "Using Intel oneAPI compiler (icx/icpx)")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -lstdc++" )
+endif()
+
 target_link_directories(libmeas PRIVATE ${SACHOME}/lib)
 target_link_libraries(libmeas PRIVATE sacio sac)
 

@@ -44,21 +44,19 @@ def main():
         band="T%03g_T%03g" %(Tmin,Tmax)
 
         # load misfits data
-        filenames = glob(f"{misfits}/{M1}.*_{band}_noise_window_chi")
+        filenames = glob(f"{misfits}/{M1}/*_{band}_noise_window_chi")
         for i in range(len(filenames)):
-            if '.ls' in filenames[i]: continue
             temp = np.loadtxt(filenames[i],usecols=[14])
             data =  np.append(data,temp)
-        filenames = glob(f"{misfits}/M00.*_{band}_noise_window_chi")
+        filenames = glob(f"{misfits}/M00/*_{band}_noise_window_chi")
         for i in range(len(filenames)):
-            if '.ls' in filenames[i]: continue
             temp = np.loadtxt(filenames[i],usecols=[14])
             data0 =  np.append(data0,temp)
 
         # create figures
         fig,ax = plt.subplots(1,1,figsize=(12,5))
         ax.hist(data0,bins=30,range=[-1,1],label='M00')
-        ax.hist(data,bins=30,range=[-1,1],label=f'{M1}',color='gray')
+        ax.hist(data,bins=30,range=[-1,1],label=f'{M1}',color='gray',alpha=0.5)
         ax.legend()
         fig.savefig(f"{seisdir}/{M1}.{band}.jpg")
         fig.clear()

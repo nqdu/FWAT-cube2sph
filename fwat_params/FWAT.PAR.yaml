@@ -34,10 +34,11 @@ measure:
 
   # sks 
   sks:
+    COMPS: ['R','T'] # components used 
     CH_CODE: BX   # CH_CODE
     FILTER_BANDS: 
-      - [5.,50.]
-    TIME_WINDOW: [5.,45.] # before and after first arrival
+      - [10.,50.]
+    TIME_WINDOW: [15.,25.] # before and after first arrival
     VERBOSE_MODE: True
     IMEAS: 2 # 2 = L2 norm
   
@@ -63,11 +64,14 @@ optimize:
   MAX_PER: 0.02 # maximum relative perturbation
 
   # model/kernel type
-  # iso model: 
-    # iso model by default, we use parameter set vp_vs_rho
-    # = 0 kappa_mu_rho
-    # = 1  vp_vs_rho
-    # = 2 vpvs_vs_rho  
+  # iso configuration
+  #     0: kappa,mu,rho
+  #     1: vp,vs,rho
+  #     2: vp/vs,vs,rho
+  # dtti configuration:
+  #     0: c11-c66,rho
+  #     1: vp,vs,rho,gcp,gsp
+  #     2. vph,vpv,vsh,vsv,rho,eta,gcp,gsp
   MODEL_TYPE: iso 
   KERNEL_SET: 2
-  MASK_VARS: []
+  MASK_VARS: [] # set all the gradients related to index in it to 0

@@ -1,38 +1,43 @@
 #!/bin/bash
-#SBATCH --nodes=1
-#SBATCH --ntasks=8
-#SBATCH --array=21-28%5
+#SBATCH --nodes=4
+#SBATCH --ntasks-per-node=40
+#SBATCH --array=1-4%5
 #SBATCH --time=00:35:59
-#SBATCH --job-name=FWD_ADJ
-#SBATCH --output=FWD_ADJ-%j_set%a.txt
-#SBATCH --account=def-liuqy
+#SBATCH --job-name=FWD
+#SBATCH --output=LOG/FWD-%j_set%a.txt
+#SBATCH --account=rrg-liuqy
 #SBATCH --mem=12G
-#SBATCH --gpus-per-node=1
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=nanqiao.du@mail.utoronto.ca
+
+# script runs mesher,database generation and solver
+# using this example setup 
+#
+###################################################
+source module_env
+. parameters.sh
 
 # error flag
 set -e 
 
-#
-###################################################
-source module_env 
-. parameters.sh
-
 #==== Comment out the following if running SEM mesh with new models====#
 MODEL=M00
-simu_type=tele
-NJOBS=4
+simu_type=noise
+NJOBS=8
 START_SET=1
+LOCAL_PC=0
+
+#### STOP HERE #### #
+
 NPROC=`grep ^"NPROC" DATA/Par_file.$simu_type | cut -d'=' -f2`
-LOCAL_PC=1
+
 
 # parfile changer script
 change_par=$FWATLIB/change_par_file.sh
 
 SOURCE_FILE=src_rec/sources.dat.$simu_type
 iter=`echo $MODEL |cut -d"M" -f2 |awk '{printf "%d", $1}'`
-nevts=`cat $SOURCE_FILE |wc -l`
+nevts=`awk 'END { print NR }' src_rec/sources.dat.$simu_type`
 work_dir=`pwd`
 mod=$MODEL
 
@@ -43,16 +48,8 @@ if [ "$LOCAL_PC" == "0" ]; then
 fi
 
 #logfile
-fwd=output_fwat1_log.$MODEL.$simu_type.job$TASK_ID.txt
-
-# check for LS or INIT
-FLAG=`python $FWATLIB/get_param.py flag $FWATPARAM/lbfgs.yaml`
-run_opt=3
-if [  "$FLAG" == "LS" ]; then 
-  run_opt=2
-  fwd=output_fwat3_log.$MODEL.$simu_type.job$TASK_ID.txt
-  mod=$MODEL.ls
-fi
+mkdir -p LOG
+fwd=LOG/output_fwat0_log.$MODEL.$simu_type.job$TASK_ID.txt
 :> $fwd
 
 for i in `seq 1 $NJOBS`; do
@@ -69,7 +66,7 @@ for i in `seq 1 $NJOBS`; do
   # get evtid
   evtid=`sed -n "$ievt"p $SOURCE_FILE |awk '{print $1}'`
   echo " "
-  echo "job $i of $NJOBS : copying params for $simu_type evtid = $evtid"  
+  echo "copying params for $simu_type evtid = $evtid"  
   evtdir=$work_dir/solver/$mod/$evtid
 
   # mkdir
@@ -90,7 +87,11 @@ for i in `seq 1 $NJOBS`; do
   $change_par LOCAL_PATH $LOCAL_PATH $evtdir/DATA/Par_file
   $change_par LOCAL_PATH $LOCAL_PATH  $evtdir/DATA/meshfem3D_files/Mesh_Par_file
   \rm -rf $evtdir/$LOCAL_PATH/*
-  ln -s $work_dir/./optimize/MODEL_${mod}/* $evtdir/$LOCAL_PATH/
+  if [ ${mod} == "M00"  ]; then
+    ln -s $work_dir/$LOCAL_PATH/* $evtdir/$LOCAL_PATH/
+  else
+    ln -s $work_dir/./optimize/MODEL_${mod}/* $evtdir/$LOCAL_PATH/
+  fi
 
   # copy simu_type depedent files
   cd src_rec
@@ -122,52 +123,30 @@ for i in `seq 1 $NJOBS`; do
   # forward simulation
   echo ""
   echo "forward simulation ..."
-  $change_par SUBSAMPLE_FORWARD_WAVEFIELD .true. $evtdir/DATA/Par_file
+  $change_par SUBSAMPLE_FORWARD_WAVEFIELD .false. $evtdir/DATA/Par_file
   $change_par SIMULATION_TYPE 1 $evtdir/DATA/Par_file
   $change_par APPROXIMATE_HESS_KL .false. $evtdir/DATA/Par_file
+  $change_par WRITE_SEISMOGRAMS_BY_MASTER .true. $evtdir/DATA/Par_file
+  $change_par SAVE_ALL_SEISMOS_IN_ONE_FILE .true. $evtdir/DATA/Par_file
+  NSTEP=`grep '^NSTEP ' $evtdir/DATA/Par_file |awk -F'=' '{print $2}'`
+  $change_par NTSTEP_BETWEEN_OUTPUT_SEISMOS $NSTEP $evtdir/DATA/Par_file
   cd $evtdir/
   date
-  mpirun -np $NPROC $fksem/bin/xspecfem3D
+  $MPIRUN -np $NPROC $fksem/bin/xspecfem3D
   date
 
   # merge all seismograms to one big file
   echo "packing seismograms ..."
-  python $MEASURE_LIB/pack_seismogram.py OUTPUT_FILES/seismograms.h5 OUTPUT_FILES/*.semd
-  \rm -rf OUTPUT_FILES/*.semd
+  python $MEASURE_LIB/pack_seismogram.py OUTPUT_FILES/seismograms.h5 OUTPUT_FILES/all_seismograms.ascii
+  \rm -rf OUTPUT_FILES/all_seismograms.ascii
 
   # run measure
   echo ""
-  echo "measure adjoint source ..."
+  echo "saving forward seismograms ..."
   cd $work_dir
   date
-  mpirun -np $NPROC python $MEASURE_LIB/run_preprocess.py $simu_type $iter $evtid $run_opt >> $fwd
+  $MPIRUN -np $NPROC python $MEASURE_LIB/run_preprocess.py $simu_type $iter $evtid 1 >> $fwd 
   date
-
-  # adjoint simulation
-  $change_par COUPLE_WITH_INJECTION_TECHNIQUE .false. $evtdir/DATA/Par_file
-  $change_par SUBSAMPLE_FORWARD_WAVEFIELD .true. $evtdir/DATA/Par_file
-  $change_par SIMULATION_TYPE 3 $evtdir/DATA/Par_file
-  $change_par APPROXIMATE_HESS_KL .true. $evtdir/DATA/Par_file
-  cd $evtdir/
-  echo ""
-  echo "adjoint simulation ..."
-  date
-  mpirun -np $NPROC $fksem/bin/xspecfem3D
-  date
-
-  # copy kernels to GRADIENT
-  # and combine them to hdf5
-  cd $work_dir
-  mkdir -p $evtdir/GRADIENT
-  \rm -rf $evtdir/GRADIENT/*
-  mv $evtdir/$LOCAL_PATH/*_kernel.bin $evtdir/GRADIENT
-  grad_list=`GET_GRAD_NAME`
-  for grad in $grad_list hess_kernel;
-  do
-    echo "combine $NPROC $grad to hdf5 ..." 
-    python $OPT_LIB/bin2h5.py $evtdir/GRADIENT $grad $NPROC 1
-  done 
-  \rm $evtdir/GRADIENT/*.bin
 
   # delete useless information
   bash $FWATLIB/clean.sh $mod $evtid 

@@ -1,20 +1,18 @@
 #!/bin/bash
-#SBATCH --nodes=1
-#SBATCH --ntasks=8
+#SBATCH --nodes=4
+#SBATCH --ntasks-per-node=40
 #SBATCH --time=00:20:59
 #SBATCH --job-name=POST
-#SBATCH --output=POST_%j.txt
-#SBATCH --account=def-liuqy
+#SBATCH --output=LOG/POST_%j.txt
+#SBATCH --account=rrg-liuqy
 #SBATCH --mem=12G
 
 set -e 
 # include file
-. parameters.sh
-# load modules 
-source module_env 
+source module_env
+source parameters.sh
 
 # input vars
-SOURCE_FILE=./src_rec/sources.dat.noise
 NPROC=`grep ^"NPROC" DATA/Par_file | cut -d'=' -f2`
 
 # parfile changer script
@@ -26,16 +24,50 @@ FLAG=`python $FWATLIB/get_param.py flag $FWATPARAM/lbfgs.yaml`
 MODEL=M`echo "$iter" |awk '{printf "%02d",$1}'`
 PRECOND=`python $FWATLIB/get_param.py optimize/PRECOND_TYPE`
 
+# check how many simu types required
+nsimtypes="${#SIMU_TYPES[@]}"
+if [ "$nsimtypes" == "1" ]; then 
+  SOURCE_FILE=./src_rec/sources.dat.${SIMU_TYPES[0]}
+else
+  # generate files if requireds
+  iter_start=`python $FWATLIB/get_param.py iter_start $FWATPARAM/lbfgs.yaml`
+  if [ "$iter" == "0" ]; then
+    # init source file
+    SOURCE_FILE=./src_rec/sources.dat.joint
+    cat ./src_rec/sources.dat.${SIMU_TYPES[0]} > $SOURCE_FILE
+
+    # compute misfit 
+    info=`python $MEASURE_LIB/cal_misfit.py $MODEL ${SIMU_TYPES[0]}`
+    chi0=`echo $info |awk '{print $1/$2}'`
+    chi1=`echo $chi0 $chi0 ${SIMU_TYPES_USER_WEIGHT[0]} |awk '{print $1/$2*$3}'`
+
+    # init weight_kl.txt 
+    :> ./optimize/weight_kl.txt
+    awk -v a=$chi1 '{print $2*0+a}' ./src_rec/sources.dat.${SIMU_TYPES[0]} >> ./optimize/weight_kl.txt
+
+    # for other simulation types
+    # misfit = L0 + L1 * s0/s1 + L2 * s0/s2 + L_i s0/s_i
+    for((i=1;i<$nsimtypes;i++)); 
+    do 
+      cat ./src/sources.dat.${SIMU_TYPES[$i]} >> $SOURCE_FILE
+      info=`python $MEASURE_LIB/cal_misfit.py $MODEL ${SIMU_TYPES[$i]}`
+      chi1=`echo $info |awk '{print $1/$2}'`
+      chi1=`echo $chi0 $chi1 ${SIMU_TYPES_USER_WEIGHT[$i]} |awk '{print $1/$2*$3}'`
+      awk -v a=$chi1 '{print $2*0+a}' ./src_rec/sources.dat.${SIMU_TYPES[$i]} >> ./optimize/weight_kl.txt
+    done 
+  fi
+fi 
+
 # create log file
-logfile=output_fwat2_post_log_${MODEL}.txt
+logfile=LOG/output_fwat2_post_log_${MODEL}.txt
 :> $logfile
 echo "running POST " >> $logfile 
 
 # sum kernels
 if [ $FLAG != "GRAD" ]; then 
   echo "sum kernels ..."
-  echo "CMD: mpirun -np $NPROC python $OPT_LIB/sum_kernel.py $SOURCE_FILE $iter $PRECOND $MODEL"
-  mpirun -np $NPROC python $OPT_LIB/sum_kernel.py $SOURCE_FILE $iter $PRECOND $MODEL >> $logfile
+  echo "CMD: $MPIRUN -np $NPROC python $OPT_LIB/sum_kernel.py $SOURCE_FILE $iter $PRECOND $MODEL"
+  $MPIRUN -np $NPROC python $OPT_LIB/sum_kernel.py $SOURCE_FILE $iter $PRECOND $MODEL >> $logfile
 
   kl_list=`GET_GRAD_NAME`
   for param in $kl_list 
@@ -59,7 +91,7 @@ sigma_v=`echo $info | awk  '{print $2}'`
 if [ $PRECOND == "default" ] && [ $MODEL == "M00"  ];then 
   param=hess_kernel
   mv optimize/SUM_KERNELS_${MODEL}/*_$param.bin $LOCAL_PATH
-  mpirun -np $NPROC $fksem/bin/xsmooth_sem_sph_pde 50000 25000 $param $LOCAL_PATH optimize/SUM_KERNELS_$MODEL/ .false. >> $logfile
+  $MPIRUN -np $NPROC $fksem/bin/xsmooth_sem_sph_pde 50000 25000 $param $LOCAL_PATH optimize/SUM_KERNELS_$MODEL/ .false. >> $logfile
   \rm $LOCAL_PATH/*_$param.bin
   for i in `seq 1 $NPROC`;
   do
@@ -76,7 +108,7 @@ if [ $FLAG != "GRAD" ]; then
 fi
 
 # get search direction
-mpirun -np $NPROC python $OPT_LIB/get_lbfgs_direc.py $iter $FWATPARAM/lbfgs.yaml 
+$MPIRUN -np $NPROC python $OPT_LIB/get_lbfgs_direc.py $iter $FWATPARAM/lbfgs.yaml 
 echo " "
 
 # smooth search direction
@@ -84,7 +116,7 @@ kl_list=`GET_DIREC_NAME`
 for param in $kl_list; 
 do 
   mv optimize/SUM_KERNELS_$MODEL/*_$param.bin $LOCAL_PATH
-  mpirun -np $NPROC $fksem/bin/xsmooth_sem_sph_pde $sigma_h $sigma_v $param $LOCAL_PATH optimize/SUM_KERNELS_$MODEL/ .false. >> $logfile
+  $MPIRUN -np $NPROC $fksem/bin/xsmooth_sem_sph_pde $sigma_h $sigma_v $param $LOCAL_PATH optimize/SUM_KERNELS_$MODEL/ .false. >> $logfile
   \rm $LOCAL_PATH/*_$param.bin
   for i in `seq 1 $NPROC`;
   do
@@ -115,7 +147,7 @@ echo -e ".false.\n.true." > adepml_stage
 \cp  $LOCAL_PATH/*Database $LSDIR/
 \cp  $LOCAL_PATH/*adepml* $LSDIR/
 \cp  $LOCAL_PATH/*undeformed_xyz.bin $LSDIR/
-mpirun -np $NPROC $fksem/bin/xgenerate_databases 
+$MPIRUN -np $NPROC $fksem/bin/xgenerate_databases 
 
 # delete 
 \rm adepml_*

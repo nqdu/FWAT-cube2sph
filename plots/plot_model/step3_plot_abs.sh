@@ -39,7 +39,7 @@ for iter in $run_indx; do
     #gmt grd2cpt $filename -Z -D -Cpolar -I  > out.cpt
 
     # plot
-    proj=-JX12c/-6c
+    proj=-JX12c/6c
 
     gmt begin pics/$param.iter$idx.$name.$ip jpg 
       gmt basemap $bounds $proj  -Bxaf+l"Distance,km" -Byaf+l"Depth,km" -BWSet

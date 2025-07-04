@@ -34,7 +34,7 @@ measure:
 
   # sks 
   sks:
-    COMPS: [T'] # components used 
+    COMPS: ['R','T'] # components used 
     CH_CODE: BX   # CH_CODE
     FILTER_BANDS: 
       - [5.,50.]

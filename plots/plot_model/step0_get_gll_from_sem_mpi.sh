@@ -33,7 +33,7 @@ do
   paste temp.txt horiz.$i.txt.temp > input/horiz.$i.txt  
 
   # interpolate
-  mpirun -np $NPROC  $specfem_dir/bin/xcreate_slice_loc input/horiz.$i.txt  $DATABASE_DIR temp.txt.loc
+  $MPIRUN -np $NPROC  $specfem_dir/bin/xcreate_slice_loc input/horiz.$i.txt  $DATABASE_DIR temp.txt.loc
   \rm temp1.txt rotation_nu
   mv temp.txt.loc input/horiz.$i.loc
   \rm -f temp* horiz.$i.txt.temp 
@@ -62,19 +62,19 @@ do
   nz=200
   for ((j=0;j<$nz;j++));
   do
-    dep=`echo "$MAX_DEP $nz $j" |awk '{printf "%g", 1000*($1+(0-$1)/($2-1)*$3)}'`
+    dep=`echo "$MAX_DEP $nz $j" |awk '{printf "%g", 1000.*($1+(0-$1)/($2-1)*$3)}'`
     #dep=`printf %g $(echo "scale=6; 1000*($MAX_DEP + (0. - $MAX_DEP ) / ($nz-1.) * $j)"|bc)`
     awk  '{print "XZ ADF",$1,$2,a,$3}' a=$dep profile.txt >> verti.$i.temp
   done
 
   # get grd file and plot
-  awk '{print $1,$2,$4,$3,0.0,-$5}' verti.$i.temp > temp.txt
+  awk '{print $1,$2,$4,$3,0.0,$5}' verti.$i.temp > temp.txt
   $cube2sph_dir/bin/write_stations_file temp.txt temp1.txt rotation_nu .false. .false.
   awk '{print $4,$3,$6}' temp1.txt > temp2.txt
   awk  '{print $5,$6}' verti.$i.temp  > temp3.txt 
   paste temp2.txt temp3.txt > input/verti.$i.txt 
 
-  mpirun -np $NPROC  $specfem_dir/bin/xcreate_slice_loc input/verti.$i.txt  $DATABASE_DIR  temp.txt.loc
+  $MPIRUN -np $NPROC  $specfem_dir/bin/xcreate_slice_loc input/verti.$i.txt  $DATABASE_DIR  temp.txt.loc
 
   \rm temp1.txt rotation_nu
   mv temp.txt.loc input/verti.$i.loc

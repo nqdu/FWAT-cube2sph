@@ -96,7 +96,6 @@ class FwatModel:
         return grad_list
     
     def _cijkl2dtti(self,model,backward=False):
-        import numpy as np
         # model now is c11, c12 -- c66, rho with shape(22）
         if self._kltype == 1: # vp,vs,rho,gc gs
             if not backward:
@@ -129,18 +128,24 @@ class FwatModel:
                 gc = (rho * vs**2) * model[3,...]
                 gs = (rho * vs**2) * model[4,...]
 
+                # convert to tti
+                A = vp**2 * rho 
+                L = vs**2 * rho 
+                N = vs**2 * rho 
+                C = vp**2 * rho 
+                F = A - 2 * L 
+
                 model_new[-1,...] = rho 
-                model_new[_Index(0,0),...] = vp**2 * rho 
-                model_new[_Index(1,1),...] = vp**2 * rho 
-                model_new[_Index(2,2),...] = vp**2 * rho 
-
-                model_new[_Index(0,1),...] = vp**2 * rho - 2. * vs**2 * rho  
-                model_new[_Index(0,2),...] = vp**2 * rho - 2. * vs**2 * rho   
-
-                model_new[_Index(3,3),...] = vs**2 * rho - gc
-                model_new[_Index(4,4),...] = vs**2 * rho + gc
-                model_new[_Index(5,5),...] = vs**2 * rho
+                model_new[_Index(0,0),...] = A
+                model_new[_Index(0,1),...] = A - 2 * N  
+                model_new[_Index(0,2),...] = F
+                model_new[_Index(1,1),...] = A
+                model_new[_Index(1,2),...] = F
+                model_new[_Index(2,2),...] = C
+                model_new[_Index(3,3),...] = L - gc
                 model_new[_Index(3,4),...] = -gs
+                model_new[_Index(4,4),...] = L + gc
+                model_new[_Index(5,5),...] = N
 
         elif self._kltype == 2: # vph,vpv,vsh,vsv,rho,eta,gcp,gsp
             if not backward:
@@ -187,8 +192,7 @@ class FwatModel:
                 # copy to cijkl
                 model_new[_Index(0,0),...] = A
                 model_new[_Index(1,1),...] = A
-                model_new[_Index(2,2),...] = A
-                model_new[_Index(3,3),...] = C 
+                model_new[_Index(2,2),...] = C 
                 model_new[_Index(0,1),...] = A - 2 * N 
                 model_new[_Index(0,2),...] = F
                 model_new[_Index(1,2),...] = F

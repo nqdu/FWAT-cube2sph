@@ -62,8 +62,8 @@ class FwatPreOP:
         self.nsta = statxt.shape[0]
         self.netwk = statxt[:,1]
         self.stnm = statxt[:,0]
-        self.stla = np.float64(statxt[:,2])
-        self.stlo = np.float64(statxt[:,3])
+        self.stla = statxt[:,2].astype(float)
+        self.stlo = statxt[:,3].astype(float)
         self.bazd = np.zeros((self.nsta))
 
         # read simulation info dt,t0,npts
@@ -186,7 +186,7 @@ class FwatPreOP:
             stf = np.zeros((ncomp,npt_syn))
 
             # sum stf from all bands
-            for ib in range(self.Tmax):
+            for ib in range(len(self.Tmax)):
                 bandname = 'T%03g_T%03g' %(self.Tmin[ib],self.Tmax[ib])
                 for ic in range(self.ncomp):
                     ch = self.components[ic]
@@ -217,6 +217,8 @@ class FwatPreOP:
                         if i == myrank and myrank == 0 and ic == 0:
                             print("EGF => CCF ...")
                         tr.data = -cumtrapz1(data[:,1],dt_syn)
+                    else:
+                        tr.data = data[:,1] * 1.
                     tr.b = t0_syn
                 else:
                     print(f"{self.meatype} is not implemeted!")
@@ -242,9 +244,14 @@ class FwatPreOP:
         self.npt_obs = hd.npts 
 
     def _print_measure_info(self,bandname,tstart,tend,tr_chi,am_chi,window_chi):
+        import os 
         ncomp = tr_chi.shape[1]
         nsta_loc = self.nsta_loc
         imeas = self.pdict['IMEAS']
+
+        # create directory
+        if self.myrank == 0:
+            os.makedirs(f"{self.MISFIT}/{self.mod}",exist_ok=True)
 
         # sync
         MPI.COMM_WORLD.Barrier()
@@ -255,7 +262,7 @@ class FwatPreOP:
             if irank == self.myrank:
 
                 # open outfile
-                outfile = f"{self.MISFIT}/{self.mod}_{self.evtid}_{bandname}_{self.meatype}_window_chi"
+                outfile = f"{self.MISFIT}/{self.mod}/{self.evtid}_{bandname}_{self.meatype}_window_chi"
                 if irank == 0:
                     fio = open(outfile,"w")
                 else:
