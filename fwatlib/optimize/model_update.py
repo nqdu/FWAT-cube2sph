@@ -59,7 +59,7 @@ def main():
         # load
         f = h5py.File(filename,"r")
         direc_vp = f[str(myrank)][:]
-        direc_max0 = max(direc_max,np.max(np.abs(direc_vp)))
+        direc_max0 = max(direc_max0,np.max(np.abs(direc_vp)))
         f.close()
 
         # get num_elments
