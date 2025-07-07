@@ -145,8 +145,7 @@ if [ "$flag" == "GRAD" ]; then
   echo " Finish line search direction  here!!!" >> $logfile 
 else 
   echo "python $OPT_LIB/model_update.py $MODEL $LSDIR $FWATPARAM/FWAT.PAR.yaml $FWATPARAM/lbfgs.yaml  $NPROC"
-  python $OPT_LIB/model_update.py $MODEL $LSDIR $FWATPARAM/FWAT.PAR.yaml $FWATPARAM/lbfgs.yaml  $NPROC  >> $logfile
-
+  $MPIRUN -np $NPROC $OPT_LIB/model_update.py $MODEL $LSDIR $FWATPARAM/FWAT.PAR.yaml $FWATPARAM/lbfgs.yaml >> $logfile
 
   # generate new model database
   change_par=$FWATLIB/change_par_file.sh
