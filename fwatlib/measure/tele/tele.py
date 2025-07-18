@@ -32,6 +32,21 @@ def compute_ak135_time(evla:float,evlo:float,evdp:float,statxt,phase='P'):
 
     return t_ref
 
+def compute_ak135_time(evla:float,evlo:float,evdp:float,stla,stlo,phase='P'):
+    from obspy.taup import TauPyModel
+    
+    nsta = len(stla)
+    t_ref = np.zeros((nsta))
+
+    # create taup model
+    model = TauPyModel("ak135")
+    
+    for i in range(nsta):
+        t_ref[i] = model.get_travel_times_geo(evdp,evla,evlo,stla[i],stlo[i],[phase])[0].time
+    
+
+    return t_ref
+
 def get_average_amplitude(glob_obs,icomp):
     """
     get the average amplitude for icomp-th component 

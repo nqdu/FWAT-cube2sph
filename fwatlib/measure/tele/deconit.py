@@ -47,8 +47,9 @@ def myconvolve(a,b):
 def deconit(u, w, dt, tshift, f0,ipart=1,maxiter=120,):
     """
     Time iterative deconvolution from cps330
-    Parameters: 
-    =======================================
+
+    Parameters
+    -----------
     u: np.ndarray
         numerator, shape(npts)
     w: np.ndarray
@@ -63,8 +64,8 @@ def deconit(u, w, dt, tshift, f0,ipart=1,maxiter=120,):
     maxiter: int
         max iteration
     
-    Returns:
-    =========================================
+    Returns
+    ----------
     rf: np.ndarray
         deconvoluted array, shape(npts)
     """
@@ -115,8 +116,7 @@ def deconit(u, w, dt, tshift, f0,ipart=1,maxiter=120,):
     pft *= np.exp(-1j * np.fft.rfftfreq(nft,dt) * np.pi * 2 * tshift)
     rf = np.fft.irfft(pft)[:nt] / dt
 
-    return rf  
-
+    return rf 
 
 def _time_decon_with_filt(u,w,dt,freqmax):
     from scipy.signal import fftconvolve

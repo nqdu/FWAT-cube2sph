@@ -36,6 +36,7 @@ measure:
   sks:
     COMPS: ['R','T'] # components used 
     CH_CODE: BX   # CH_CODE
+    CAL_OBS_SI : False
     FILTER_BANDS: 
       - [10.,50.]
     TIME_WINDOW: [15.,25.] # before and after first arrival
@@ -44,12 +45,13 @@ measure:
   
   # receiver function
   rf:
-    CH_CODE: BX   # CH_CODE
+    COMPS: ['R','Z'] # components used 
+    CH_CODE: BX   # CH_CODE, obs data will be index as net.stnm.{CH_CODE}R.rf.sac
     FILTER_BANDS: 
       - [5.,50.]
     GAUSS_F0:
       - [1.0]
-    MINDERR: 0.001
+    MINERR: 0.001
     MAXIT: 150
     TIME_WINDOW: [5.,25.] # time window, before/after t= 0
     TSHIFT: 5.

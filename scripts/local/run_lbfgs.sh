@@ -46,9 +46,10 @@ SET_FWAT()
 
     #  run simulation
     if [ "$flag" == "INIT" ]; then 
-      bash $fwd > FWD_ADJ.$simu_type.$iter.txt
+      bash $fwd > LOG/FWD_ADJ.$simu_type.$iter.txt
     else
-      bash $fwd > LS.$simu_type.$iter.txt
+      bash $fwd > LOG/LS.$simu_type.$iter.txt
+    fi
   done 
 }
 
@@ -94,13 +95,13 @@ for ii in `seq 1 4`;do
     
     # sum kernels, get search direction, generate trial model 
     fwd=sbash_postproc_kl.sh
-    bash $fwd > POST.$iter.txt 
+    bash $fwd > LOG/POST.$iter.txt 
     
   elif [ $flag == "GRAD"  ];then 
     # get search direction, generate trial model 
     fwd=sbash_postproc_kl.sh
     echo "Post processing ..."
-    bash $fwd > POST.$iter.txt 
+    bash $fwd > LOG/POST.$iter.txt 
 
   else  # line search
     SET_FWAT $NJOBS $flag $mod
@@ -108,7 +109,7 @@ for ii in `seq 1 4`;do
     # check wolfe condition
     fwd=sbash_wolfe.sh
     echo "checking wolfe condition ..."
-    bash $fwd > WOLFE.$iter.txt 
+    bash $fwd > LOG/WOLFE.$iter.txt 
   fi
 done
 

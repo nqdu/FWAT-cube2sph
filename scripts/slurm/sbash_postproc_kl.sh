@@ -88,10 +88,11 @@ sigma_h=`echo $info | awk  '{print $1}'`
 sigma_v=`echo $info | awk  '{print $2}'`
 
 # smooth hess kernel if required
+GPU_MODE=`grep ^"GPU_MODE" DATA/Par_file | cut -d'=' -f2`
 if [ $PRECOND == "default" ] && [ $MODEL == "M00"  ];then 
   param=hess_kernel
   mv optimize/SUM_KERNELS_${MODEL}/*_$param.bin $LOCAL_PATH
-  $MPIRUN -np $NPROC $fksem/bin/xsmooth_sem_sph_pde 50000 25000 $param $LOCAL_PATH optimize/SUM_KERNELS_$MODEL/ .false. >> $logfile
+  $MPIRUN -np $NPROC $fksem/bin/xsmooth_sem_sph_pde 50000 25000 $param $LOCAL_PATH optimize/SUM_KERNELS_$MODEL/ $GPU_MODE >> $logfile
   \rm $LOCAL_PATH/*_$param.bin
   for i in `seq 1 $NPROC`;
   do
@@ -116,7 +117,7 @@ kl_list=`GET_DIREC_NAME`
 for param in $kl_list; 
 do 
   mv optimize/SUM_KERNELS_$MODEL/*_$param.bin $LOCAL_PATH
-  $MPIRUN -np $NPROC $fksem/bin/xsmooth_sem_sph_pde $sigma_h $sigma_v $param $LOCAL_PATH optimize/SUM_KERNELS_$MODEL/ .false. >> $logfile
+  $MPIRUN -np $NPROC $fksem/bin/xsmooth_sem_sph_pde $sigma_h $sigma_v $param $LOCAL_PATH optimize/SUM_KERNELS_$MODEL/ $GPU_MODE >> $logfile
   \rm $LOCAL_PATH/*_$param.bin
   for i in `seq 1 $NPROC`;
   do
@@ -134,8 +135,8 @@ done
 LSDIR=./optimize/MODEL_${MODEL}.ls
 mkdir -p $LSDIR
 echo " "
-echo "python $OPT_LIB/model_update.py $MODEL $LSDIR $FWATPARAM/FWAT.PAR.yaml $FWATPARAM/lbfgs.yaml  $NPROC"
-$MPIRUN -np $NPROC $OPT_LIB/model_update.py $MODEL $LSDIR $FWATPARAM/FWAT.PAR.yaml $FWATPARAM/lbfgs.yaml >> $logfile
+echo "$MPIRUN -np $NPROC python $OPT_LIB/model_update.py $MODEL $LSDIR $FWATPARAM/FWAT.PAR.yaml $FWATPARAM/lbfgs.yaml"
+$MPIRUN -np $NPROC python $OPT_LIB/model_update.py $MODEL $LSDIR $FWATPARAM/FWAT.PAR.yaml $FWATPARAM/lbfgs.yaml >> $logfile
 
 # generate new model database
 $change_par LOCAL_PATH $LSDIR DATA/Par_file
