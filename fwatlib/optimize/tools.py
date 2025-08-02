@@ -248,6 +248,10 @@ class FwatModel:
                 gsp = model_new[4,...]
                 phi = 0.5 * np.arctan2(gsp,gcp)
                 g0p = np.hypot(gsp,gcp)
+                
+                # zero out phi when g0p < 1.0e-4
+                idx = g0p < 1.0e-4
+                phi[idx] = 0.
 
                 # copy back to model_new
                 model_new[3,...] = np.float32(phi)
