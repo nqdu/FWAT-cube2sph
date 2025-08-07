@@ -9,9 +9,10 @@ download [here](https://github.com/nqdu/specfem3d-cube2sph/tree/devel)
 ```bash 
 NAME evla evlo evdp evbur
 ```
-2. create `src_rec/STATIONS_${NAME}`, the `NAME` should match the first line in `soruces.dat`.
 
-3. `FORCESOLUTION_$NAME` in `src_rec`
+2. create `src_rec/STATIONS_${NAME}_globe`, the `NAME` should match the first line in `soruces.dat`. Then convert it to `src_rec/STATIONS_${NAME}` using `utils/cube2sph/bin/write_station_file`
+
+3. `FORCESOLUTION_$NAME_globe` in `src_rec`
 ```
 FORCE 001 
 time shift:     0.0000
@@ -25,8 +26,10 @@ component dir vect source E:     0.e0
 component dir vect source N:     0.e0
 component dir vect source Z_UP:  1.e0
 ```
+Then convert it to `FORCESOLUTION_$NAME` using `utils/cube2sph/bin/write_force_solution_file`. For multi-channel noise simulation, you should provide `FORCESOLUTION_$NAME_Z`,`FORCESOLUTION_$NAME_N`,`FORCESOLUTION_$NAME_E`, and `STATIONS_${NAME}_R/T`, 
+`STATIONS_${NAME}_Z`
 
-4. `CMTSOLUTION_$NAME` in `src_rec`
+4. `CMTSOLUTION_$NAME_globe` in `src_rec`. Then convert it to `CMTSOLUTION_$NAME` using `utils/cube2sph/bin/write_cmt_solution`
 
 
 5. data should be in `fwat_data/$NAME`
@@ -35,8 +38,6 @@ component dir vect source Z_UP:  1.e0
 ```bash
 ./INSTALL slurm INSTALL_DIR
 ```
-then this package will be installed on `INSTALL_DIR`
+then the submission scripts will be installed in `INSTALL_DIR`
 
-# python packages required
-see `requirements.txt`
 

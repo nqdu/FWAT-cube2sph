@@ -30,5 +30,5 @@ target_link_libraries(libmeas PRIVATE sacio sac)
 
 install(TARGETS libmeas
   COMPONENT python
-  LIBRARY DESTINATION ${PROJECT_SOURCE_DIR}/fwatlib/measure/lib
+  LIBRARY DESTINATION ${PROJECT_SOURCE_DIR}/fwat/measure/lib
 )

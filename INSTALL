@@ -14,6 +14,7 @@ SACHOME=${HOME}/software/sac/
 
 ### STOP HERE ##########
 
+
 # check input dir
 if [[ $# -ne 2 ]]; then 
   echo "Usage: ./INSTALL.sh SUBMIT_SYSTEM(slurm/pbs/local) INSTALL_DIR"
@@ -30,24 +31,37 @@ make install -j4
 cd ..
 rm -rf build 
 
+# build python
+pip install -e .
+
 mkdir -p $INSTALL_DIR
 \cp -r scripts/module_env scripts/*.sh plots fwat_params $INSTALL_DIR/
 CDIR=`pwd`
-awk -v val="$CDIR" '{if ($0 ~ /^FWATLIB_PATH=/) print "FWATLIB_PATH="val; else print $0}' $INSTALL_DIR/parameters.sh> tmp && mv tmp $INSTALL_DIR/parameters.sh
 
+cd scripts
 if [ "$SYSTEM" == "slurm" ]; then 
-  \cp scripts/slurm/*.sh  $INSTALL_DIR/
+  cat slurm/slurm_tag_sem.sh sbash_forward.sh >  $INSTALL_DIR/sbash_forward.sh
+  cat slurm/slurm_tag_sem.sh sbash_measure.sh >  $INSTALL_DIR/sbash_measure.sh
+  cat slurm/slurm_tag_post.sh sbash_postproc_kl.sh > $INSTALL_DIR/sbash_postproc_kl.sh
+  cat slurm/slurm_tag_post.sh sbash_wolfe.sh > $INSTALL_DIR/sbash_wolfe.sh
+  \cp slurm/run_fwi.sh ../$INSTALL_DIR/
 elif [ "$SYSTEM" == "local" ]; then 
-  \cp scripts/slurm/*.sh  $INSTALL_DIR/
-  \cp scripts/local/*.sh $INSTALL_DIR/
+  echo "#!/bin/bash\n" > tmp
+  cat tmp sbash_forward.sh >  $INSTALL_DIR/sbash_forward.sh
+  cat tmp sbash_measure.sh >  $INSTALL_DIR/sbash_measure.sh
+  cat tmp sbash_postproc_kl.sh > $INSTALL_DIR/sbash_postproc_kl.sh
+  cat tmp sbash_wolfe.sh > $INSTALL_DIR/sbash_wolfe.sh
+  \rm tmp
+  \cp local/run_fwi.sh $INSTALL_DIR/
 else 
   echo "$SYSTEM is not implemented!"
   exit 1
 fi 
 
+cd ..
+
 
 chmod +x $INSTALL_DIR/*.sh 
-chmod +x fwatlib/*.sh
 
 echo " ============= " 
 echo " Install Successfully!"
