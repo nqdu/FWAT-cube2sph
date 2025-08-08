@@ -127,7 +127,7 @@ class Noise_PreOP(FwatPreOP):
                 # interp obs/syn
                 dat_inp1 = interpolate_syn(obs_tr.data,t0_obs,dt_obs,npt_obs,
                                         t0_obs + dt_inp,dt_inp,npt1_inp)
-                syn_inp = interpolate_syn(syn_tr.data,t0_syn,dt_syn,npt_syn,
+                syn_inp = interpolate_syn(syn_tr,t0_syn,dt_syn,npt_syn,
                                          t0_inp,dt_inp,npt_cut)
 
                 # compute time derivative 

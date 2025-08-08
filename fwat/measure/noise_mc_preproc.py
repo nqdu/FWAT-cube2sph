@@ -2,6 +2,29 @@ import numpy as np
 from mpi4py import MPI 
 from fwat.const import PARAM_FILE
 
+def _get_rotate_matrix(azd,bazd,rotate_src=True,rotate_sta = True):
+    from numpy import sin,cos
+    R_s = np.eye(3,3)
+    R_r = np.eye(3,3)
+
+    if rotate_src:
+        az = np.deg2rad(azd)
+        R_s = np.array([
+            [sin(az),cos(az),0],
+            [cos(az),-sin(az),0],
+            [0,0,1.]
+        ])
+
+    if rotate_sta:
+        baz = np.deg2rad(bazd)
+        R_r = np.array([
+            [-sin(baz),-cos(baz),0],
+            [-cos(baz),sin(baz),0],
+            [0.,0.,1.]
+        ])
+
+    return R_s,R_r
+
 class NoiseMC_PreOP():
     def __init__(self, measure_type:str, iter:int, evtid:str, run_opt:int):
         # import packages
@@ -32,7 +55,7 @@ class NoiseMC_PreOP():
         self.run_opt = run_opt
 
         # get source comps and receiver comps
-        self.cc_comps:list = pdict['CC_COMPS']
+        self.cc_comps:list[str] = pdict['CC_COMPS']
         self.ncomp = len(self.cc_comps)
 
         # get all synthetic directories
@@ -94,11 +117,22 @@ class NoiseMC_PreOP():
         self.t0_syn = t[0]
         self.dt_syn = t[1] - t[0]
         self.npt_syn = len(t)
-        
-        # allocate jobs for each proc 
-        # istart,iend = alloc_mpi_jobs(self.nsta,self.nprocs,self.myrank)
-        # self.nsta_loc = iend - istart + 1
-        # self._istart = istart 
+
+        # sanity check
+        self._sanity_check()
+    
+    def _sanity_check(self):
+        # make sure [RT][NE] donnot co-exist
+        scomps = [self.cc_comps[i][0] for i in range(self.ncomp)]
+        rcomps = [self.cc_comps[i][1] for i in range(self.ncomp)]
+
+        if ('N' in scomps or 'E' in scomps) and (('R' in scomps or 'T' in scomps)):
+            print("[NE] and [RT] cannot both exist in source-side CC-components")
+            exit(1)
+
+        if ('N' in rcomps or 'E' in rcomps) and (('R' in rcomps or 'T' in rcomps)):
+            print("[NE] and [RT] cannot both exist in receiver-side CC-components")
+            exit(1)
 
     def _rotate_XYZ_to_ZNE(self):
         from .cube2sph_rotate import rotate_seismo_fwd
@@ -290,10 +324,13 @@ class NoiseMC_PreOP():
         from .utils import rotate_EN_to_RT
         from .utils import alloc_mpi_jobs
 
+        # get receiver components
+        rcomp = [self.cc_comps[i][1] for i in range(self.ncomp)]
+
         # loop each synthetic directory
         for ie in range(len(self.scomp_syn)):
             need_rt_rotate = False
-            if 'R' in self.rcomp or 'T' in self.rcomp:
+            if 'R' in rcomp or 'T' in rcomp:
                 need_rt_rotate = True 
 
             # check if need rotate
@@ -334,6 +371,7 @@ class NoiseMC_PreOP():
 
         # sync
         MPI.COMM_WORLD.Barrier()
+
 
     def save_forward(self):
         import os 
@@ -422,60 +460,216 @@ class NoiseMC_PreOP():
                 tr.kstnm = sta_names[i].split('.')[1]
                 info = self.stainfo[sta_names[i]]
                 tr.stla = info[1]
-                tr.stlo = info[1]
+                tr.stlo = info[0]
 
                 # save to sac
                 filename = f"{outdir}/{code}.sac"
                 tr.write(filename)
-        # sync
+            # sync
             MPI.COMM_WORLD.Barrier()
     
     def cal_adj_source(self,ib:int):
         from obspy.io.sac import SACTrace
         from .utils import interpolate_syn,dif1
         from .utils import bandpass,alloc_mpi_jobs
+        from .utils import rotate_EN_to_RT
         from .measure import measure_adj
         import os 
 
+        # get vars
+        npt_syn = self.npt_syn
+        t0_syn = self.t0_syn
+        dt_syn = self.dt_syn
+
+        # new dt/nt for interpolate
+        dt_inp = 0.01
+        t0_inp = -10.
+        t1_inp = t0_syn + (npt_syn - 1) * dt_syn
+        npt_cut = int((t1_inp - t0_inp) / dt_inp) + 1
+
         # band name
         bandname = self._get_bandname(ib)
+        freqmin = 1. / self.Tmax[ib]
+        freqmax = 1. / self.Tmin[ib]
+
+        # group velocity window
+        vmin_list = [x[0] for x in self.pdict['GROUPVEL_WIN']]
+        vmax_list = [x[1] for x in self.pdict['GROUPVEL_WIN']]
+        imeas = self.pdict['IMEAS']
 
         # log
         if self.myrank == 0:
             print(f"preprocessing for band {bandname} ...")
+            for ie in range(len(self.scomp_syn)):
+                outdir = f"{self.syndirs[ie]}/OUTPUT_FILES/{bandname}"
+                os.makedirs(outdir,exist_ok=True)
+        MPI.COMM_WORLD.Barrier()
 
-        # loop each source component
-        for ie in range(len(self.scomp)):
-            chs = self.scomp[ie]
-            
-            # make dir
-            outdir = f"{self.DATA_DIR}/{self.evtid}_{self.scomp[ie]}"
-            os.makedirs(outdir,exist_ok=True)
+        # allocate jobs
+        sta_names_all = sorted(self.stainfo.keys())
+        nsta = len(sta_names_all)
+        istart,iend = alloc_mpi_jobs(nsta,self.nprocs,self.myrank)
+        nsta_loc = iend - istart 
 
-            # load stations
-            statxt = np.loadtxt(f"{self.SRC_REC}/STATIONS_{self.evtid}_{chs}_globe",dtype=str,ndmin=2)
-            sta_names = [statxt[i,1] + "." + statxt[i,0] for i in range(statxt.shape[0])]
+        # misfits
+        ncomp = self.ncomp
+        tstart = np.zeros((nsta_loc))
+        tend = np.zeros((nsta_loc))
+        win_chi = np.zeros((nsta_loc,ncomp,20))
+        tr_chi = np.zeros((nsta_loc,ncomp))
+        am_chi = np.zeros((nsta_loc,ncomp))
 
-            # allocate jobs
-            istart,iend = alloc_mpi_jobs(len(sta_names),self.nprocs,self.myrank)
-            nsta_loc = iend - istart
+        # components to read
+        rcomp = [self.cc_comps[i][1] for i in range(self.ncomp)]
+        if 'R' in rcomp or 'T' in rcomp:
+            rcomp = ['R','T','Z']
+        else:
+            rcomp = ['E','N','Z']
+        scomp = [self.cc_comps[i][0] for i in range(self.ncomp)]
+        if 'R' in scomp or 'T' in scomp:
+            scomp = ['R','T','Z']
+        else:
+            scomp = ['E','N','Z']
 
-            # misfits
-            ncomp = len(self.rcomp)
-            tstart = np.zeros((nsta_loc))
-            tend = np.zeros((nsta_loc))
-            win_chi = np.zeros((nsta_loc,ncomp,20))
-            tr_chi = np.zeros((nsta_loc,ncomp))
-            am_chi = np.zeros((nsta_loc,ncomp))
-            # loop each station
+        # load station names for each source comp
+        sta_names_comps = []
+        for ic in range(3):
+            filename = f"{self.SRC_REC}/STATIONS_{self.evtid}_{scomp[ic]}_globe"
+            if os.path.exists(filename):
+                # load stations
+                statxt = np.loadtxt(filename,dtype=str,ndmin=2)
+                sta_names = set([statxt[i,1] + "." + statxt[i,0] for i in range(statxt.shape[0])])
+            else:
+                sta_names = set()
+            sta_names_comps.append(sta_names)
+        
+        # loop each station
+        for ir in range(nsta_loc):
+            i = ir + istart 
 
+            # allocate space for adjoint source
+            adj_src_all = np.zeros((3,3,npt_syn))
 
-            for i in range(istart,iend+1):
-                for ic in range(len(self.scomp)):
-                    ch = self.rcomp[ic]
+            # loop each CC-component
+            for ic in range(self.ncomp):
+                chs = self.cc_comps[ic][0]
+                chr = self.cc_comps[ic][1]
+                i_s = scomp.index(chs)
+                i_r = rcomp.index(chr)
 
-                    # get station code
-                    code = f"{sta_names[i]}.{self.chcode}{ch}"
+                # check if this station exists in this source component
+                if sta_names_all[i] not in sta_names_comps[i_s]:
+                    continue
+
+                # load obs_data
+                code = f"{sta_names_all[i]}.{self.chcode}{chr}"
+                obs_tr = SACTrace.read(f"{self.DATA_DIR}/{self.evtid}_{chs}/{code}.sac")
+                t0_obs = obs_tr.b 
+                dt_obs = obs_tr.delta 
+                npt_obs = obs_tr.npts
+                npt1_inp = int((npt_obs - 1) * dt_obs / dt_inp)
+                dist = obs_tr.dist 
+
+                # load synthetic data
+                if chs in ['N','E','Z']:
+                    filename = f"{self.syndirs[ic]}/OUTPUT_FILES/{code}.sem.npy"
+                    syn_tr = np.load(filename)[:,1]
+                else: # chs is in ['R','T']
+                    # load E/N data
+                    data = np.zeros((2,npt_syn))
+                    for ic0,ch0 in enumerate(['N','E']):
+                        code0 = f"{sta_names[i]}.{self.chcode}{ch0}"
+                        syndir = f"{self.SOLVER}/{self.mod}/{self.evtid}_{ch0}/"
+                        filename = f"{syndir}/OUTPUT_FILES/{code0}.sem.npy"
+                        data[ic0,:] = np.load(filename)[:,1]
+                    
+                    # rotation
+                    az = self.stainfo[sta_names[i]][2]
+                    ve = data[0,:]
+                    vn = data[1,:]
+                    vr,vt = rotate_EN_to_RT(ve,vn,az)
+                    vr = -vr 
+                    vt = -vt 
+
+                    # choose components
+                    if chs == 'R':
+                        syn_tr = vr * 1. 
+                    else:
+                        syn_tr = vt * 1.
+
+                # interp obs/syn
+                dat_inp1 = interpolate_syn(obs_tr.data,t0_obs,dt_obs,npt_obs,
+                                        t0_obs + dt_inp,dt_inp,npt1_inp)
+                syn_inp = interpolate_syn(syn_tr,t0_syn,dt_syn,npt_syn,
+                                         t0_inp,dt_inp,npt_cut)
+
+                # compute time derivative 
+                if self.pdict['USE_EGF'] == False:
+                    dat_inp1 = -dif1(dat_inp1,dt_inp)
+                    if self.myrank == 0: print("CCFs => EGFs ...")
+                
+                
+                # cut 
+                dat_inp = interpolate_syn(dat_inp1,t0_obs + dt_inp,dt_inp,npt1_inp,
+                                         t0_inp,dt_inp,npt_cut)
+
+                # preprocess
+                dat_inp = bandpass(dat_inp,dt_inp,freqmin,freqmax)
+                syn_inp = bandpass(syn_inp,dt_inp,freqmin,freqmax)
+        
+                # normalize my amplitude of the window
+                dist = obs_tr.dist
+                win_b = np.floor((dist / vmax_list[ib] - self.Tmax[ib] / 2. + t0_inp) / dt_inp)
+                win_e = np.floor((dist / vmin_list[ib] + self.Tmax[ib] / 2. - t0_inp) / dt_inp)
+                win_b = int(max(win_b,0))
+                win_e = int(min(win_e,len(dat_inp)-1))
+                dat_inp *= np.max(np.abs(syn_inp[win_b:win_e])) / np.max(np.abs(dat_inp[win_b:win_e]))
+
+                # compute time window
+                tstart[ir] = dist / vmax_list[ib] - self.Tmax[ib] * 0.5 
+                tend[ir] = dist / vmin_list[ib] + self.Tmax[ib] * 0.5 
+                tstart[ir] = max(tstart[ir],t0_inp)
+                tend[ir] = min(tend[ir],t0_obs+(npt_obs-1)*dt_obs)
+
+                # compute misfits and adjoint source
+                verbose = (self.myrank == 0) and (ir == 0)
+                tr_chi[ir,ic],am_chi[ir,ic],win_chi[ir,ic,:],adjsrc =   \
+                    measure_adj(t0_inp,dt_inp,npt_cut,t0_syn,dt_syn,npt_syn,
+                                tstart[ir],tend[ir],imeas,self.Tmax[ib]*1.01,
+                                self.Tmin[ib]*0.99,verbose,dat_inp,
+                                syn_inp)
+
+                # save adjoint source to adj_src_all
+                adj_src_all[i_s,i_r,:] = adjsrc.copy()
+
+                # save obs and syn data as sac
+                outdir = f"{self.syndirs[i_s]}/OUTPUT_FILES/{bandname}"
+                obs_tr.delta = dt_inp 
+                obs_tr.b = t0_inp 
+                obs_tr.data = dat_inp 
+                obs_tr.write(f"{outdir}/{code}.sac.obs")
+                obs_tr.data = syn_inp
+                obs_tr.write(f"{outdir}/{code}.sac.syn")
+
+        # rotate adjoint source to ENZ-ENZ
+        azd,bazd = self.stainfo[sta_names_all[i]]
+        rotate_src = (scomp == ['R','T','Z'])
+        rotate_sta = (rcomp == ['R','T','Z'])
+        R_s,R_r = _get_rotate_matrix(azd,bazd,rotate_src=rotate_src,rotate_sta=rotate_sta)
+        adj_src_all = np.einsum("ip,jq,pqk-> ijk",R_s,R_r,adj_src_all)
+
+        # save adjoint source
+        data = np.zeros((npt_syn,2))
+        data[:,0] = t0_syn + np.arange(npt_syn) * dt_syn
+        for ic in range(len(self.scomp_syn)):
+            for ic1 in range(len(self.scomp_syn)):
+                code = f"{sta_names_all[i]}.{self.chcode}{self.scomp_syn[ic1]}"
+                filename = f"{self.syndirs[ic]}/OUTPUT_FILES/{bandname}/{code}.adj.sem.npy"
+                data[:,1] = adj_src_all[ic,ic1,:]
+                np.save(filename,data)
+
+        # print measure_adj information
+
 
     def execute(self):
         # rotate seismograms from XYZ to ZNE
@@ -488,4 +682,8 @@ class NoiseMC_PreOP():
         if self.run_opt == 1:
             self.save_forward()
             return 0
-        
+    
+        # loop each frequency band to compute misfit/adjoint source 
+        for ib in range(len(self.Tmax)):
+            self.cal_adj_source(ib)
+            MPI.COMM_WORLD.Barrier()

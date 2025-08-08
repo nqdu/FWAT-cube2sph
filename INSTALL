@@ -10,7 +10,7 @@ CXX="g++"
 # F90="ifort"
 
 # SAC HOME
-SACHOME=${HOME}/software/sac/
+SACHOME=${HOME}/software/seismology/sac/
 
 ### STOP HERE ##########
 
