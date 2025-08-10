@@ -76,7 +76,6 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#source-and-stations">Source and Stations</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#create-the-src-rec-directory-and-source-files">Create the <code class="docutils literal notranslate"><span class="pre">src_rec</span></code> Directory and Source Files</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#id2">Create the <code class="docutils literal notranslate"><span class="pre">src_rec</span></code> Directory and Source Files</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#create-the-station-file">Create the Station File</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#create-the-force-solution-file">Create the Force Solution File</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#create-the-cmt-solution-file">Create the CMT Solution File</a></li>
@@ -126,7 +125,6 @@
 <p>Here is a template of <code class="docutils literal notranslate"><span class="pre">fwat.yaml</span></code>:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># FWAT Package parameters</span>
 <span class="nt">simulation</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">GPU_MODE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">True</span><span class="w"> </span>
 <span class="w">  </span><span class="nt">DUMP_WAVEFIELDS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">True</span>
 
 <span class="c1"># Measurements block, for computing adjoint source</span>
@@ -210,7 +208,6 @@
 <h3>Simulation block<a class="headerlink" href="#simulation-block" title="Link to this heading"></a></h3>
 <p>This block contains parameters for forward/adjoint simulation.</p>
 <ul class="simple">
-<li><p><strong><code class="docutils literal notranslate"><span class="pre">GPU_MODE</span></code></strong> – If set to <code class="docutils literal notranslate"><span class="pre">true</span></code>, enables the <code class="docutils literal notranslate"><span class="pre">GPU_MODE</span></code> option in SPECFEM3D’s <code class="docutils literal notranslate"><span class="pre">Par_file</span></code>.</p></li>
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">DUMP_WAVEFIELDS</span></code></strong> – If set to <code class="docutils literal notranslate"><span class="pre">true</span></code>, enables the <code class="docutils literal notranslate"><span class="pre">SUBSAMPLE_FORWARD_WAVEFIELD</span></code> option in <code class="docutils literal notranslate"><span class="pre">Par_file</span></code>. In this mode, the full wavefield from the forward simulation is saved and later read back during the adjoint simulation.</p></li>
 </ul>
 </section>
@@ -414,8 +411,6 @@ Example: <code class="docutils literal notranslate"><span class="pre">1.0e-4</sp
 Example: <code class="docutils literal notranslate"><span class="pre">0.9</span></code></p></li>
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">FACTOR</span></code></strong> – Bracketing parameter (Gilbert’s value).<br />
 Example: <code class="docutils literal notranslate"><span class="pre">10</span></code></p></li>
-<li><p><strong><code class="docutils literal notranslate"><span class="pre">MAXLS</span></code></strong> – Maximum number of line search iterations.<br />
-Example: <code class="docutils literal notranslate"><span class="pre">100</span></code></p></li>
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">alpha_L</span></code></strong> – Left bound for step size.</p></li>
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">alpha_R</span></code></strong> – Right bound for step size.</p></li>
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">alpha</span></code></strong> – Current step size. For first iteration it wil be <code class="docutils literal notranslate"><span class="pre">-1.</span></code>, then it will be automatically tuned.</p></li>
@@ -494,11 +489,6 @@ Edit these functions to match your working environment, for example, by adding G
 <p>This section describes the setup process for source and station files.</p>
 <section id="create-the-src-rec-directory-and-source-files">
 <h3>Create the <code class="docutils literal notranslate"><span class="pre">src_rec</span></code> Directory and Source Files<a class="headerlink" href="#create-the-src-rec-directory-and-source-files" title="Link to this heading"></a></h3>
-<p>Create a directory named <code class="docutils literal notranslate"><span class="pre">src_rec</span></code> and add source definition files named <code class="docutils literal notranslate"><span class="pre">src_rec/sources.dat.*</span></code><br />
-(for example, <code class="docutils literal notranslate"><span class="pre">src_rec/sources.dat.noise</span></code>).</p>
-</section>
-<section id="id2">
-<h3>Create the <code class="docutils literal notranslate"><span class="pre">src_rec</span></code> Directory and Source Files<a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
 <p>Create a directory named <code class="docutils literal notranslate"><span class="pre">src_rec</span></code> and add source definition files named <code class="docutils literal notranslate"><span class="pre">src_rec/sources.dat.*</span></code><br />
 (for example, <code class="docutils literal notranslate"><span class="pre">src_rec/sources.dat.noise</span></code>).</p>
 <p>The file format is as follows:</p>
