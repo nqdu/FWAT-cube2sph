@@ -1,7 +1,0 @@
-numpy>=1.20
-scipy>=1.7.0
-mpi4py
-h5py
-obspy>=1.4.0
-numba
-pybind11-global

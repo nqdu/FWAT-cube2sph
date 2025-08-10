@@ -1,4 +1,0 @@
-[console_scripts]
-fwat-main = fwat.scripts.cli:main
-fwat-model = fwat.scripts.model:main
-fwat-utils = fwat.scripts.utils:main
