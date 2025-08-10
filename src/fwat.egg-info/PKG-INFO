@@ -1,0 +1,17 @@
+Metadata-Version: 2.4
+Name: fwat
+Version: 0.7.0
+Summary: A CLI for fwat program
+Author-email: Nanqiao Du <nanqiao.du@email.com>
+License: MIT
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: numpy>=1.20
+Requires-Dist: scipy>=1.7.0
+Requires-Dist: mpi4py
+Requires-Dist: h5py
+Requires-Dist: obspy>=1.4.0
+Requires-Dist: numba
+Requires-Dist: pybind11-global
+Dynamic: license-file

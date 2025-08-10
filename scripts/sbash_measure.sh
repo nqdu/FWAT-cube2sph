@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # script runs mesher,database generation and solver
 # using this example setup 
 #
@@ -11,9 +9,7 @@ source module_env
 set -e 
 
 #==== Comment out the following if running SEM mesh with new models====#
-simu_type=noise
-NJOBS=8
-LOCAL_PC=0
+simu_type=$1
 
 #### STOP HERE #### #
 NPROC=`grep ^"NPROC" DATA/Par_file.$simu_type | cut -d'=' -f2`
@@ -29,8 +25,20 @@ work_dir=`pwd`
 
 # assign job id
 TASK_ID=1
-if [ "$LOCAL_PC" == "0" ]; then
+if [ "$PLATFORM"  == "slurm" ];  then 
   TASK_ID=$SLURM_ARRAY_TASK_ID
+  for i in "${!SIMU_TYPES[@]}"; do
+    if [[ "${SIMU_TYPES[$i]}" == "$simu_type" ]]; then
+      NJOBS=${NJOBS_PER_JOBARRAY[$i]}
+      break
+    fi
+  done
+elif [ "$PLATFORM"  == "local" ]; then
+  TASK_ID=1
+  NJOBS=$nevts
+else 
+  echo "not implemented!"
+  exit 1
 fi
 
 #logfile
@@ -56,29 +64,36 @@ for i in `seq 1 $NJOBS`; do
 
   # get evtid
   evtid=`sed -n "$ievt"p $SOURCE_FILE |awk '{print $1}'`
-  echo " "
-  echo "copying params for $simu_type evtid = $evtid"  
 
   # prepare files
   fwat-main prepare forward $simu_type $iter $evtid $run_opt
 
   # run forward simulation
-  evtdir=solver/$MODEL/$evtid
-  cd $evtdir/
-  echo ""
-  echo "forward simulation ..."
-  date
-  $MPIRUN -np $NPROC $SEM_PATH/bin/xspecfem3D
-  date
+  evtlist=`cat LOG/.$simu_type-$iter-$evtid-$run_opt`
+  \rm LOG/.$simu_type-$iter-$evtid-$run_opt
 
-  # merge all seismograms to one big file
-  echo "packing seismograms ..."
-  fwat-main pack OUTPUT_FILES/seismograms.h5 OUTPUT_FILES/all_seismograms.ascii
-  \rm -rf OUTPUT_FILES/all_seismograms.ascii
+  # run forward simulation
+  for evtid_wk in $evtlist;
+  do 
+    evtdir=solver/$MODEL/$evtid_wk
+    cd $evtdir/
+    echo ""
+    echo "forward simulation for $evtid_wk ..."
+    date
+    $MPIRUN -np $NPROC $SEM_PATH/bin/xspecfem3D
+    date
+
+    # merge all seismograms to one big file
+    echo " "
+    echo "packing seismograms for $evtid_wk ..."
+    fwat-main pack OUTPUT_FILES/seismograms.h5 OUTPUT_FILES/all_seismograms.ascii
+    \rm -rf OUTPUT_FILES/all_seismograms.ascii
+    cd $work_dir
+  done 
 
   # run measure
   echo ""
-  echo "measure adjoint source ..."
+  echo "measure adjoint source for $evtid ..."
   cd $work_dir
   date
   $MPIRUN -np $NPROC fwat-main measure $simu_type $iter $evtid $run_opt >> $fwd 
@@ -86,27 +101,33 @@ for i in `seq 1 $NJOBS`; do
 
   # adjoint simulation
   fwat-main prepare adjoint $simu_type $iter $evtid $run_opt
-  cd $evtdir/
-  echo ""
-  echo "adjoint simulation ..."
-  date
-  $MPIRUN -np $NPROC $SEM_PATH/bin/xspecfem3D
-  date
+  for evtid_wk in $evtlist;
+  do 
+    evtdir=solver/$MODEL/$evtid_wk
+    cd $evtdir/
+    echo ""
+    echo "adjoint simulation for $evtid_wk ..."
+    date
+    $MPIRUN -np $NPROC $SEM_PATH/bin/xspecfem3D
+    date
+    echo " "
+    cd $work_dir
 
-  cd $work_dir
-  mkdir -p $evtdir/GRADIENT
-  \rm -rf $evtdir/GRADIENT/*
-  mv $evtdir/DATABASES_MPI/*_kernel.bin $evtdir/GRADIENT
-  grad_list=`fwat-model name grad`
-  for grad in $grad_list hess_kernel;
-  do
-    echo "combine $NPROC $grad to hdf5 ..." 
-    fwat-main bin2h5 $evtdir/GRADIENT $grad $NPROC 1
-  done 
-  \rm $evtdir/GRADIENT/*.bin
+    # combine kernels
+    mkdir -p $evtdir/GRADIENT
+    \rm -rf $evtdir/GRADIENT/*
+    mv $evtdir/DATABASES_MPI/*_kernel.bin $evtdir/GRADIENT
+    grad_list=`fwat-model name grad`
+    for grad in $grad_list hess_kernel;
+    do
+      echo "combine $NPROC $grad to hdf5 ..." 
+      fwat-main bin2h5 $evtdir/GRADIENT $grad $NPROC 1
+    done 
+    \rm $evtdir/GRADIENT/*.bin
 
-  # delete useless information
-  fwat-utils clean $MODEL $evtid 
+    # delete useless information
+    fwat-utils clean $MODEL $evtid_wk 
+  done
 
   # print flags
   echo " " >> $fwd 

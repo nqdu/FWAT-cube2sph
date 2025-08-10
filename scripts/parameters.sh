@@ -1,16 +1,15 @@
-#!bin/bash 
+#!bin/bash
 
 # binary/python file location
-SEM_PATH=${HOME}/code/c_fortran/specfem3d-cube2sph/    # solver location
+SEM_PATH=~/specfem3d-cube2sph  # solver location
+MPIRUN=mpirun
+
+PLATFORM="local" # local or slurm
 
 # simulation types
 SIMU_TYPES=("noise")
 SIMU_TYPES_USER_WEIGHT=(1. 1.)
 NJOBS_PER_JOBARRAY=(1 1)
-
-# mpirun command 
-# use mpirun -oversubscribe if hyper-threading are enabled
-MPIRUN="mpirun"
 
 ############## STOP HERE ###################
 

@@ -143,7 +143,7 @@ else
   change_par SAVE_MESH_FILES .false. DATA/Par_file
 
   # copy info to new 
-  LOCAL_PATH=./DATABASES_MPI
+  LOCAL_PATH=./optimize/MODEL_${MODEL}
   echo -e ".false.\n.true." > adepml_stage
   \cp  $LOCAL_PATH/*Database $LSDIR/
   \cp  $LOCAL_PATH/*adepml* $LSDIR/

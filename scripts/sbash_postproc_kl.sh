@@ -69,7 +69,7 @@ if [ $FLAG != "GRAD" ]; then
 fi 
 
 # set smoothing parameters
-LOCAL_PATH=./DATABASES_MPI
+LOCAL_PATH=./optimize/MODEL_${MODEL}
 change_par LOCAL_PATH $LOCAL_PATH ./DATA/Par_file
 change_par LOCAL_PATH $LOCAL_PATH ./DATA/meshfem3D_files/Mesh_Par_file
 info=`fwat-utils getparam optimize/SMOOTHING  | sed 's/\[\|]//g' | sed 's/,/ /g'`

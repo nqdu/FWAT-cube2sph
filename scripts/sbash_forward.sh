@@ -8,13 +8,13 @@ source module_env
 # error flag
 set -e 
 
-#==== Comment out the following if running SEM mesh with new models====#
-simu_type=noise
-NJOBS=8
-LOCAL_PC=0
+if [ "$#" -ne 1 ]; then
+    echo "Usage: $0 sbash_forward simu_type"
+    exit 1
+fi
+simu_type=$1
 
-#### STOP HERE #### #
-
+# params
 NPROC=`grep ^"NPROC" DATA/Par_file.$simu_type | cut -d'=' -f2`
 SOURCE_FILE=src_rec/sources.dat.$simu_type
 iter=`fwat-utils getparam iter fwat_params/lbfgs.yaml`
@@ -28,8 +28,20 @@ work_dir=`pwd`
 
 # assign job id
 TASK_ID=1
-if [ "$LOCAL_PC" == "0" ]; then
+if [ "$PLATFORM"  == "slurm" ];  then 
   TASK_ID=$SLURM_ARRAY_TASK_ID
+  for i in "${!SIMU_TYPES[@]}"; do
+    if [[ "${SIMU_TYPES[$i]}" == "$simu_type" ]]; then
+      NJOBS=${NJOBS_PER_JOBARRAY[$i]}
+      break
+    fi
+  done
+elif [ "$PLATFORM"  == "local" ]; then
+  TASK_ID=1
+  NJOBS=$nevts
+else 
+  echo "not implemented!"
+  exit 1
 fi
 
 #logfile
@@ -48,36 +60,46 @@ for i in `seq 1 $NJOBS`; do
 
   # get evtid
   evtid=`sed -n "$ievt"p $SOURCE_FILE |awk '{print $1}'`
-  echo " "
-  echo "copying params for $simu_type evtid = $evtid"  
 
   # prepare files
-  fwat-main prepare forward $simu_type $iter $evtid 1
+  run_opt=1
+  fwat-main prepare forward $simu_type $iter $evtid $run_opt
 
   # run forward simulation
-  evtdir=solver/$MODEL/$evtid
-  cd $evtdir/
-  echo ""
-  echo "forward simulation ..."
-  date
-  $MPIRUN -np $NPROC $SEM_PATH/bin/xspecfem3D
-  date
+  evtlist=`cat LOG/.$simu_type-$iter-$evtid-$run_opt`
+  \rm LOG/.$simu_type-$iter-$evtid-$run_opt
 
-  # merge all seismograms to one big file
-  echo "packing seismograms ..."
-  fwat-main pack OUTPUT_FILES/seismograms.h5 OUTPUT_FILES/all_seismograms.ascii
-  \rm -rf OUTPUT_FILES/all_seismograms.ascii
+  # run forward simulation
+  for evtid_wk in $evtlist;
+  do 
+    evtdir=solver/$MODEL/$evtid_wk
+    cd $evtdir/
+    echo ""
+    echo "forward simulation for $evtid_wk ..."
+    date
+    $MPIRUN -np $NPROC $SEM_PATH/bin/xspecfem3D
+    date
+
+    # merge all seismograms to one big file
+    echo "packing seismograms for $evtid_wk ..."
+    fwat-main pack OUTPUT_FILES/seismograms.h5 OUTPUT_FILES/all_seismograms.ascii
+    \rm -rf OUTPUT_FILES/all_seismograms.ascii
+    cd $work_dir
+  done 
 
   # run measure
   echo ""
-  echo "saving forward seismograms ..."
+  echo "saving forward seismograms for $evtid ..."
   cd $work_dir
   date
   $MPIRUN -np $NPROC fwat-main measure $simu_type $iter $evtid 1 >> $fwd 
   date
 
   # delete useless information
-  fwat-utils clean $MODEL $evtid 
+  for evtid_wk in $evtlist;
+  do
+    fwat-utils clean $MODEL $evtid_wk 
+  done  
 
   # print flags
   echo " " >> $fwd 

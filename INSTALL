@@ -10,18 +10,17 @@ CXX="g++"
 # F90="ifort"
 
 # SAC HOME
-SACHOME=${HOME}/software/seismology/sac/
+SACHOME=${HOME}/software//sac/
 
 ### STOP HERE ##########
 
 
 # check input dir
-if [[ $# -ne 2 ]]; then 
-  echo "Usage: ./INSTALL.sh SUBMIT_SYSTEM(slurm/pbs/local) INSTALL_DIR"
+if [[ $# -ne 1 ]]; then 
+  echo "Usage: ./INSTALL.sh INSTALL_DIR"
   exit 1
 fi
-SYSTEM=$1
-INSTALL_DIR=$2
+INSTALL_DIR=$1
 
 # compile measure_adj
 mkdir -p build
@@ -37,29 +36,6 @@ pip install -e .
 mkdir -p $INSTALL_DIR
 \cp -r scripts/module_env scripts/*.sh plots fwat_params $INSTALL_DIR/
 CDIR=`pwd`
-
-cd scripts
-if [ "$SYSTEM" == "slurm" ]; then 
-  cat slurm/slurm_tag_sem.sh sbash_forward.sh >  $INSTALL_DIR/sbash_forward.sh
-  cat slurm/slurm_tag_sem.sh sbash_measure.sh >  $INSTALL_DIR/sbash_measure.sh
-  cat slurm/slurm_tag_post.sh sbash_postproc_kl.sh > $INSTALL_DIR/sbash_postproc_kl.sh
-  cat slurm/slurm_tag_post.sh sbash_wolfe.sh > $INSTALL_DIR/sbash_wolfe.sh
-  \cp slurm/run_fwi.sh ../$INSTALL_DIR/
-elif [ "$SYSTEM" == "local" ]; then 
-  echo "#!/bin/bash\n" > tmp
-  cat tmp sbash_forward.sh >  $INSTALL_DIR/sbash_forward.sh
-  cat tmp sbash_measure.sh >  $INSTALL_DIR/sbash_measure.sh
-  cat tmp sbash_postproc_kl.sh > $INSTALL_DIR/sbash_postproc_kl.sh
-  cat tmp sbash_wolfe.sh > $INSTALL_DIR/sbash_wolfe.sh
-  \rm tmp
-  \cp local/run_fwi.sh $INSTALL_DIR/
-else 
-  echo "$SYSTEM is not implemented!"
-  exit 1
-fi 
-
-cd ..
-
 
 chmod +x $INSTALL_DIR/*.sh 
 
