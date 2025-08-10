@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fwat"
+version = "0.7.0"
+description = "A CLI for fwat program"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [{name = "Nanqiao Du", email = "nanqiao.du@email.com"}]
+dependencies = [
+    "numpy >=1.20",
+    "scipy >= 1.7.0",
+    "mpi4py",
+    "h5py",
+    "obspy >=1.4.0",
+    "numba",
+    "pybind11-global"
+]
+
+[project.scripts]
+fwat-main = "fwat.scripts.cli:main"
+fwat-model = "fwat.scripts.model:main"
+fwat-utils = "fwat.scripts.utils:main"
+
+[tool.setuptools.packages.find]
+where = ["src/"]

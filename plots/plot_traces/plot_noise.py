@@ -4,6 +4,7 @@ import sys
 import os
 from multiprocessing import Pool
 
+from fwat.const import PARAM_FILE
 
 import matplotlib as mpl
 mpl.rcParams['lines.linewidth'] = 0.5
@@ -133,12 +134,14 @@ def main():
         exit(1)
     
     # set directory
-    solver="../../solver/"
-    seisdir="seismograms_noise/"
-    sourcelist="../../src_rec/sources.dat.noise"
-    paramfile = "../../fwat_params/FWAT.PAR.yaml"
+    path = "../"
 
     #### stop here
+
+    solver=f"{path}/solver/"
+    seisdir="seismograms_noise/"
+    sourcelist=f"{path}src_rec/sources.dat.noise"
+    paramfile = f"{path}/{PARAM_FILE}"
 
     # read model name
     M1 = sys.argv[1]

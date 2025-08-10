@@ -1,37 +1,29 @@
-#!bin/bash 
+#!bin/bash
 
 # binary/python file location
-fksem='/home/l/liuqy/nqdu//specfem3d-cube2sph/'    # solver location
-FWATLIB_PATH=`pwd`
+SEM_PATH=~/specfem3d-cube2sph  # solver location
+MPIRUN=mpirun
+
+PLATFORM="local" # local or slurm
 
 # simulation types
-SIMU_TYPES=("tele" "noise")
+SIMU_TYPES=("noise")
 SIMU_TYPES_USER_WEIGHT=(1. 1.)
-
-# mpirun command 
-# use mpirun -oversubscribe if hyper-threading are enabled
-MPIRUN="mpirun"
+NJOBS_PER_JOBARRAY=(1 1)
 
 ############## STOP HERE ###################
-FWATPARAM=`pwd`/fwat_params
-FWATLIB=$FWATLIB_PATH/fwatlib    # fwatlib location
-MEASURE_LIB=$FWATLIB/measure 
-OPT_LIB=$FWATLIB/optimize
 
-GET_GRAD_NAME(){
-    local PFILE="$FWATPARAM/FWAT.PAR.yaml"
-    local grad_list=`cd $OPT_LIB; python -c "from tools import FwatModel; m = FwatModel('$PFILE'); print(' '.join(m.get_grad_names()))"`
-    echo $grad_list
-}
+change_par() 
+{
+  # get input args
+  local param=$1
+  local value=$2
+  local file=$3
 
-GET_DIREC_NAME(){
-    local PFILE="$FWATPARAM/FWAT.PAR.yaml"
-    local grad_list=`cd $OPT_LIB; python -c "from tools import FwatModel; m = FwatModel('$PFILE'); print(' '.join(m.get_direc_names()))"`
-    echo $grad_list
-}
+  # locate parameter
+  oldstr=`grep "^$param " $file`
+  newstr="$param           =     $value"
 
-GET_MODEL_NAME(){
-    local PFILE="$FWATPARAM/FWAT.PAR.yaml"
-    local grad_list=`cd $OPT_LIB; python -c "from tools import FwatModel; m = FwatModel('$PFILE'); print(' '.join(m.get_model_names()))"`
-    echo $grad_list
+  sed  "s?$oldstr?$newstr?g" $file  > $file.temporary
+  mv $file.temporary $file
 }

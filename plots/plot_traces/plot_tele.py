@@ -155,9 +155,7 @@ def main():
         exit(1)
     
     # set directory
-    solver="../../solver/"
-    seisdir="seismograms_comp/"
-    sourcelist="../../src_rec/sources.dat.tele"
+    path = "../"
 
     # ploting window
     twb=5
@@ -168,6 +166,10 @@ def main():
 
     #### stop here 
     
+    solver=f"{path}/solver/"
+    seisdir="seismograms_comp/"
+    sourcelist=f"{path}/src_rec/sources.dat.tele"
+
     # create directory
     os.makedirs(seisdir,exist_ok=True)
 

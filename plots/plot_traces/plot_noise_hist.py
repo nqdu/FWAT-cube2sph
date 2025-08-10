@@ -21,9 +21,11 @@ def main():
         exit(1)
     
     # set directory
+    from fwat.const import PARAM_FILE
+    path = "../.."
     seisdir= "noise_hist/"
-    misfits = "../../misfits"
-    paramfile = "../../fwat_params/FWAT.PAR.yaml"
+    misfits = f"{path}/misfits"
+    paramfile = f"{path}/{PARAM_FILE}"
 
     #### stop here
 

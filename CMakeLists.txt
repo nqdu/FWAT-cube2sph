@@ -14,11 +14,11 @@ set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
 project(measure_adj LANGUAGES CXX Fortran)
-file (GLOB SOURCE "${PROJECT_SOURCE_DIR}/src/*.f90")
+file (GLOB SOURCE "${PROJECT_SOURCE_DIR}/3rd_party/measure_adj/*.f90")
 
 #find_package(Python3 COMPONENTS Interpreter Development)
 find_package(pybind11 CONFIG REQUIRED)
-pybind11_add_module(libmeas src/main.cpp ${SOURCE})
+pybind11_add_module(libmeas 3rd_party/measure_adj/main.cpp ${SOURCE})
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "IntelLLVM")
   message(STATUS "Using Intel oneAPI compiler (icx/icpx)")
@@ -30,5 +30,5 @@ target_link_libraries(libmeas PRIVATE sacio sac)
 
 install(TARGETS libmeas
   COMPONENT python
-  LIBRARY DESTINATION ${PROJECT_SOURCE_DIR}/fwatlib/measure/lib
+  LIBRARY DESTINATION ${PROJECT_SOURCE_DIR}/src/fwat/measure/lib
 )
