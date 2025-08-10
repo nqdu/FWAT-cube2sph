@@ -1,0 +1,627 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tutorial &mdash; FWAT  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="prev" title="Introduction" href="install.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            FWAT
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="install.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="install.html#installation">Installation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Tutorial</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#fwat-parameter-files">FWAT Parameter files</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#simulation-block">Simulation block</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#measurement-block">Measurement block</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#teleseismic-waveform-inversion-tele">Teleseismic Waveform Inversion (<code class="docutils literal notranslate"><span class="pre">tele</span></code>)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#multi-channel-ambient-noise-noise">Multi-channel Ambient Noise (<code class="docutils literal notranslate"><span class="pre">noise</span></code>)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sks-si-splitting-fwi-sks">SKS SI-Splitting FWI (<code class="docutils literal notranslate"><span class="pre">sks</span></code>)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#receiver-functions-rf">Receiver Functions (<code class="docutils literal notranslate"><span class="pre">rf</span></code>)</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#optimization-block">Optimization block</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#general-optimization-settings">General Optimization Settings</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#model-and-kernel-settings">Model and Kernel Settings</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#lbfgs-file">LBFGS file</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#general-settings">General Settings</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#iteration-flag-flag">Iteration Flag (<code class="docutils literal notranslate"><span class="pre">flag</span></code>)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#line-search-parameters">Line Search Parameters</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#cluster-parameters">Cluster Parameters</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#module-env"><code class="docutils literal notranslate"><span class="pre">module_env</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#parameters-sh"><code class="docutils literal notranslate"><span class="pre">parameters.sh</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#run-fwi-sh-and-run-forward-sh"><code class="docutils literal notranslate"><span class="pre">run_fwi.sh</span></code> and <code class="docutils literal notranslate"><span class="pre">run_forward.sh</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#source-and-stations">Source and Stations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#create-the-src-rec-directory-and-source-files">Create the <code class="docutils literal notranslate"><span class="pre">src_rec</span></code> Directory and Source Files</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id2">Create the <code class="docutils literal notranslate"><span class="pre">src_rec</span></code> Directory and Source Files</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#create-the-station-file">Create the Station File</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#create-the-force-solution-file">Create the Force Solution File</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#create-the-cmt-solution-file">Create the CMT Solution File</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#place-the-observation-data">Place the observation Data</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#specfem-mesh-generations">SpecFEM Mesh generations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="#specfem-par-file-settings">SpecFEM Par_file settings</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">FWAT</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Tutorial</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/markdown/tutorial.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="tutorial">
+<h1>Tutorial<a class="headerlink" href="#tutorial" title="Link to this heading"></a></h1>
+<section id="fwat-parameter-files">
+<h2>FWAT Parameter files<a class="headerlink" href="#fwat-parameter-files" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">fwat_params</span></code> directory contains two parameter files:</p>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">fwat.yaml</span></code></strong> – Defines the measurement parameters, simulation settings, and optimization options. This file is not automatically refreshed.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">lbfgs.yaml</span></code></strong> – Stores the FWI model parameters and is automatically updated after each iteration.</p></li>
+</ul>
+<p>Backup versions of both files are available as <code class="docutils literal notranslate"><span class="pre">fwat.yaml.org</span></code>, and <code class="docutils literal notranslate"><span class="pre">lbfgs.yaml.org</span></code>.</p>
+<p>Here is a template of <code class="docutils literal notranslate"><span class="pre">fwat.yaml</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># FWAT Package parameters</span>
+<span class="nt">simulation</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">GPU_MODE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">True</span><span class="w"> </span>
+<span class="w">  </span><span class="nt">DUMP_WAVEFIELDS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">True</span>
+
+<span class="c1"># Measurements block, for computing adjoint source</span>
+<span class="nt">measure</span><span class="p">:</span>
+<span class="w">  </span><span class="c1"># tele seismic</span>
+<span class="w">  </span><span class="nt">tele</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">COMPS</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;Z&#39;</span><span class="p p-Indicator">,</span><span class="s">&#39;R&#39;</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="c1"># components used </span>
+<span class="w">    </span><span class="nt">CH_CODE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">BX</span><span class="w">   </span><span class="c1"># CH_CODE</span>
+<span class="w">    </span><span class="nt">FILTER_BANDS</span><span class="p">:</span><span class="w"> </span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">5.</span><span class="p p-Indicator">,</span><span class="nv">50.</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">TIME_WINDOW</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">5.</span><span class="p p-Indicator">,</span><span class="nv">45.</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="c1"># before and after first arrival</span>
+<span class="w">    </span><span class="nt">VERBOSE_MODE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">True</span>
+<span class="w">    </span><span class="nt">IMEAS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w"> </span><span class="c1"># 2 = L2 norm</span>
+
+<span class="w">  </span><span class="nt">noise</span><span class="p">:</span><span class="w"> </span><span class="c1"># multichannel noise </span>
+<span class="w">    </span><span class="nt">CC_COMPS</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;ZZ&#39;</span><span class="p p-Indicator">]</span><span class="w">  </span><span class="c1"># {SOURCE-COMP}{RECEIVER-COMP}</span>
+<span class="w">    </span><span class="nt">CH_CODE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">BX</span><span class="w">   </span><span class="c1"># CH_CODE</span>
+<span class="w">    </span><span class="nt">FILTER_BANDS</span><span class="p">:</span><span class="w">  </span><span class="c1"># filter bands used, in s, [T_min,Tmax]</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">20.</span><span class="p p-Indicator">,</span><span class="nv">40.</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">15.</span><span class="p p-Indicator">,</span><span class="nv">30.</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">10.</span><span class="p p-Indicator">,</span><span class="nv">20.</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">5.</span><span class="p p-Indicator">,</span><span class="nv">15.</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">GROUPVEL_WIN</span><span class="p">:</span><span class="w">   </span><span class="c1"># Time window, determined by group velocity, km/s, [v_min,vmax]</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">2.5</span><span class="p p-Indicator">,</span><span class="nv">4.5</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">2.5</span><span class="p p-Indicator">,</span><span class="nv">4.5</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">2.5</span><span class="p p-Indicator">,</span><span class="nv">4.5</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">2.5</span><span class="p p-Indicator">,</span><span class="nv">4.5</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">USE_EGF</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">True</span><span class="w">   </span><span class="c1"># if False, the input data is Cross-correlation, a negative derivative will be applied</span>
+<span class="w">    </span><span class="nt">ADJ_SRC_NORM</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">False</span><span class="w">  </span><span class="c1"># if true, the adjoint source wiil be normalized</span>
+<span class="w">    </span><span class="nt">USE_NEAR_OFFSET</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">True</span><span class="w"> </span><span class="c1"># if FALSE, reset tstart</span>
+<span class="w">    </span><span class="nt">VERBOSE_MODE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">True</span>
+<span class="w">    </span><span class="nt">IMEAS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span><span class="w"> </span><span class="c1">#  = 5 cross correlation  =7 multitaper</span>
+
+<span class="w">  </span><span class="c1"># sks </span>
+<span class="w">  </span><span class="nt">sks</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">COMPS</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;R&#39;</span><span class="p p-Indicator">,</span><span class="s">&#39;T&#39;</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="c1"># components used </span>
+<span class="w">    </span><span class="nt">CH_CODE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">BX</span><span class="w">   </span><span class="c1"># CH_CODE</span>
+<span class="w">    </span><span class="nt">FILTER_BANDS</span><span class="p">:</span><span class="w"> </span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">5.</span><span class="p p-Indicator">,</span><span class="nv">50.</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">TIME_WINDOW</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">5.</span><span class="p p-Indicator">,</span><span class="nv">45.</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="c1"># before and after first arrival</span>
+<span class="w">    </span><span class="nt">VERBOSE_MODE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">True</span>
+<span class="w">    </span><span class="nt">IMEAS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w"> </span><span class="c1"># 2 = L2 norm</span>
+<span class="w">  </span>
+<span class="w">  </span><span class="c1"># receiver function</span>
+<span class="w">  </span><span class="nt">rf</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">CH_CODE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">BX</span><span class="w">   </span><span class="c1"># CH_CODE</span>
+<span class="w">    </span><span class="nt">FILTER_BANDS</span><span class="p">:</span><span class="w"> </span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">5.</span><span class="p p-Indicator">,</span><span class="nv">50.</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">GAUSS_F0</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">1.0</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">MINDERR</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+<span class="w">    </span><span class="nt">MAXIT</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">150</span>
+<span class="w">    </span><span class="nt">TIME_WINDOW</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">5.</span><span class="p p-Indicator">,</span><span class="nv">25.</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="c1"># time window, before/after t= 0</span>
+<span class="w">    </span><span class="nt">TSHIFT</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5.</span>
+<span class="w">    </span><span class="nt">VERBOSE_MODE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">True</span>
+<span class="w">    </span><span class="nt">IMEAS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w"> </span><span class="c1"># 2 = L2 norm</span>
+
+<span class="c1"># optimization</span>
+<span class="nt">optimize</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">SMOOTHING</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">16000.</span><span class="p p-Indicator">,</span><span class="nv">8000.</span><span class="p p-Indicator">]</span><span class="w">  </span><span class="c1"># gaussian smoothing in horizontal/vertical direction, in m</span>
+<span class="w">  </span><span class="nt">OPT_METHOD</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LBFGS</span><span class="w">  </span><span class="c1"># GD/ LBFGS</span>
+<span class="w">  </span><span class="nt">PRECOND_TYPE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">z_precond</span><span class="w"> </span><span class="c1"># default / z_precond /z2_precond</span>
+<span class="w">  </span><span class="nt">MAX_PER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.02</span><span class="w"> </span><span class="c1"># maximum relative perturbation</span>
+
+<span class="w">  </span><span class="c1"># model/kernel type</span>
+<span class="w">  </span><span class="c1"># iso configuration</span>
+<span class="w">  </span><span class="c1">#     0: kappa,mu,rho</span>
+<span class="w">  </span><span class="c1">#     1: vp,vs,rho</span>
+<span class="w">  </span><span class="c1">#     2: vp/vs,vs,rho</span>
+<span class="w">  </span><span class="c1"># dtti configuration:</span>
+<span class="w">  </span><span class="c1">#     0: c11-c66,rho</span>
+<span class="w">  </span><span class="c1">#     1: vp,vs,rho,gcp,gsp</span>
+<span class="w">  </span><span class="c1">#     2. vph,vpv,vsh,vsv,rho,eta,gcp,gsp</span>
+<span class="w">  </span><span class="nt">MODEL_TYPE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">iso</span><span class="w"> </span>
+<span class="w">  </span><span class="nt">KERNEL_SET</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<span class="w">  </span><span class="nt">MASK_VARS</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span><span class="w"> </span><span class="c1"># set all the gradients related to index in it to 0</span>
+</pre></div>
+</div>
+<p>several configuration blocks:</p>
+<section id="simulation-block">
+<h3>Simulation block<a class="headerlink" href="#simulation-block" title="Link to this heading"></a></h3>
+<p>This block contains parameters for forward/adjoint simulation.</p>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">GPU_MODE</span></code></strong> – If set to <code class="docutils literal notranslate"><span class="pre">true</span></code>, enables the <code class="docutils literal notranslate"><span class="pre">GPU_MODE</span></code> option in SPECFEM3D’s <code class="docutils literal notranslate"><span class="pre">Par_file</span></code>.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">DUMP_WAVEFIELDS</span></code></strong> – If set to <code class="docutils literal notranslate"><span class="pre">true</span></code>, enables the <code class="docutils literal notranslate"><span class="pre">SUBSAMPLE_FORWARD_WAVEFIELD</span></code> option in <code class="docutils literal notranslate"><span class="pre">Par_file</span></code>. In this mode, the full wavefield from the forward simulation is saved and later read back during the adjoint simulation.</p></li>
+</ul>
+</section>
+<section id="measurement-block">
+<h3>Measurement block<a class="headerlink" href="#measurement-block" title="Link to this heading"></a></h3>
+<p>This block defines parameters used for measurements, including computing misfits, generating adjoint sources, and applying seismogram rotations.  It currently supports the following four FWI workflows:</p>
+<ul class="simple">
+<li><p>Teleseismic waveform inversion</p></li>
+<li><p>SKS SI-splitting FWI</p></li>
+<li><p>Ambient noise (single-channel and multi-channel) FWI</p></li>
+<li><p>Receiver function FWI
+Each sub-block specifies settings for a particular measurement method.</p></li>
+</ul>
+<section id="teleseismic-waveform-inversion-tele">
+<h4>Teleseismic Waveform Inversion (<code class="docutils literal notranslate"><span class="pre">tele</span></code>)<a class="headerlink" href="#teleseismic-waveform-inversion-tele" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">COMPS</span></code></strong> – List of components used.<br />
+Example: <code class="docutils literal notranslate"><span class="pre">['Z','R']</span></code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">CH_CODE</span></code></strong> – Channel code.<br />
+Example: <code class="docutils literal notranslate"><span class="pre">BX</span></code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">FILTER_BANDS</span></code></strong> – Frequency filter bands in seconds, <code class="docutils literal notranslate"><span class="pre">[T_min,</span> <span class="pre">T_max]</span></code>.<br />
+Example: <code class="docutils literal notranslate"><span class="pre">[[5.,</span> <span class="pre">50.]]</span></code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">TIME_WINDOW</span></code></strong> – Time window (in seconds) before and after the first arrival.<br />
+Example: <code class="docutils literal notranslate"><span class="pre">[5.,</span> <span class="pre">45.]</span></code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">VERBOSE_MODE</span></code></strong> – If <code class="docutils literal notranslate"><span class="pre">true</span></code>, enables verbose output. Currently it will do nothing.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">IMEAS</span></code></strong> – Measurement type code (<code class="docutils literal notranslate"><span class="pre">2</span></code> = L2 norm). Refer to <a class="reference external" href="https://github.com/SPECFEM/specfem3d/tree/master/utils/ADJOINT_TOMOGRAPHY_TOOLS/measure_adj">measure_adj</a> for further information.</p></li>
+</ul>
+</section>
+<section id="multi-channel-ambient-noise-noise">
+<h4>Multi-channel Ambient Noise (<code class="docutils literal notranslate"><span class="pre">noise</span></code>)<a class="headerlink" href="#multi-channel-ambient-noise-noise" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">CC_COMPS</span></code></strong> – Cross-correlation components in <code class="docutils literal notranslate"><span class="pre">{SOURCE-COMP}{RECEIVER-COMP}</span></code> format. The station files used can be refered to {source section}<code class="docutils literal notranslate"><span class="pre">source-and-stations</span></code>. Example: <code class="docutils literal notranslate"><span class="pre">['ZZ','TT']</span></code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">CH_CODE</span></code></strong> – Channel code.<br />
+Example: <code class="docutils literal notranslate"><span class="pre">BX</span></code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">FILTER_BANDS</span></code></strong> – List of filter bands in seconds, <code class="docutils literal notranslate"><span class="pre">[T_min,</span> <span class="pre">T_max]</span></code>.<br />
+Example:
+<code class="docutils literal notranslate"><span class="pre">[[20.,</span> <span class="pre">40.],</span> <span class="pre">[15.,</span> <span class="pre">30.],</span> <span class="pre">[10.,</span> <span class="pre">20.],</span> <span class="pre">[5.,</span> <span class="pre">15.]]</span> </code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">GROUPVEL_WIN</span></code></strong> – Time window determined by group velocity in km/s, <code class="docutils literal notranslate"><span class="pre">[v_min,</span> <span class="pre">v_max]</span></code>.<br />
+Example:
+<code class="docutils literal notranslate"><span class="pre">[[2.5,</span> <span class="pre">4.5],</span> <span class="pre">[2.5,</span> <span class="pre">4.5],</span> <span class="pre">[2.5,</span> <span class="pre">4.5],</span> <span class="pre">[2.5,</span> <span class="pre">4.5]]</span></code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">USE_EGF</span></code></strong> – If <code class="docutils literal notranslate"><span class="pre">false</span></code>, the input data is cross-correlation; a negative derivative will be applied.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">ADJ_SRC_NORM</span></code></strong> – If <code class="docutils literal notranslate"><span class="pre">true</span></code>, normalizes the adjoint source.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">USE_NEAR_OFFSET</span></code></strong> – If <code class="docutils literal notranslate"><span class="pre">false</span></code>, resets <code class="docutils literal notranslate"><span class="pre">tstart</span></code>.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">VERBOSE_MODE</span></code></strong> – If <code class="docutils literal notranslate"><span class="pre">true</span></code>, enables verbose output.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">IMEAS</span></code></strong> – Measurement type code (<code class="docutils literal notranslate"><span class="pre">5</span></code> = cross-correlation, or <code class="docutils literal notranslate"><span class="pre">7</span></code> = multitaper).</p></li>
+</ul>
+</section>
+<section id="sks-si-splitting-fwi-sks">
+<h4>SKS SI-Splitting FWI (<code class="docutils literal notranslate"><span class="pre">sks</span></code>)<a class="headerlink" href="#sks-si-splitting-fwi-sks" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">COMPS</span></code></strong> – List of components used.<br />
+Example: <code class="docutils literal notranslate"><span class="pre">['R','T']</span></code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">CH_CODE</span></code></strong> – Channel code.<br />
+Example: <code class="docutils literal notranslate"><span class="pre">BX</span></code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">FILTER_BANDS</span></code></strong> – Frequency filter bands in seconds, <code class="docutils literal notranslate"><span class="pre">[T_min,</span> <span class="pre">T_max]</span></code>.<br />
+Example: <code class="docutils literal notranslate"><span class="pre">[[5.,</span> <span class="pre">50.]]</span></code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">TIME_WINDOW</span></code></strong> – Time window (in seconds) before and after the first arrival.<br />
+Example: <code class="docutils literal notranslate"><span class="pre">[5.,</span> <span class="pre">45.]</span></code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">VERBOSE_MODE</span></code></strong> – If <code class="docutils literal notranslate"><span class="pre">true</span></code>, enables verbose output.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">IMEAS</span></code></strong> – Measurement type code (<code class="docutils literal notranslate"><span class="pre">2</span></code> = L2 norm).</p></li>
+</ul>
+</section>
+<section id="receiver-functions-rf">
+<h4>Receiver Functions (<code class="docutils literal notranslate"><span class="pre">rf</span></code>)<a class="headerlink" href="#receiver-functions-rf" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">CH_CODE</span></code></strong> – Channel code.<br />
+Example: <code class="docutils literal notranslate"><span class="pre">BX</span></code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">FILTER_BANDS</span></code></strong> – Frequency filter bands in seconds, <code class="docutils literal notranslate"><span class="pre">[T_min,</span> <span class="pre">T_max]</span></code>.<br />
+Example: <code class="docutils literal notranslate"><span class="pre">[[5.,</span> <span class="pre">50.]]</span></code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">GAUSS_F0</span></code></strong> – Gaussian filter width.<br />
+Example: <code class="docutils literal notranslate"><span class="pre">[[1.0]]</span></code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">MINDERR</span></code></strong> – Minimum deconvolution error tolerance.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">MAXIT</span></code></strong> – Maximum number of iterations for deconvolution.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">TIME_WINDOW</span></code></strong> – Time window (in seconds) before and after <code class="docutils literal notranslate"><span class="pre">t</span> <span class="pre">=</span> <span class="pre">0</span></code>.<br />
+Example: <code class="docutils literal notranslate"><span class="pre">[5.,</span> <span class="pre">25.]</span></code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">TSHIFT</span></code></strong> – Time shift applied (in seconds).</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">VERBOSE_MODE</span></code></strong> – If <code class="docutils literal notranslate"><span class="pre">true</span></code>, enables verbose output.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">IMEAS</span></code></strong> – Measurement type code (<code class="docutils literal notranslate"><span class="pre">2</span></code> = L2 norm).</p></li>
+</ul>
+</section>
+</section>
+<section id="optimization-block">
+<h3>Optimization block<a class="headerlink" href="#optimization-block" title="Link to this heading"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">optimize</span></code> block defines parameters for the optimization process in FWI.</p>
+<section id="general-optimization-settings">
+<h4>General Optimization Settings<a class="headerlink" href="#general-optimization-settings" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">SMOOTHING</span></code></strong> – Gaussian smoothing lengths (in meters) for the horizontal and vertical directions.<br />
+Example: <code class="docutils literal notranslate"><span class="pre">[16000.,</span> <span class="pre">8000.]</span></code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">OPT_METHOD</span></code></strong> – Optimization method.<br />
+Options:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">GD</span></code> – Gradient Descent</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">LBFGS</span></code> – Limited-memory Broyden–Fletcher–Goldfarb–Shanno (default: <code class="docutils literal notranslate"><span class="pre">LBFGS</span></code>)</p></li>
+</ul>
+</li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">PRECOND_TYPE</span></code></strong> – Preconditioning method.<br />
+Options:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">default</span></code> – No special preconditioning</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">z_precond</span></code> – Depth-based preconditioning</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">z2_precond</span></code> – <code class="docutils literal notranslate"><span class="pre">z^2</span></code> depth-based preconditioning</p></li>
+</ul>
+</li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">MAX_PER</span></code></strong> – Maximum relative perturbation allowed during model updates.<br />
+Example: <code class="docutils literal notranslate"><span class="pre">0.02</span></code> (2% maximum change per iteration)</p></li>
+</ul>
+</section>
+<section id="model-and-kernel-settings">
+<h4>Model and Kernel Settings<a class="headerlink" href="#model-and-kernel-settings" title="Link to this heading"></a></h4>
+<ul>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">MODEL_TYPE</span></code></strong> – Model type.<br />
+Possible configurations:</p>
+<p><strong>Isotropic (<code class="docutils literal notranslate"><span class="pre">iso</span></code>):</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">0</span></code>: <code class="docutils literal notranslate"><span class="pre">kappa</span></code>, <code class="docutils literal notranslate"><span class="pre">mu</span></code>, <code class="docutils literal notranslate"><span class="pre">rho</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">1</span></code>: <code class="docutils literal notranslate"><span class="pre">vp</span></code>, <code class="docutils literal notranslate"><span class="pre">vs</span></code>, <code class="docutils literal notranslate"><span class="pre">rho</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">2</span></code>: <code class="docutils literal notranslate"><span class="pre">vp/vs</span> <span class="pre">(kappa)</span></code>, <code class="docutils literal notranslate"><span class="pre">vs</span></code>, <code class="docutils literal notranslate"><span class="pre">rho</span></code></p></li>
+</ul>
+<p><strong>Tilted Transversely Isotropic (<code class="docutils literal notranslate"><span class="pre">dtti</span></code>):</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">0</span></code>: <code class="docutils literal notranslate"><span class="pre">c11</span></code>–<code class="docutils literal notranslate"><span class="pre">c66</span></code>, <code class="docutils literal notranslate"><span class="pre">rho</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">1</span></code>: <code class="docutils literal notranslate"><span class="pre">vp</span></code>, <code class="docutils literal notranslate"><span class="pre">vs</span></code>, <code class="docutils literal notranslate"><span class="pre">rho</span></code>, <code class="docutils literal notranslate"><span class="pre">gcp</span></code>, <code class="docutils literal notranslate"><span class="pre">gsp</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">2</span></code>: <code class="docutils literal notranslate"><span class="pre">vph</span></code>, <code class="docutils literal notranslate"><span class="pre">vpv</span></code>, <code class="docutils literal notranslate"><span class="pre">vsh</span></code>, <code class="docutils literal notranslate"><span class="pre">vsv</span></code>, <code class="docutils literal notranslate"><span class="pre">rho</span></code>, <code class="docutils literal notranslate"><span class="pre">eta</span></code>, <code class="docutils literal notranslate"><span class="pre">gcp</span></code>, <code class="docutils literal notranslate"><span class="pre">gsp</span></code></p></li>
+</ul>
+</li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">KERNEL_SET</span></code></strong> – Kernel set index.<br />
+Example: <code class="docutils literal notranslate"><span class="pre">2</span></code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">MASK_VARS</span></code></strong> – List of variable indices to mask in the gradient (set gradients for these indices to <code class="docutils literal notranslate"><span class="pre">0</span></code>).<br />
+Example: <code class="docutils literal notranslate"><span class="pre">[]</span></code> (no masking)</p></li>
+</ul>
+</section>
+</section>
+<section id="lbfgs-file">
+<h3>LBFGS file<a class="headerlink" href="#lbfgs-file" title="Link to this heading"></a></h3>
+<p>here is a template:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># Preconditioned L-BFGS Parameters</span>
+<span class="nt">MAXITER</span><span class="p">:</span><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">10000</span><span class="w">   </span><span class="c1"># max iterations</span>
+<span class="nt">MSTORE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span><span class="w">         </span><span class="c1"># maximum number of stored pairs</span>
+<span class="nt">CONV</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.0e-8</span>
+
+<span class="c1"># iteration flag</span>
+<span class="nt">iter</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="nt">iter_start</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="nt">iter_ls</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="nt">first_ls</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">True</span>
+
+<span class="c1"># FLAG: str one of[&#39;INIT&#39;,&#39;GRAD&#39;,&#39;PREC&#39;,&#39;CONV&#39;,&#39;NSTE&#39;,&#39;FAIL&#39;]</span>
+<span class="c1">#     = &#39;INIT&#39; must be used for first iteration</span>
+<span class="c1">#     = &#39;GRAD&#39; the user must compute the cost and (preconditioned) gradient at current point x.  </span>
+<span class="c1">#     = &#39;PREC&#39; the user must multiply the vector self.q_plb by its preconditioner.  </span>
+<span class="c1">#     = &#39;CONV&#39; a minimizer has been found.  </span>
+<span class="c1">#     = &#39;NSTE&#39; a new step is performed.    </span>
+<span class="c1">#     = &#39;FAIL&#39; the linesearch has failed. </span>
+<span class="nt">flag</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;INIT&#39;</span><span class="w">   </span>
+
+<span class="c1"># line search</span>
+<span class="nt">M1</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.0e-4</span><span class="w"> </span><span class="c1"># Wolfe conditions parameter 1 (Nocedal value)</span>
+<span class="nt">M2</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.9</span><span class="w">  </span><span class="c1"># Wolfe conditions parameter 2 (Nocedal value)</span>
+<span class="nt">FACTOR</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span><span class="w"> </span><span class="c1"># Bracketting parameter (Gilbert value</span>
+<span class="nt">MAXLS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+<span class="nt">alpha_L</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="nt">alpha_R</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="nt">alpha</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-1.</span>
+<span class="nt">alpha_init</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-1.</span>
+
+<span class="c1"># debug </span>
+<span class="nt">PRINT</span><span class="p">:</span><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">True</span><span class="w"> </span>
+<span class="nt">DEBUG</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">False</span>
+</pre></div>
+</div>
+<p>This block defines settings for the preconditioned L-BFGS optimization algorithm.</p>
+<p>At current stage, only part of these parameters are enabled:</p>
+<section id="general-settings">
+<h4>General Settings<a class="headerlink" href="#general-settings" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">MSTORE</span></code></strong> – Maximum number of stored vector pairs (used in the L-BFGS memory).<br />
+Example: <code class="docutils literal notranslate"><span class="pre">10</span></code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">iter</span></code></strong> – Current iteration counter.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">iter_start</span></code></strong> – Starting iteration index. Only the memory between <code class="docutils literal notranslate"><span class="pre">iter_start</span></code> and <code class="docutils literal notranslate"><span class="pre">iter</span></code> will be accessed.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">iter_ls</span></code></strong> – Line search iteration counter.</p></li>
+</ul>
+</section>
+<section id="iteration-flag-flag">
+<h4>Iteration Flag (<code class="docutils literal notranslate"><span class="pre">flag</span></code>)<a class="headerlink" href="#iteration-flag-flag" title="Link to this heading"></a></h4>
+<p>String flag that indicates the current optimization state.<br />
+Possible values:</p>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">INIT</span></code></strong> – First iteration (initialization step).</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">GRAD</span></code></strong> – Compute the cost and (preconditioned) gradient at the current point <code class="docutils literal notranslate"><span class="pre">x</span></code>.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">LS</span></code></strong> – line search stage</p></li>
+</ul>
+</section>
+<hr class="docutils" />
+<section id="line-search-parameters">
+<h4>Line Search Parameters<a class="headerlink" href="#line-search-parameters" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">M1</span></code></strong> – Wolfe condition parameter 1 (Nocedal’s value).<br />
+Example: <code class="docutils literal notranslate"><span class="pre">1.0e-4</span></code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">M2</span></code></strong> – Wolfe condition parameter 2 (Nocedal’s value).<br />
+Example: <code class="docutils literal notranslate"><span class="pre">0.9</span></code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">FACTOR</span></code></strong> – Bracketing parameter (Gilbert’s value).<br />
+Example: <code class="docutils literal notranslate"><span class="pre">10</span></code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">MAXLS</span></code></strong> – Maximum number of line search iterations.<br />
+Example: <code class="docutils literal notranslate"><span class="pre">100</span></code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">alpha_L</span></code></strong> – Left bound for step size.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">alpha_R</span></code></strong> – Right bound for step size.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">alpha</span></code></strong> – Current step size. For first iteration it wil be <code class="docutils literal notranslate"><span class="pre">-1.</span></code>, then it will be automatically tuned.</p></li>
+</ul>
+</section>
+</section>
+</section>
+<section id="cluster-parameters">
+<h2>Cluster Parameters<a class="headerlink" href="#cluster-parameters" title="Link to this heading"></a></h2>
+<p>All of the following files are stored in <code class="docutils literal notranslate"><span class="pre">INSTALL_DIR</span></code> during installation.</p>
+<hr class="docutils" />
+<section id="module-env">
+<h3><code class="docutils literal notranslate"><span class="pre">module_env</span></code><a class="headerlink" href="#module-env" title="Link to this heading"></a></h3>
+<p>Contains the environment module commands required to load dependencies on the cluster.</p>
+</section>
+<hr class="docutils" />
+<section id="parameters-sh">
+<h3><code class="docutils literal notranslate"><span class="pre">parameters.sh</span></code><a class="headerlink" href="#parameters-sh" title="Link to this heading"></a></h3>
+<ul>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">SEM_PATH</span></code></strong> – Path to the solver binary directory.<br />
+Example:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">SEM_PATH</span><span class="o">=</span>~/specfem3d-cube2sph
+</pre></div>
+</div>
+</li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">MPIRUN</span></code></strong> – Command for running MPI jobs.<br />
+Example:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">MPIRUN</span><span class="o">=</span>mpirun
+</pre></div>
+</div>
+</li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">PLATFORM</span></code></strong> – Execution platform.<br />
+Options:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">local</span></code> – Run locally.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">slurm</span></code> – Run on a SLURM-based cluster.</p></li>
+</ul>
+</li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">SIMU_TYPES</span></code></strong> – List of simulation types to run.<br />
+Example:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">SIMU_TYPES</span><span class="o">=(</span><span class="s2">&quot;noise&quot;</span><span class="o">)</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">SIMU_TYPES_USER_WEIGHT</span></code></strong> – User-defined weights for each simulation type.<br />
+Example:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">SIMU_TYPES_USER_WEIGHT</span><span class="o">=(</span><span class="m">1</span>.<span class="w"> </span><span class="m">1</span>.<span class="o">)</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">NJOBS_PER_JOBARRAY</span></code></strong> – Number of jobs per job array for each simulation type.<br />
+Example:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">NJOBS_PER_JOBARRAY</span><span class="o">=(</span><span class="m">1</span><span class="w"> </span><span class="m">1</span><span class="o">)</span>
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+<hr class="docutils" />
+<section id="run-fwi-sh-and-run-forward-sh">
+<h3><code class="docutils literal notranslate"><span class="pre">run_fwi.sh</span></code> and <code class="docutils literal notranslate"><span class="pre">run_forward.sh</span></code><a class="headerlink" href="#run-fwi-sh-and-run-forward-sh" title="Link to this heading"></a></h3>
+<p>These scripts implement several functions that add SLURM job headers, making them executable on a cluster.<br />
+The functions include:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">SHELL_HEADER_SEM</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">SHELL_HEADER_POST</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">SHELL_HEADER_WOLFE</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">WAIT_FINISH</span></code></p></li>
+</ul>
+<p><strong>Note:</strong><br />
+Edit these functions to match your working environment, for example, by adding GPU-specific flags, account information, or other SLURM parameters.</p>
+</section>
+</section>
+<section id="source-and-stations">
+<span id="id1"></span><h2>Source and Stations<a class="headerlink" href="#source-and-stations" title="Link to this heading"></a></h2>
+<p>This section describes the setup process for source and station files.</p>
+<section id="create-the-src-rec-directory-and-source-files">
+<h3>Create the <code class="docutils literal notranslate"><span class="pre">src_rec</span></code> Directory and Source Files<a class="headerlink" href="#create-the-src-rec-directory-and-source-files" title="Link to this heading"></a></h3>
+<p>Create a directory named <code class="docutils literal notranslate"><span class="pre">src_rec</span></code> and add source definition files named <code class="docutils literal notranslate"><span class="pre">src_rec/sources.dat.*</span></code><br />
+(for example, <code class="docutils literal notranslate"><span class="pre">src_rec/sources.dat.noise</span></code>).</p>
+</section>
+<section id="id2">
+<h3>Create the <code class="docutils literal notranslate"><span class="pre">src_rec</span></code> Directory and Source Files<a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
+<p>Create a directory named <code class="docutils literal notranslate"><span class="pre">src_rec</span></code> and add source definition files named <code class="docutils literal notranslate"><span class="pre">src_rec/sources.dat.*</span></code><br />
+(for example, <code class="docutils literal notranslate"><span class="pre">src_rec/sources.dat.noise</span></code>).</p>
+<p>The file format is as follows:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>NAME<span class="w"> </span>evla<span class="w"> </span>evlo<span class="w"> </span>evdp<span class="w"> </span>evbur
+</pre></div>
+</div>
+<p>where:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">NAME</span></code> – Source name identifier.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">evla</span></code>, <code class="docutils literal notranslate"><span class="pre">evlo</span></code> – Event latitude and longitude.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">evdp</span></code> – Event depth.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">evbur</span></code> – Event burial depth.</p></li>
+</ul>
+</section>
+<hr class="docutils" />
+<section id="create-the-station-file">
+<h3>Create the Station File<a class="headerlink" href="#create-the-station-file" title="Link to this heading"></a></h3>
+<p>Create a file named <code class="docutils literal notranslate"><span class="pre">src_rec/STATIONS_${NAME}_globe</span></code>, where <code class="docutils literal notranslate"><span class="pre">NAME</span></code> matches the <strong>first column</strong> in <code class="docutils literal notranslate"><span class="pre">sources.dat</span></code>.</p>
+<p>Convert it to spherical coordinates using:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>utils/cube2sph/bin/write_station_file
+</pre></div>
+</div>
+<p>This will produce:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>src_rec/STATIONS_${NAME}
+</pre></div>
+</div>
+</section>
+<section id="create-the-force-solution-file">
+<h3>Create the Force Solution File<a class="headerlink" href="#create-the-force-solution-file" title="Link to this heading"></a></h3>
+<p>Create <code class="docutils literal notranslate"><span class="pre">src_rec/FORCESOLUTION_${NAME}_globe</span></code> with the following format:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">FORCE</span> <span class="mi">001</span> 
+<span class="n">time</span> <span class="n">shift</span><span class="p">:</span>     <span class="mf">0.0000</span>
+<span class="n">f0</span><span class="p">:</span>             <span class="mf">1.0</span>
+<span class="n">latorUTM</span><span class="p">:</span>       <span class="mf">34.5</span>
+<span class="n">longorUTM</span><span class="p">:</span>      <span class="mf">125.4</span>
+<span class="n">depth</span><span class="p">:</span>          <span class="mf">0.0000</span>
+<span class="n">source</span> <span class="n">time</span> <span class="n">function</span><span class="p">:</span>            <span class="mi">0</span>
+<span class="n">factor</span> <span class="n">force</span> <span class="n">source</span><span class="p">:</span>             <span class="mf">1.e15</span>
+<span class="n">component</span> <span class="nb">dir</span> <span class="n">vect</span> <span class="n">source</span> <span class="n">E</span><span class="p">:</span>     <span class="mf">0.e0</span>
+<span class="n">component</span> <span class="nb">dir</span> <span class="n">vect</span> <span class="n">source</span> <span class="n">N</span><span class="p">:</span>     <span class="mf">0.e0</span>
+<span class="n">component</span> <span class="nb">dir</span> <span class="n">vect</span> <span class="n">source</span> <span class="n">Z_UP</span><span class="p">:</span>  <span class="mf">1.e0</span>
+</pre></div>
+</div>
+<p>Convert it to:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>src_rec/FORCESOLUTION_${NAME}
+</pre></div>
+</div>
+<p>using:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>utils/cube2sph/bin/write_force_solution_file
+</pre></div>
+</div>
+<p><strong>Note:</strong><br />
+For multi-channel noise simulation, provide the following files:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">FORCESOLUTION_${NAME}_Z</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">FORCESOLUTION_${NAME}_N</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">FORCESOLUTION_${NAME}_E</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">STATIONS_${NAME}_R</span></code> / <code class="docutils literal notranslate"><span class="pre">STATIONS_${NAME}_T</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">STATIONS_${NAME}_Z</span></code>
+The station numbers in each <code class="docutils literal notranslate"><span class="pre">STATION_${NAME}_[RTZ]</span></code> can be different.</p></li>
+</ul>
+</section>
+<section id="create-the-cmt-solution-file">
+<h3>Create the CMT Solution File<a class="headerlink" href="#create-the-cmt-solution-file" title="Link to this heading"></a></h3>
+<p>Create <code class="docutils literal notranslate"><span class="pre">src_rec/CMTSOLUTION_${NAME}_globe</span></code> and convert it to:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>src_rec/CMTSOLUTION_${NAME}
+</pre></div>
+</div>
+<p>using:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>utils/cube2sph/bin/write_cmt_solution
+</pre></div>
+</div>
+</section>
+<section id="place-the-observation-data">
+<h3>Place the observation Data<a class="headerlink" href="#place-the-observation-data" title="Link to this heading"></a></h3>
+<p>Store the data in:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>fwat_data/$NAME
+</pre></div>
+</div>
+<p>For multi-channel noise data, it should be placed as:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>fwat_data/$NAME_[RTZ]
+</pre></div>
+</div>
+</section>
+</section>
+<section id="specfem-mesh-generations">
+<h2>SpecFEM Mesh generations<a class="headerlink" href="#specfem-mesh-generations" title="Link to this heading"></a></h2>
+<p>to be continued …</p>
+</section>
+</section>
+<section id="specfem-par-file-settings">
+<h1>SpecFEM Par_file settings<a class="headerlink" href="#specfem-par-file-settings" title="Link to this heading"></a></h1>
+<p>to be continued …</p>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="install.html" class="btn btn-neutral float-left" title="Introduction" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
