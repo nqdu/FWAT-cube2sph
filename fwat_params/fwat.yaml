@@ -1,6 +1,5 @@
 # FWAT Package parameters
 simulation:
-  GPU_MODE: True 
   DUMP_WAVEFIELDS: True
 
 # Measurements block, for computing adjoint source

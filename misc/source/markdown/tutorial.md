@@ -12,7 +12,6 @@ Here is a template of `fwat.yaml`:
 ```yaml
 # FWAT Package parameters
 simulation:
-  GPU_MODE: True 
   DUMP_WAVEFIELDS: True
 
 # Measurements block, for computing adjoint source
@@ -95,7 +94,6 @@ several configuration blocks:
 
 ### Simulation block
 This block contains parameters for forward/adjoint simulation.
-  - **`GPU_MODE`** – If set to `true`, enables the `GPU_MODE` option in SPECFEM3D’s `Par_file`.
   - **`DUMP_WAVEFIELDS`** – If set to `true`, enables the `SUBSAMPLE_FORWARD_WAVEFIELD` option in `Par_file`. In this mode, the full wavefield from the forward simulation is saved and later read back during the adjoint simulation.
 
 ### Measurement block
@@ -273,8 +271,6 @@ Possible values:
   Example: `0.9`
 - **`FACTOR`** – Bracketing parameter (Gilbert’s value).  
   Example: `10`
-- **`MAXLS`** – Maximum number of line search iterations.  
-  Example: `100`
 - **`alpha_L`** – Left bound for step size.
 - **`alpha_R`** – Right bound for step size.
 - **`alpha`** – Current step size. For first iteration it wil be `-1.`, then it will be automatically tuned.
@@ -344,11 +340,6 @@ Edit these functions to match your working environment, for example, by adding G
 ## Source and Stations
 
 This section describes the setup process for source and station files.
-
-### Create the `src_rec` Directory and Source Files
-Create a directory named `src_rec` and add source definition files named `src_rec/sources.dat.*`  
-(for example, `src_rec/sources.dat.noise`).  
-
 
 ### Create the `src_rec` Directory and Source Files
 Create a directory named `src_rec` and add source definition files named `src_rec/sources.dat.*`  

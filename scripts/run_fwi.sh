@@ -11,6 +11,7 @@ EOF
   local stype=$2
   local walltime=$3
     cat << EOF
+#!/bin/bash
 #SBATCH --nodes=4
 #SBATCH --ntasks-per-node=40
 #SBATCH --array=1-$narray%5
@@ -33,6 +34,7 @@ SHELL_HEADER_POST() {
 EOF
   else
     cat << EOF
+#!/bin/bash
 #SBATCH --nodes=4
 #SBATCH --ntasks-per-node=40
 #SBATCH --time=00:15:59
@@ -54,6 +56,7 @@ SHELL_HEADER_WOLFE(){
 EOF
   else
     cat << EOF
+#!/bin/bash
 #SBATCH --nodes=4
 #SBATCH --ntasks-per-node=40
 #SBATCH --time=00:15:59

@@ -25,7 +25,7 @@ def run(args:list[str]):
     sys_remove(f"{rundir}/{LOCAL_PATH}")
     sys_remove(f"{rundir}/OUTPUT_FILES/*.sac")
     sys_remove(f"{rundir}/DATA/meshfem*")
-    sys_remove(f"{rundir}/OUTPUT_FILES/*forward_wavefield.bin")
+    sys_remove(f"{rundir}/OUTPUT_FILES/*forward_wavefield.bin*")
 
     # remove period band
     sys_remove(f"{rundir}/OUTPUT_FILES/T[0-9]*_T[0-9]*")
