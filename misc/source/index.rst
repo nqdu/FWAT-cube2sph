@@ -6,6 +6,7 @@ Welcome to FWAT
    :caption: Contents:
 
    markdown/install.md
-   markdown/tutorial.md
+   markdown/cube2sph.md
+   markdown/fwat.md
 ..    markdown/gallery.md
 ..    python/index
