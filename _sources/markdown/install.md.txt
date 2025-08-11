@@ -2,8 +2,6 @@
 
 **FWAT-cube2sph** (**F**ull **W**aveform **A**djoint **T**omography) is a package designed for full waveform inversion based on the **specfem3d-cube2sph** solver. 
 
-This package intended for advanced [specfem3d](https://github.com/SPECFEM/specfem3d/tree/devel/src) users, and assumes that readers are already familiar with specfem3d.
-
 # Installation 
 
 1. **Compilers:** C++/Fortran compilers which support c++17 (tested on `GCC >=7.5`), `cmake >= 3.12`

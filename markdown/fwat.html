@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tutorial &mdash; FWAT  documentation</title>
+  <title>Full Waveform Inversion Tutorial &mdash; FWAT  documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
 
@@ -19,7 +19,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="prev" title="Introduction" href="install.html" /> 
+    <link rel="prev" title="Cube2sph Tutorial" href="cube2sph.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -45,9 +45,10 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="install.html">Introduction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="install.html#installation">Installation</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Tutorial</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="cube2sph.html">Cube2sph Tutorial</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Full Waveform Inversion Tutorial</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#fwat-parameter-files">FWAT Parameter files</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#simulation-block">Simulation block</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#simulation-block">Simulation Block</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#measurement-block">Measurement block</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#teleseismic-waveform-inversion-tele">Teleseismic Waveform Inversion (<code class="docutils literal notranslate"><span class="pre">tele</span></code>)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#multi-channel-ambient-noise-noise">Multi-channel Ambient Noise (<code class="docutils literal notranslate"><span class="pre">noise</span></code>)</a></li>
@@ -68,12 +69,6 @@
 </li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#cluster-parameters">Cluster Parameters</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#module-env"><code class="docutils literal notranslate"><span class="pre">module_env</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#parameters-sh"><code class="docutils literal notranslate"><span class="pre">parameters.sh</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#run-fwi-sh-and-run-forward-sh"><code class="docutils literal notranslate"><span class="pre">run_fwi.sh</span></code> and <code class="docutils literal notranslate"><span class="pre">run_forward.sh</span></code></a></li>
-</ul>
-</li>
 <li class="toctree-l2"><a class="reference internal" href="#source-and-stations">Source and Stations</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#create-the-src-rec-directory-and-source-files">Create the <code class="docutils literal notranslate"><span class="pre">src_rec</span></code> Directory and Source Files</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#create-the-station-file">Create the Station File</a></li>
@@ -82,10 +77,15 @@
 <li class="toctree-l3"><a class="reference internal" href="#place-the-observation-data">Place the observation Data</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#specfem-mesh-generations">SpecFEM Mesh generations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#cluster-parameters">Cluster Parameters</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#module-env"><code class="docutils literal notranslate"><span class="pre">module_env</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#parameters-sh"><code class="docutils literal notranslate"><span class="pre">parameters.sh</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#run-fwi-sh-and-run-forward-sh"><code class="docutils literal notranslate"><span class="pre">run_fwi.sh</span></code> and <code class="docutils literal notranslate"><span class="pre">run_forward.sh</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="#specfem-par-file-settings">SpecFEM Par_file settings</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#checklist">Checklist</a></li>
+</ul>
+</li>
 </ul>
 
         </div>
@@ -102,9 +102,9 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Tutorial</li>
+      <li class="breadcrumb-item active">Full Waveform Inversion Tutorial</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="../_sources/markdown/tutorial.md.txt" rel="nofollow"> View page source</a>
+            <a href="../_sources/markdown/fwat.md.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -112,8 +112,8 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="tutorial">
-<h1>Tutorial<a class="headerlink" href="#tutorial" title="Link to this heading"></a></h1>
+  <section id="full-waveform-inversion-tutorial">
+<h1>Full Waveform Inversion Tutorial<a class="headerlink" href="#full-waveform-inversion-tutorial" title="Link to this heading"></a></h1>
 <section id="fwat-parameter-files">
 <h2>FWAT Parameter files<a class="headerlink" href="#fwat-parameter-files" title="Link to this heading"></a></h2>
 <p>The <code class="docutils literal notranslate"><span class="pre">fwat_params</span></code> directory contains two parameter files:</p>
@@ -205,14 +205,24 @@
 </div>
 <p>several configuration blocks:</p>
 <section id="simulation-block">
-<h3>Simulation block<a class="headerlink" href="#simulation-block" title="Link to this heading"></a></h3>
-<p>This block contains parameters for forward/adjoint simulation.</p>
+<h3>Simulation Block<a class="headerlink" href="#simulation-block" title="Link to this heading"></a></h3>
+<p>This block contains parameters for forward and adjoint simulations.</p>
 <ul class="simple">
-<li><p><strong><code class="docutils literal notranslate"><span class="pre">DUMP_WAVEFIELDS</span></code></strong> – If set to <code class="docutils literal notranslate"><span class="pre">true</span></code>, enables the <code class="docutils literal notranslate"><span class="pre">SUBSAMPLE_FORWARD_WAVEFIELD</span></code> option in <code class="docutils literal notranslate"><span class="pre">Par_file</span></code>. In this mode, the full wavefield from the forward simulation is saved and later read back during the adjoint simulation.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">DUMP_WAVEFIELDS</span></code></strong> – If set to <code class="docutils literal notranslate"><span class="pre">true</span></code>, enables the <code class="docutils literal notranslate"><span class="pre">SUBSAMPLE_FORWARD_WAVEFIELD</span></code> option in <code class="docutils literal notranslate"><span class="pre">Par_file</span></code>.<br />
+In this mode, the full wavefield from the forward simulation is saved and later read back during the adjoint simulation.</p></li>
+</ul>
+<p>To control how many time steps the wavefield is dumped, modify the following parameters in <code class="docutils literal notranslate"><span class="pre">Par_file</span></code>:</p>
+<div class="highlight-fortran notranslate"><div class="highlight"><pre><span></span><span class="n">KERNEL_SPP</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">8</span>
+<span class="n">KERNEL_T0</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="mf">5.0</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">KERNEL_SPP</span></code></strong> – Number of sampling points per period.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">KERNEL_T0</span></code></strong> – Minimum period used in your simulation (can be found in <code class="docutils literal notranslate"><span class="pre">output_generate_databases.txt</span></code>).</p></li>
 </ul>
 </section>
 <section id="measurement-block">
-<h3>Measurement block<a class="headerlink" href="#measurement-block" title="Link to this heading"></a></h3>
+<span id="id1"></span><h3>Measurement block<a class="headerlink" href="#measurement-block" title="Link to this heading"></a></h3>
 <p>This block defines parameters used for measurements, including computing misfits, generating adjoint sources, and applying seismogram rotations.  It currently supports the following four FWI workflows:</p>
 <ul class="simple">
 <li><p>Teleseismic waveform inversion</p></li>
@@ -418,6 +428,99 @@ Example: <code class="docutils literal notranslate"><span class="pre">10</span><
 </section>
 </section>
 </section>
+<section id="source-and-stations">
+<span id="id2"></span><h2>Source and Stations<a class="headerlink" href="#source-and-stations" title="Link to this heading"></a></h2>
+<p>This section describes the setup process for source and station files.</p>
+<section id="create-the-src-rec-directory-and-source-files">
+<h3>Create the <code class="docutils literal notranslate"><span class="pre">src_rec</span></code> Directory and Source Files<a class="headerlink" href="#create-the-src-rec-directory-and-source-files" title="Link to this heading"></a></h3>
+<p>Create a directory named <code class="docutils literal notranslate"><span class="pre">src_rec</span></code> and add source definition files named <code class="docutils literal notranslate"><span class="pre">src_rec/sources.dat.*</span></code><br />
+(for example, <code class="docutils literal notranslate"><span class="pre">src_rec/sources.dat.noise</span></code>).</p>
+<p>The file format is as follows:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>NAME<span class="w"> </span>evla<span class="w"> </span>evlo<span class="w"> </span>evdp<span class="w"> </span>evbur
+</pre></div>
+</div>
+<p>where:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">NAME</span></code> – Source name identifier.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">evla</span></code>, <code class="docutils literal notranslate"><span class="pre">evlo</span></code> – Event latitude and longitude.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">evdp</span></code> – Event depth.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">evbur</span></code> – Event burial depth.</p></li>
+</ul>
+</section>
+<hr class="docutils" />
+<section id="create-the-station-file">
+<h3>Create the Station File<a class="headerlink" href="#create-the-station-file" title="Link to this heading"></a></h3>
+<p>Create a file named <code class="docutils literal notranslate"><span class="pre">src_rec/STATIONS_${NAME}_globe</span></code>, where <code class="docutils literal notranslate"><span class="pre">NAME</span></code> matches the <strong>first column</strong> in <code class="docutils literal notranslate"><span class="pre">sources.dat</span></code>.</p>
+<p>Convert it to spherical coordinates using:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>utils/cube2sph/bin/write_station_file
+</pre></div>
+</div>
+<p>This will produce:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>src_rec/STATIONS_${NAME}, rot_${NAME}
+</pre></div>
+</div>
+</section>
+<section id="create-the-force-solution-file">
+<h3>Create the Force Solution File<a class="headerlink" href="#create-the-force-solution-file" title="Link to this heading"></a></h3>
+<p>Create <code class="docutils literal notranslate"><span class="pre">src_rec/FORCESOLUTION_${NAME}_globe</span></code> with the following format:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">FORCE</span> <span class="mi">001</span> 
+<span class="n">time</span> <span class="n">shift</span><span class="p">:</span>     <span class="mf">0.0000</span>
+<span class="n">f0</span><span class="p">:</span>             <span class="mf">1.0</span>
+<span class="n">latorUTM</span><span class="p">:</span>       <span class="mf">34.5</span>
+<span class="n">longorUTM</span><span class="p">:</span>      <span class="mf">125.4</span>
+<span class="n">depth</span><span class="p">:</span>          <span class="mf">0.0000</span>
+<span class="n">source</span> <span class="n">time</span> <span class="n">function</span><span class="p">:</span>            <span class="mi">0</span>
+<span class="n">factor</span> <span class="n">force</span> <span class="n">source</span><span class="p">:</span>             <span class="mf">1.e15</span>
+<span class="n">component</span> <span class="nb">dir</span> <span class="n">vect</span> <span class="n">source</span> <span class="n">E</span><span class="p">:</span>     <span class="mf">0.e0</span>
+<span class="n">component</span> <span class="nb">dir</span> <span class="n">vect</span> <span class="n">source</span> <span class="n">N</span><span class="p">:</span>     <span class="mf">0.e0</span>
+<span class="n">component</span> <span class="nb">dir</span> <span class="n">vect</span> <span class="n">source</span> <span class="n">Z_UP</span><span class="p">:</span>  <span class="mf">1.e0</span>
+</pre></div>
+</div>
+<p>Convert it to:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>src_rec/FORCESOLUTION_${NAME}
+</pre></div>
+</div>
+<p>using:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>utils/cube2sph/bin/write_force_solution_file
+</pre></div>
+</div>
+<p><strong>Note:</strong><br />
+For multi-channel noise simulation, provide the following files:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">FORCESOLUTION_${NAME}_Z</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">FORCESOLUTION_${NAME}_N</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">FORCESOLUTION_${NAME}_E</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">STATIONS_${NAME}_R</span></code> / <code class="docutils literal notranslate"><span class="pre">STATIONS_${NAME}_T</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">STATIONS_${NAME}_Z</span></code>
+The stations in each <code class="docutils literal notranslate"><span class="pre">STATION_${NAME}_[RTZ]</span></code> can be different. You should merge all <code class="docutils literal notranslate"><span class="pre">rot_${NAME}_{RTZ}</span></code> together by</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>cat<span class="w"> </span>rot_<span class="si">${</span><span class="nv">NAME</span><span class="si">}</span>_<span class="o">{</span>RTZ<span class="o">}</span><span class="w"> </span><span class="p">|</span>sort<span class="w"> </span>-n<span class="w"> </span><span class="p">|</span>uniq<span class="w"> </span>&gt;<span class="w"> </span>rot_<span class="si">${</span><span class="nv">NAME</span><span class="si">}</span>
+</pre></div>
+</div>
+</section>
+<section id="create-the-cmt-solution-file">
+<h3>Create the CMT Solution File<a class="headerlink" href="#create-the-cmt-solution-file" title="Link to this heading"></a></h3>
+<p>Create <code class="docutils literal notranslate"><span class="pre">src_rec/CMTSOLUTION_${NAME}_globe</span></code> and convert it to:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>src_rec/CMTSOLUTION_${NAME}
+</pre></div>
+</div>
+<p>using:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>utils/cube2sph/bin/write_cmt_solution
+</pre></div>
+</div>
+</section>
+<section id="place-the-observation-data">
+<h3>Place the observation Data<a class="headerlink" href="#place-the-observation-data" title="Link to this heading"></a></h3>
+<p>Store the data in:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>fwat_data/$NAME
+</pre></div>
+</div>
+<p>For multi-channel noise data, it should be placed as:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>fwat_data/$NAME_[RTZ]
+</pre></div>
+</div>
+</section>
+</section>
 <section id="cluster-parameters">
 <h2>Cluster Parameters<a class="headerlink" href="#cluster-parameters" title="Link to this heading"></a></h2>
 <p>All of the following files are stored in <code class="docutils literal notranslate"><span class="pre">INSTALL_DIR</span></code> during installation.</p>
@@ -484,111 +587,25 @@ The functions include:</p>
 Edit these functions to match your working environment, for example, by adding GPU-specific flags, account information, or other SLURM parameters.</p>
 </section>
 </section>
-<section id="source-and-stations">
-<span id="id1"></span><h2>Source and Stations<a class="headerlink" href="#source-and-stations" title="Link to this heading"></a></h2>
-<p>This section describes the setup process for source and station files.</p>
-<section id="create-the-src-rec-directory-and-source-files">
-<h3>Create the <code class="docutils literal notranslate"><span class="pre">src_rec</span></code> Directory and Source Files<a class="headerlink" href="#create-the-src-rec-directory-and-source-files" title="Link to this heading"></a></h3>
-<p>Create a directory named <code class="docutils literal notranslate"><span class="pre">src_rec</span></code> and add source definition files named <code class="docutils literal notranslate"><span class="pre">src_rec/sources.dat.*</span></code><br />
-(for example, <code class="docutils literal notranslate"><span class="pre">src_rec/sources.dat.noise</span></code>).</p>
-<p>The file format is as follows:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>NAME<span class="w"> </span>evla<span class="w"> </span>evlo<span class="w"> </span>evdp<span class="w"> </span>evbur
-</pre></div>
-</div>
-<p>where:</p>
+<section id="checklist">
+<h2>Checklist<a class="headerlink" href="#checklist" title="Link to this heading"></a></h2>
+<p>Before running a forward or adjoint simulation, ensure the following items are prepared:</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">NAME</span></code> – Source name identifier.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">evla</span></code>, <code class="docutils literal notranslate"><span class="pre">evlo</span></code> – Event latitude and longitude.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">evdp</span></code> – Event depth.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">evbur</span></code> – Event burial depth.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">DATA</span></code></strong> – Directory containing input data. You can copy the <code class="docutils literal notranslate"><span class="pre">DATA</span></code> directory used in mesh generation.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">DATA/Par_file.{simu_type}</span></code></strong> – For each simulation type (see <a class="reference internal" href="#measurement-block">Measurement</a>), provide a corresponding <code class="docutils literal notranslate"><span class="pre">Par_file</span></code>.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">DATA/axisem/SOURCE_TAG</span></code></strong> – Background wavefield file, which can be generated using <a class="reference external" href="https://github.com/nqdu/AxiSEMLib/tree/main">AxiSEMLib</a>.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">OUTPUT_FILES</span></code></strong> – You can copy these from the mesh generation output.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">DATABASES_MPI</span></code></strong> – Required for forward simulation.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">./optimize/MODEL_M00</span></code></strong> – Directory containing your initial model (files in <code class="docutils literal notranslate"><span class="pre">DATABASES_MPI</span></code>) for FWI.</p></li>
 </ul>
 </section>
-<hr class="docutils" />
-<section id="create-the-station-file">
-<h3>Create the Station File<a class="headerlink" href="#create-the-station-file" title="Link to this heading"></a></h3>
-<p>Create a file named <code class="docutils literal notranslate"><span class="pre">src_rec/STATIONS_${NAME}_globe</span></code>, where <code class="docutils literal notranslate"><span class="pre">NAME</span></code> matches the <strong>first column</strong> in <code class="docutils literal notranslate"><span class="pre">sources.dat</span></code>.</p>
-<p>Convert it to spherical coordinates using:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>utils/cube2sph/bin/write_station_file
-</pre></div>
-</div>
-<p>This will produce:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>src_rec/STATIONS_${NAME}
-</pre></div>
-</div>
-</section>
-<section id="create-the-force-solution-file">
-<h3>Create the Force Solution File<a class="headerlink" href="#create-the-force-solution-file" title="Link to this heading"></a></h3>
-<p>Create <code class="docutils literal notranslate"><span class="pre">src_rec/FORCESOLUTION_${NAME}_globe</span></code> with the following format:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">FORCE</span> <span class="mi">001</span> 
-<span class="n">time</span> <span class="n">shift</span><span class="p">:</span>     <span class="mf">0.0000</span>
-<span class="n">f0</span><span class="p">:</span>             <span class="mf">1.0</span>
-<span class="n">latorUTM</span><span class="p">:</span>       <span class="mf">34.5</span>
-<span class="n">longorUTM</span><span class="p">:</span>      <span class="mf">125.4</span>
-<span class="n">depth</span><span class="p">:</span>          <span class="mf">0.0000</span>
-<span class="n">source</span> <span class="n">time</span> <span class="n">function</span><span class="p">:</span>            <span class="mi">0</span>
-<span class="n">factor</span> <span class="n">force</span> <span class="n">source</span><span class="p">:</span>             <span class="mf">1.e15</span>
-<span class="n">component</span> <span class="nb">dir</span> <span class="n">vect</span> <span class="n">source</span> <span class="n">E</span><span class="p">:</span>     <span class="mf">0.e0</span>
-<span class="n">component</span> <span class="nb">dir</span> <span class="n">vect</span> <span class="n">source</span> <span class="n">N</span><span class="p">:</span>     <span class="mf">0.e0</span>
-<span class="n">component</span> <span class="nb">dir</span> <span class="n">vect</span> <span class="n">source</span> <span class="n">Z_UP</span><span class="p">:</span>  <span class="mf">1.e0</span>
-</pre></div>
-</div>
-<p>Convert it to:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>src_rec/FORCESOLUTION_${NAME}
-</pre></div>
-</div>
-<p>using:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>utils/cube2sph/bin/write_force_solution_file
-</pre></div>
-</div>
-<p><strong>Note:</strong><br />
-For multi-channel noise simulation, provide the following files:</p>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">FORCESOLUTION_${NAME}_Z</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">FORCESOLUTION_${NAME}_N</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">FORCESOLUTION_${NAME}_E</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">STATIONS_${NAME}_R</span></code> / <code class="docutils literal notranslate"><span class="pre">STATIONS_${NAME}_T</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">STATIONS_${NAME}_Z</span></code>
-The station numbers in each <code class="docutils literal notranslate"><span class="pre">STATION_${NAME}_[RTZ]</span></code> can be different.</p></li>
-</ul>
-</section>
-<section id="create-the-cmt-solution-file">
-<h3>Create the CMT Solution File<a class="headerlink" href="#create-the-cmt-solution-file" title="Link to this heading"></a></h3>
-<p>Create <code class="docutils literal notranslate"><span class="pre">src_rec/CMTSOLUTION_${NAME}_globe</span></code> and convert it to:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>src_rec/CMTSOLUTION_${NAME}
-</pre></div>
-</div>
-<p>using:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>utils/cube2sph/bin/write_cmt_solution
-</pre></div>
-</div>
-</section>
-<section id="place-the-observation-data">
-<h3>Place the observation Data<a class="headerlink" href="#place-the-observation-data" title="Link to this heading"></a></h3>
-<p>Store the data in:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>fwat_data/$NAME
-</pre></div>
-</div>
-<p>For multi-channel noise data, it should be placed as:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>fwat_data/$NAME_[RTZ]
-</pre></div>
-</div>
-</section>
-</section>
-<section id="specfem-mesh-generations">
-<h2>SpecFEM Mesh generations<a class="headerlink" href="#specfem-mesh-generations" title="Link to this heading"></a></h2>
-<p>to be continued …</p>
-</section>
-</section>
-<section id="specfem-par-file-settings">
-<h1>SpecFEM Par_file settings<a class="headerlink" href="#specfem-par-file-settings" title="Link to this heading"></a></h1>
-<p>to be continued …</p>
 </section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="install.html" class="btn btn-neutral float-left" title="Introduction" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="cube2sph.html" class="btn btn-neutral float-left" title="Cube2sph Tutorial" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
     </div>
 
   <hr/>
