@@ -64,7 +64,6 @@ Ensure that the PML thickness is an exact integer multiple of the element size. 
   - Must be `(multiple of NPROC)` for regular meshes.
 - **`NPROC_XI`**, **`NPROC_ETA`** – Number of MPI processors along ξ and η directions. It should be fixed to 1, the partition will be done later.
 
----
 
 #### Doubling Layers
 
@@ -135,7 +134,7 @@ Only modified `ELLIPTICITY` if you required.
 ### Mesh Generation
 
 1. In `step1_run_mesher.sh`, set `myprocs` to the desired number of MPI slices, then run the script.  
-2. Update `cube2sph_params` based on the output from `step0`, then execute it using MPI.
+2. Update `cube2sph_params` in `step2_slurm_cube2sph.sh` based on the output from `step0`, then execute it using MPI.
 
 Congratulations! You have completed the mesh generation process.
 
