@@ -1,4 +1,4 @@
-# Tutorial
+# Full Waveform Inversion Tutorial
 
 ## FWAT Parameter files
 The `fwat_params` directory contains two parameter files:
@@ -12,7 +12,6 @@ Here is a template of `fwat.yaml`:
 ```yaml
 # FWAT Package parameters
 simulation:
-  GPU_MODE: True 
   DUMP_WAVEFIELDS: True
 
 # Measurements block, for computing adjoint source
@@ -93,11 +92,22 @@ optimize:
 
 several configuration blocks:
 
-### Simulation block
-This block contains parameters for forward/adjoint simulation.
-  - **`GPU_MODE`** – If set to `true`, enables the `GPU_MODE` option in SPECFEM3D’s `Par_file`.
-  - **`DUMP_WAVEFIELDS`** – If set to `true`, enables the `SUBSAMPLE_FORWARD_WAVEFIELD` option in `Par_file`. In this mode, the full wavefield from the forward simulation is saved and later read back during the adjoint simulation.
+### Simulation Block
 
+This block contains parameters for forward and adjoint simulations.
+
+- **`DUMP_WAVEFIELDS`** – If set to `true`, enables the `SUBSAMPLE_FORWARD_WAVEFIELD` option in `Par_file`.  
+  In this mode, the full wavefield from the forward simulation is saved and later read back during the adjoint simulation.  
+
+To control how many time steps the wavefield is dumped, modify the following parameters in `Par_file`:
+```fortran
+KERNEL_SPP = 8
+KERNEL_T0  = 5.0
+```
+- **`KERNEL_SPP`** – Number of sampling points per period.  
+- **`KERNEL_T0`** – Minimum period used in your simulation (can be found in `output_generate_databases.txt`).
+
+(measurement-block)=
 ### Measurement block
 This block defines parameters used for measurements, including computing misfits, generating adjoint sources, and applying seismogram rotations.  It currently supports the following four FWI workflows:  
 
@@ -264,7 +274,6 @@ Possible values:
 - **`INIT`** – First iteration (initialization step).  
 - **`GRAD`** – Compute the cost and (preconditioned) gradient at the current point `x`.  
 - **`LS`** – line search stage
----
 
 #### Line Search Parameters
 - **`M1`** – Wolfe condition parameter 1 (Nocedal’s value).  
@@ -273,22 +282,105 @@ Possible values:
   Example: `0.9`
 - **`FACTOR`** – Bracketing parameter (Gilbert’s value).  
   Example: `10`
-- **`MAXLS`** – Maximum number of line search iterations.  
-  Example: `100`
 - **`alpha_L`** – Left bound for step size.
 - **`alpha_R`** – Right bound for step size.
 - **`alpha`** – Current step size. For first iteration it wil be `-1.`, then it will be automatically tuned.
+
+(source-and-stations)=
+## Source and Stations
+
+This section describes the setup process for source and station files.
+
+### Create the `src_rec` Directory and Source Files
+Create a directory named `src_rec` and add source definition files named `src_rec/sources.dat.*`  
+(for example, `src_rec/sources.dat.noise`).  
+
+The file format is as follows:
+```bash
+NAME evla evlo evdp evbur
+```
+where:
+- `NAME` – Source name identifier.
+- `evla`, `evlo` – Event latitude and longitude.
+- `evdp` – Event depth.
+- `evbur` – Event burial depth.
+
+### Create the Station File
+Create a file named `src_rec/STATIONS_${NAME}_globe`, where `NAME` matches the **first column** in `sources.dat`.  
+
+Convert it to spherical coordinates using:
+```bash
+utils/cube2sph/bin/write_station_file
+```
+This will produce:
+```
+src_rec/STATIONS_${NAME}, rot_${NAME}
+```
+
+### Create the Force Solution File
+Create `src_rec/FORCESOLUTION_${NAME}_globe` with the following format:
+```
+FORCE 001 
+time shift:     0.0000
+f0:             1.0
+latorUTM:       34.5
+longorUTM:      125.4
+depth:          0.0000
+source time function:            0
+factor force source:             1.e15
+component dir vect source E:     0.e0
+component dir vect source N:     0.e0
+component dir vect source Z_UP:  1.e0
+```
+Convert it to:
+```
+src_rec/FORCESOLUTION_${NAME}
+```
+using:
+```bash
+utils/cube2sph/bin/write_force_solution_file
+```
+
+**Note:**  
+For multi-channel noise simulation, provide the following files:
+- `FORCESOLUTION_${NAME}_Z`
+- `FORCESOLUTION_${NAME}_N`
+- `FORCESOLUTION_${NAME}_E`
+- `STATIONS_${NAME}_R` / `STATIONS_${NAME}_T`
+- `STATIONS_${NAME}_Z`
+The stations in each `STATION_${NAME}_[RTZ]` can be different. You should merge all `rot_${NAME}_{RTZ}` together by 
+```bash
+cat rot_${NAME}_{RTZ} |sort -n |uniq > rot_${NAME}
+```
+
+### Create the CMT Solution File
+Create `src_rec/CMTSOLUTION_${NAME}_globe` and convert it to:
+```
+src_rec/CMTSOLUTION_${NAME}
+```
+using:
+```bash
+utils/cube2sph/bin/write_cmt_solution
+```
+
+### Place the observation Data
+Store the data in:
+```
+fwat_data/$NAME
+```
+For multi-channel noise data, it should be placed as:
+```
+fwat_data/$NAME_[RTZ]
+```
 
 ## Cluster Parameters
 
 All of the following files are stored in `INSTALL_DIR` during installation.
 
----
 
 ### `module_env`
 Contains the environment module commands required to load dependencies on the cluster.
 
----
 
 ### `parameters.sh`
 
@@ -327,8 +419,6 @@ Contains the environment module commands required to load dependencies on the cl
   NJOBS_PER_JOBARRAY=(1 1)
   ```
 
----
-
 ### `run_fwi.sh` and `run_forward.sh`
 These scripts implement several functions that add SLURM job headers, making them executable on a cluster.  
 The functions include:
@@ -340,99 +430,13 @@ The functions include:
 **Note:**  
 Edit these functions to match your working environment, for example, by adding GPU-specific flags, account information, or other SLURM parameters.
 
-(source-and-stations)=
-## Source and Stations
+## Checklist
 
-This section describes the setup process for source and station files.
+Before running a forward or adjoint simulation, ensure the following items are prepared:
 
-### Create the `src_rec` Directory and Source Files
-Create a directory named `src_rec` and add source definition files named `src_rec/sources.dat.*`  
-(for example, `src_rec/sources.dat.noise`).  
-
-
-### Create the `src_rec` Directory and Source Files
-Create a directory named `src_rec` and add source definition files named `src_rec/sources.dat.*`  
-(for example, `src_rec/sources.dat.noise`).  
-
-The file format is as follows:
-```bash
-NAME evla evlo evdp evbur
-```
-where:
-- `NAME` – Source name identifier.
-- `evla`, `evlo` – Event latitude and longitude.
-- `evdp` – Event depth.
-- `evbur` – Event burial depth.
----
-
-### Create the Station File
-Create a file named `src_rec/STATIONS_${NAME}_globe`, where `NAME` matches the **first column** in `sources.dat`.  
-
-Convert it to spherical coordinates using:
-```bash
-utils/cube2sph/bin/write_station_file
-```
-This will produce:
-```
-src_rec/STATIONS_${NAME}
-```
-
-
-### Create the Force Solution File
-Create `src_rec/FORCESOLUTION_${NAME}_globe` with the following format:
-```
-FORCE 001 
-time shift:     0.0000
-f0:             1.0
-latorUTM:       34.5
-longorUTM:      125.4
-depth:          0.0000
-source time function:            0
-factor force source:             1.e15
-component dir vect source E:     0.e0
-component dir vect source N:     0.e0
-component dir vect source Z_UP:  1.e0
-```
-Convert it to:
-```
-src_rec/FORCESOLUTION_${NAME}
-```
-using:
-```bash
-utils/cube2sph/bin/write_force_solution_file
-```
-
-**Note:**  
-For multi-channel noise simulation, provide the following files:
-- `FORCESOLUTION_${NAME}_Z`
-- `FORCESOLUTION_${NAME}_N`
-- `FORCESOLUTION_${NAME}_E`
-- `STATIONS_${NAME}_R` / `STATIONS_${NAME}_T`
-- `STATIONS_${NAME}_Z`
-The station numbers in each `STATION_${NAME}_[RTZ]` can be different.
-
-### Create the CMT Solution File
-Create `src_rec/CMTSOLUTION_${NAME}_globe` and convert it to:
-```
-src_rec/CMTSOLUTION_${NAME}
-```
-using:
-```bash
-utils/cube2sph/bin/write_cmt_solution
-```
-
-### Place the observation Data
-Store the data in:
-```
-fwat_data/$NAME
-```
-For multi-channel noise data, it should be placed as:
-```
-fwat_data/$NAME_[RTZ]
-```
-
-## SpecFEM Mesh generations
-to be continued ...
-
-# SpecFEM Par_file settings
-to be continued ...
+- **`DATA`** – Directory containing input data. You can copy the `DATA` directory used in mesh generation.  
+- **`DATA/Par_file.{simu_type}`** – For each simulation type (see [Measurement](#measurement-block)), provide a corresponding `Par_file`.  
+- **`DATA/axisem/SOURCE_TAG`** – Background wavefield file, which can be generated using [AxiSEMLib](https://github.com/nqdu/AxiSEMLib/tree/main).  
+- **`OUTPUT_FILES`** – You can copy these from the mesh generation output.  
+- **`DATABASES_MPI`** – Required for forward simulation.  
+- **`./optimize/MODEL_M00`** – Directory containing your initial model (files in `DATABASES_MPI`) for FWI.

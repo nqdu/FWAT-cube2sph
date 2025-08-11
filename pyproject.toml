@@ -12,10 +12,10 @@ license = {text = "MIT"}
 authors = [{name = "Nanqiao Du", email = "nanqiao.du@email.com"}]
 dependencies = [
     "numpy >=1.20",
-    "scipy >= 1.7.0",
+    "scipy >= 1.12.0",
     "mpi4py",
     "h5py",
-    "obspy >=1.4.0",
+    "obspy >=1.4.2",
     "numba",
     "pybind11-global"
 ]

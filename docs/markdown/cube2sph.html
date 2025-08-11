@@ -1,0 +1,319 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cube2sph Tutorial &mdash; FWAT  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Full Waveform Inversion Tutorial" href="fwat.html" />
+    <link rel="prev" title="Introduction" href="install.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            FWAT
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="install.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="install.html#installation">Installation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Cube2sph Tutorial</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#cube2sph-mesh-generation">Cube2sph Mesh Generation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#setup-constants-h"><strong><code class="docutils literal notranslate"><span class="pre">setup/constants.h</span></code></strong></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#ade-pml-flags">ADE-PML Flags</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cube2sph-flags">Cube2sph Flags</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#mesh-par-file"><code class="docutils literal notranslate"><span class="pre">Mesh_Par_file</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#mesh-size">Mesh Size</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#model-geometry-files">Model Geometry Files</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#surface-mesh-resolution">Surface Mesh Resolution</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#doubling-layers">Doubling Layers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain-materials">Domain Materials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain-regions">Domain Regions</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#data-par-file-init"><strong><code class="docutils literal notranslate"><span class="pre">DATA/Par_file.init</span></code></strong></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#pml-parameters">PML parameters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#injection-parameters">Injection Parameters</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#cube2sph-model-par"><em><strong><code class="docutils literal notranslate"><span class="pre">Cube2sph_model_par</span></code></strong></em></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#mesh-generation">Mesh Generation</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#specfem-simulations">SpecFEM Simulations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="fwat.html">Full Waveform Inversion Tutorial</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">FWAT</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Cube2sph Tutorial</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/markdown/cube2sph.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="cube2sph-tutorial">
+<h1>Cube2sph Tutorial<a class="headerlink" href="#cube2sph-tutorial" title="Link to this heading"></a></h1>
+<section id="cube2sph-mesh-generation">
+<h2>Cube2sph Mesh Generation<a class="headerlink" href="#cube2sph-mesh-generation" title="Link to this heading"></a></h2>
+<p>This package is intended for advanced <a class="reference external" href="https://github.com/SPECFEM/specfem3d/tree/devel/src">SPECFEM3D</a> users and assumes that readers are already familiar with SPECFEM3D.  Most of the <code class="docutils literal notranslate"><span class="pre">Par_files</span></code> are identical to those in SPECFEM3D, so only the new or modified parameters are listed here.</p>
+<p><strong>Note:</strong><br />
+Do <strong>not</strong> modify any other parameters unless you are certain of their effect.</p>
+<section id="setup-constants-h">
+<h3><strong><code class="docutils literal notranslate"><span class="pre">setup/constants.h</span></code></strong><a class="headerlink" href="#setup-constants-h" title="Link to this heading"></a></h3>
+<p>Several flags are enabled by default:</p>
+<section id="ade-pml-flags">
+<h4>ADE-PML Flags<a class="headerlink" href="#ade-pml-flags" title="Link to this heading"></a></h4>
+<div class="highlight-fortran notranslate"><div class="highlight"><pre><span></span><span class="kt">logical</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">USE_ADE_PML</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">.</span><span class="n">true</span><span class="p">.</span>
+<span class="kt">logical</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">ADEPML_DEFORMED</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">.</span><span class="n">true</span><span class="p">.</span>
+</pre></div>
+</div>
+<p>Keep these enabled unless you have a specific reason to change them.</p>
+</section>
+<section id="cube2sph-flags">
+<h4>Cube2sph Flags<a class="headerlink" href="#cube2sph-flags" title="Link to this heading"></a></h4>
+<div class="highlight-fortran notranslate"><div class="highlight"><pre><span></span><span class="kt">logical</span><span class="p">,</span><span class="w"> </span><span class="k">parameter</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">CUBE2SPH_MESH</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">.</span><span class="n">true</span><span class="p">.</span>
+<span class="kt">logical</span><span class="p">,</span><span class="w"> </span><span class="k">parameter</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">AZIMUTHAL_ANISOTROPY</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">.</span><span class="n">false</span><span class="p">.</span>
+<span class="kt">logical</span><span class="p">,</span><span class="w"> </span><span class="k">parameter</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">SAVE_MESH_AS_CUBIT</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">.</span><span class="n">true</span><span class="p">.</span>
+</pre></div>
+</div>
+<p>These flags should remain as shown:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">CUBE2SPH_MESH</span></code> is always enabled, as the cube-to-sphere transformation is a core step.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">AZIMUTHAL_ANISOTROPY</span></code> should remain <code class="docutils literal notranslate"><span class="pre">false</span></code> here; anisotropy is handled in other way.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">SAVE_MESH_AS_CUBIT</span></code> is always enabled.<br />
+This is required because part of the workflow—specifically the conversion from an 8-point mesh to a 27-point mesh—depends on the <code class="docutils literal notranslate"><span class="pre">CUBIT</span></code> files.</p></li>
+</ul>
+</section>
+</section>
+<section id="mesh-par-file">
+<h3><code class="docutils literal notranslate"><span class="pre">Mesh_Par_file</span></code><a class="headerlink" href="#mesh-par-file" title="Link to this heading"></a></h3>
+<p>This file can be found in utils/cube2sph/EXAMPLES/NED-MODEL.</p>
+<section id="mesh-size">
+<h4>Mesh Size<a class="headerlink" href="#mesh-size" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">LATITUDE_MIN</span></code></strong>, <strong><code class="docutils literal notranslate"><span class="pre">LATITUDE_MAX</span></code></strong> – Minimum and maximum y coordinates of the mesh block, in meters.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">LONGITUDE_MIN</span></code></strong>, <strong><code class="docutils literal notranslate"><span class="pre">LONGITUDE_MAX</span></code></strong> – Minimum and maximum x coordinates of the mesh block, in meters.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">DEPTH_BLOCK_KM</span></code></strong> – Depth of the mesh block in kilometers.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">THICKNESS_OF_X_PML</span></code></strong> – X-direction PML thickness.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">THICKNESS_OF_Y_PML</span></code></strong> – Y-direction PML thickness.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">THICKNESS_OF_Z_PML</span></code></strong> – Z-direction PML thickness.</p></li>
+</ul>
+<p><strong>Note:</strong><br />
+Modify these parameters to ensure they fully cover your study region.<br />
+For example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">LONGITUDE_MIN</span> <span class="o">-</span> <span class="n">THICKNESS_OF_X_PML</span> <span class="o">&lt;</span> <span class="n">x_study</span> <span class="o">&lt;</span> <span class="n">LONGITUDE_MAX</span> <span class="o">+</span> <span class="n">THICKNESS_OF_X_PML</span>
+</pre></div>
+</div>
+<p>Ensure that the PML thickness is an exact integer multiple of the element size. To verify coverage, modify the parameters in <code class="docutils literal notranslate"><span class="pre">step0_plot_region.sh</span></code> and run it. (Note: the <code class="docutils literal notranslate"><span class="pre">rot</span></code> parameters will rotate the cube2sph mesh to better cover your study region.) Inspect the generated figures to confirm. The program will also produce a cube2sph_param file that can be used directly in <code class="docutils literal notranslate"><span class="pre">step2_slurm_cube2sph.sh</span></code>.</p>
+</section>
+<section id="model-geometry-files">
+<h4>Model Geometry Files<a class="headerlink" href="#model-geometry-files" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">INTERFACES_FILE</span></code></strong> – File containing the interfaces of the model/mesh.<br />
+Example: <code class="docutils literal notranslate"><span class="pre">interfaces.dat</span></code></p>
+<ul>
+<li><p>For constant interfaces, you can directly edit all required files.</p></li>
+<li><p>For realistic interfaces (e.g., topography on the free surface), see the solutions provided in <code class="docutils literal notranslate"><span class="pre">create_model/topo</span></code>.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="surface-mesh-resolution">
+<h4>Surface Mesh Resolution<a class="headerlink" href="#surface-mesh-resolution" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">NEX_XI</span></code></strong>, <strong><code class="docutils literal notranslate"><span class="pre">NEX_ETA</span></code></strong> – Number of elements at the surface along the mesh edges in the ξ and η directions.</p>
+<ul>
+<li><p>Must be <code class="docutils literal notranslate"><span class="pre">8</span> <span class="pre">×</span> <span class="pre">(multiple</span> <span class="pre">of</span> <span class="pre">NPROC)</span></code> for irregular meshes with doublings.</p></li>
+<li><p>Must be <code class="docutils literal notranslate"><span class="pre">(multiple</span> <span class="pre">of</span> <span class="pre">NPROC)</span></code> for regular meshes.</p></li>
+</ul>
+</li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">NPROC_XI</span></code></strong>, <strong><code class="docutils literal notranslate"><span class="pre">NPROC_ETA</span></code></strong> – Number of MPI processors along ξ and η directions. It should be fixed to 1, the partition will be done later.</p></li>
+</ul>
+</section>
+<hr class="docutils" />
+<section id="doubling-layers">
+<h4>Doubling Layers<a class="headerlink" href="#doubling-layers" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">USE_REGULAR_MESH</span></code></strong> – If <code class="docutils literal notranslate"><span class="pre">.true.</span></code>, generates a regular mesh; if <code class="docutils literal notranslate"><span class="pre">.false.</span></code>, allows irregular mesh with doublings.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">NDOUBLINGS</span></code></strong> – Number of doubling layers (only for irregular meshes).</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">NZ_DOUBLING_1</span></code></strong>, <strong><code class="docutils literal notranslate"><span class="pre">NZ_DOUBLING_2</span></code></strong>, <strong><code class="docutils literal notranslate"><span class="pre">NZ_DOUBLING_3</span></code></strong> – Depth indices for doubling layers.<br />
+Example: If <code class="docutils literal notranslate"><span class="pre">NDOUBLINGS</span> <span class="pre">=</span> <span class="pre">1</span></code>, set <code class="docutils literal notranslate"><span class="pre">NZ_DOUBLING_1</span></code> to the position of the doubling layer.</p></li>
+</ul>
+</section>
+<section id="domain-materials">
+<h4>Domain Materials<a class="headerlink" href="#domain-materials" title="Link to this heading"></a></h4>
+<ul>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">NMATERIALS</span></code></strong> – Number of materials in the model.</p></li>
+<li><p>Material format:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">material_id</span>  <span class="n">rho</span>  <span class="n">vp</span>  <span class="n">vs</span>  <span class="n">Q_Kappa</span>  <span class="n">Q_mu</span>  <span class="n">anisotropy_flag</span>  <span class="n">domain_id</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">Q_Kappa</span></code></strong> – Bulk modulus attenuation quality factor.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">Q_mu</span></code></strong> – Shear modulus attenuation quality factor.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">anisotropy_flag</span></code></strong> – <code class="docutils literal notranslate"><span class="pre">0</span></code> = no anisotropy; other values depend on <code class="docutils literal notranslate"><span class="pre">aniso_model.f90</span></code> implementation.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">domain_id</span></code></strong> – <code class="docutils literal notranslate"><span class="pre">1</span></code> = acoustic, <code class="docutils literal notranslate"><span class="pre">2</span></code> = elastic.<br />
+Example:</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">-</span><span class="mi">1</span>  <span class="mi">1</span>  <span class="mi">1</span>  <span class="mi">1</span>  <span class="mi">9999</span>  <span class="mi">40</span>  <span class="mi">0</span>  <span class="mi">2</span>
+<span class="o">-</span><span class="mi">2</span>  <span class="mi">1</span>  <span class="mi">1</span>  <span class="mi">1</span>  <span class="mi">9999</span>  <span class="mi">40</span>  <span class="mi">0</span>  <span class="mi">2</span>
+</pre></div>
+</div>
+</li>
+</ul>
+<p>Note we only support input when <code class="docutils literal notranslate"><span class="pre">material_id</span> <span class="pre">&lt;</span> <span class="pre">0</span></code>, the the program will read tomography files in <code class="docutils literal notranslate"><span class="pre">nummaterial_velocity_file_tomo</span></code>, different <code class="docutils literal notranslate"><span class="pre">material_id</span></code> will be linked to a different tomography file. The generation of tomography file for realistic models can be found in <code class="docutils literal notranslate"><span class="pre">create_model/3dveloc</span></code>.</p>
+</section>
+<section id="domain-regions">
+<h4>Domain Regions<a class="headerlink" href="#domain-regions" title="Link to this heading"></a></h4>
+<ul>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">NREGIONS</span></code></strong> – Number of regions in the model.</p></li>
+<li><p>Region format:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">NEX_XI_BEGIN</span>  <span class="n">NEX_XI_END</span>  <span class="n">NEX_ETA_BEGIN</span>  <span class="n">NEX_ETA_END</span>  <span class="n">NZ_BEGIN</span>  <span class="n">NZ_END</span>  <span class="n">material_id</span>
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+</section>
+<section id="data-par-file-init">
+<h3><strong><code class="docutils literal notranslate"><span class="pre">DATA/Par_file.init</span></code></strong><a class="headerlink" href="#data-par-file-init" title="Link to this heading"></a></h3>
+<p>This file can be found in <code class="docutils literal notranslate"><span class="pre">utils/cube2sph/EXAMPLES/NED-MODEL</span></code>. Please note the mesh generation program will automatically generate a new <code class="docutils literal notranslate"><span class="pre">Par_file</span></code>, so the user should only edit parameters in this file.</p>
+<p><code class="docutils literal notranslate"><span class="pre">Note</span></code> you can copy this file as a template for your own case, DONNOT modify any thing except listed below:</p>
+<section id="pml-parameters">
+<h4>PML parameters<a class="headerlink" href="#pml-parameters" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">f0_FOR_PML</span></code></strong> – dominant frequency for your study.</p></li>
+</ul>
+</section>
+<section id="injection-parameters">
+<h4>Injection Parameters<a class="headerlink" href="#injection-parameters" title="Link to this heading"></a></h4>
+<p>Used for wavefield injection.</p>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">COUPLE_WITH_INJECTION_TECHNIQUE</span></code></strong> – Enables coupling with an external injection technique.</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">.true.</span></code> → Coupling is enabled.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.false.</span></code> → Coupling is disabled.</p></li>
+</ul>
+</li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">INJECTION_TECHNIQUE_TYPE</span></code></strong> – Specifies the injection technique type:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">1</span></code> – DSM (Direct Solution Method)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">2</span></code> – AxiSEM</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">3</span></code> – FK (Frequency–Wavenumber)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">4</span></code> –  Wavefield discontinuity</p></li>
+</ul>
+</li>
+</ul>
+<p>Note if <code class="docutils literal notranslate"><span class="pre">INJECTION_TECHNIQUE_TYPE</span> <span class="pre">=</span> <span class="pre">4</span></code> it will use the <a class="reference external" href="https://academic.oup.com/gji/advance-article-abstract/doi/10.1093/gji/ggaf054/8029895">wavefield discontinuity</a> technique to do coupled simulation. If it is enabled (even if the <code class="docutils literal notranslate"><span class="pre">COUPLE_WITH_INJECTION_TECHNIQUE</span></code> is disabled) you should provide the following:</p>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">WAVEFIELD_DISCON_BOX_XMIN</span></code></strong> – Minimum X coordinate.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">WAVEFIELD_DISCON_BOX_XMAX</span></code></strong> – Maximum X coordinate.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">WAVEFIELD_DISCON_BOX_YMIN</span></code></strong> – Minimum Y coordinate.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">WAVEFIELD_DISCON_BOX_YMAX</span></code></strong> – Maximum Y coordinate.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">WAVEFIELD_DISCON_BOX_ZMIN</span></code></strong> – Minimum Z coordinate (depth).</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">WAVEFIELD_DISCON_BOX_ZMAX</span></code></strong> – Maximum Z coordinate (depth).</p></li>
+</ul>
+<p>Ensure that these boundaries match exactly the the element boundaries in non-PML region.</p>
+</section>
+</section>
+<section id="cube2sph-model-par">
+<h3><em><strong><code class="docutils literal notranslate"><span class="pre">Cube2sph_model_par</span></code></strong></em><a class="headerlink" href="#cube2sph-model-par" title="Link to this heading"></a></h3>
+<p>Only modified <code class="docutils literal notranslate"><span class="pre">ELLIPTICITY</span></code> if you required.</p>
+</section>
+<section id="mesh-generation">
+<h3>Mesh Generation<a class="headerlink" href="#mesh-generation" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p>In <code class="docutils literal notranslate"><span class="pre">step1_run_mesher.sh</span></code>, set <code class="docutils literal notranslate"><span class="pre">myprocs</span></code> to the desired number of MPI slices, then run the script.</p></li>
+<li><p>Update <code class="docutils literal notranslate"><span class="pre">cube2sph_params</span></code> based on the output from <code class="docutils literal notranslate"><span class="pre">step0</span></code>, then execute it using MPI.</p></li>
+</ol>
+<p>Congratulations! You have completed the mesh generation process.</p>
+</section>
+</section>
+<section id="specfem-simulations">
+<h2>SpecFEM Simulations<a class="headerlink" href="#specfem-simulations" title="Link to this heading"></a></h2>
+<p>to be continued …</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="install.html" class="btn btn-neutral float-left" title="Introduction" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="fwat.html" class="btn btn-neutral float-right" title="Full Waveform Inversion Tutorial" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

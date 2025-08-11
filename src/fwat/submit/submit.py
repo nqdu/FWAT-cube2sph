@@ -52,6 +52,14 @@ class FwatSubmitor:
             self.pdict = param['simulation']
             self.mdict = param['measure'][meatype]
 
+        # get GPU_MODE in DATA/Par_file.{meatype}
+        from fwat.system.specfem import get_param
+        mode = get_param(f'DATA/Par_file.{meatype}','GPU_MODE').lower()
+        if mode == '.false.':
+            self.pdict['GPU_MODE'] = False 
+        else:
+            self.pdict['GPU_MODE'] = True
+
         # get path
         self.SOLVER = SOLVER
         self.SRC_REC = SRC_REC
@@ -152,6 +160,8 @@ class FwatSubmitor:
         return evtid_list,stations_list
 
     def prepare_fwd(self):
+        import glob 
+
         evtid_list,stations_list = self._get_simulation_list(True)
 
         # loop each evtid list
@@ -184,11 +194,11 @@ class FwatSubmitor:
                     pass
 
                 # link axisem field
-                for f in os.listdir(f"{syndir}/DATABASES_MPI/"):
-                    if 'wavefield_discontinuity' in f :
-                        sys_remove(f"{syndir}/DATABASES_MPI/{f}")
-                        os.symlink(f"{self.cwd}/DATA/axisem/{evtid}/{f}", 
-                                f"{syndir}/DATABASES_MPI/{f}")
+                for f in glob.glob("f{syndir}/DATABASES_MPI/*wavefield_discontinuity.bin"):
+                    sys_remove(f)
+                for f in os.listdir(f"{self.cwd}/DATA/axisem/{evtid}/"):
+                    os.symlink(f"{self.cwd}/DATA/axisem/{evtid}/{f}",
+                               f"{syndir}/DATABASES_MPI/{f}" )
             
             elif self.meatype == "noise":
                 filename = f"{syndir}/DATA/Par_file"
@@ -253,6 +263,9 @@ class FwatSubmitor:
             SAVE_FORWARD=".false."
             if self.pdict['DUMP_WAVEFIELDS']:
                 SUBSAMPLE = ".true."
+            else:
+                if self.meatype in ['sks','tele','rf']:
+                    COUPLE_WITH_INJECTION = ".true."
             
             filename = f"{syndir}/DATA/Par_file"
             change_parfile(filename,
