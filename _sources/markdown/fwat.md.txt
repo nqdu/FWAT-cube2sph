@@ -274,7 +274,6 @@ Possible values:
 - **`INIT`** – First iteration (initialization step).  
 - **`GRAD`** – Compute the cost and (preconditioned) gradient at the current point `x`.  
 - **`LS`** – line search stage
----
 
 #### Line Search Parameters
 - **`M1`** – Wolfe condition parameter 1 (Nocedal’s value).  
@@ -305,7 +304,6 @@ where:
 - `evla`, `evlo` – Event latitude and longitude.
 - `evdp` – Event depth.
 - `evbur` – Event burial depth.
----
 
 ### Create the Station File
 Create a file named `src_rec/STATIONS_${NAME}_globe`, where `NAME` matches the **first column** in `sources.dat`.  
@@ -379,12 +377,10 @@ fwat_data/$NAME_[RTZ]
 
 All of the following files are stored in `INSTALL_DIR` during installation.
 
----
 
 ### `module_env`
 Contains the environment module commands required to load dependencies on the cluster.
 
----
 
 ### `parameters.sh`
 
@@ -422,8 +418,6 @@ Contains the environment module commands required to load dependencies on the cl
   ```bash
   NJOBS_PER_JOBARRAY=(1 1)
   ```
-
----
 
 ### `run_fwi.sh` and `run_forward.sh`
 These scripts implement several functions that add SLURM job headers, making them executable on a cluster.  

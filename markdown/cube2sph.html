@@ -180,7 +180,6 @@ Example: <code class="docutils literal notranslate"><span class="pre">interfaces
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">NPROC_XI</span></code></strong>, <strong><code class="docutils literal notranslate"><span class="pre">NPROC_ETA</span></code></strong> – Number of MPI processors along ξ and η directions. It should be fixed to 1, the partition will be done later.</p></li>
 </ul>
 </section>
-<hr class="docutils" />
 <section id="doubling-layers">
 <h4>Doubling Layers<a class="headerlink" href="#doubling-layers" title="Link to this heading"></a></h4>
 <ul class="simple">
@@ -274,7 +273,7 @@ Example:</p></li>
 <h3>Mesh Generation<a class="headerlink" href="#mesh-generation" title="Link to this heading"></a></h3>
 <ol class="arabic simple">
 <li><p>In <code class="docutils literal notranslate"><span class="pre">step1_run_mesher.sh</span></code>, set <code class="docutils literal notranslate"><span class="pre">myprocs</span></code> to the desired number of MPI slices, then run the script.</p></li>
-<li><p>Update <code class="docutils literal notranslate"><span class="pre">cube2sph_params</span></code> based on the output from <code class="docutils literal notranslate"><span class="pre">step0</span></code>, then execute it using MPI.</p></li>
+<li><p>Update <code class="docutils literal notranslate"><span class="pre">cube2sph_params</span></code> in <code class="docutils literal notranslate"><span class="pre">step2_slurm_cube2sph.sh</span></code> based on the output from <code class="docutils literal notranslate"><span class="pre">step0</span></code>, then execute it using MPI.</p></li>
 </ol>
 <p>Congratulations! You have completed the mesh generation process.</p>
 </section>
