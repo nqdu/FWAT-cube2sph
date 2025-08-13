@@ -30,7 +30,7 @@ for iter in $run_indx;do
     for ip in `seq 1 $nfiles`; do
 
       if [ "$INTP_KL" == "1" ]; then 
-        python $fwatlib/optimize/bin2h5.py ${WORK_PREFIX}${ii}${lsflag}/  $param $NPROC 0
+        fwat-main bin2h5 ${WORK_PREFIX}${ii}${lsflag}/  $param $NPROC 0
       fi
 
       $specfem_dir/bin/xcreate_slice $param ${WORK_PREFIX}${ii}${lsflag}/  $DATABASE_DIR \

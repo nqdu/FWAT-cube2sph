@@ -124,6 +124,7 @@ for i in `seq 1 $NJOBS`; do
       fwat-main bin2h5 $evtdir/GRADIENT $grad $NPROC 1
     done 
     \rm $evtdir/GRADIENT/*.bin
+    echo ""
 
     # delete useless information
     fwat-utils clean $MODEL $evtid_wk 

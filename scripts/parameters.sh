@@ -8,8 +8,8 @@ PLATFORM="local" # local or slurm
 
 # simulation types
 SIMU_TYPES=("noise")
-SIMU_TYPES_USER_WEIGHT=(1. 1.)
-NJOBS_PER_JOBARRAY=(1 1)
+SIMU_TYPES_USER_WEIGHT=(1.)
+NJOBS_PER_JOBARRAY=(1)
 
 ############## STOP HERE ###################
 

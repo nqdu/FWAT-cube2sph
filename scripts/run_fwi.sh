@@ -6,7 +6,7 @@ SHELL_HEADER_SEM(){
     cat << EOF
 #!/bin/bash
 EOF
-  else
+  elif [[ "$PLATFORM"  == "slurm" ]]; then 
   local narray=$1
   local stype=$2
   local walltime=$3
@@ -24,6 +24,18 @@ EOF
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=nanqiao.du@mail.utoronto.ca
 EOF
+  elif [[ "$PLATFORM"  == "pbs" ]]; then 
+    cat << EOF
+#!/bin/bash -l
+#PBS -l nodes=2:ppn=80
+#PBS -l walltime=01:30:00
+#PBS -N FWD_ADJ.$flag.$stype
+#PBS -J 1-$narray
+#PBS -q starq
+#PBS -j oe
+EOF
+  else 
+    echo "not implemented!"
   fi
 }
 
@@ -129,7 +141,11 @@ RUN_POST ()
   if [[ "$PLATFORM"  == "local" ]];  then  
     bash $fwd > LOG/POST.$iter.txt 
   else 
-    job_post=$(sbatch --dependency=afterok:${job_adj} $fwd | cut -d ' ' -f4)
+    if [ "$flag" == "GRAD" ]; then 
+      job_post=$(sbatch $fwd | cut -d ' ' -f4)
+    else 
+      job_post=$(sbatch --dependency=afterok:${job_adj} $fwd | cut -d ' ' -f4)
+    fi
   fi 
 }
 

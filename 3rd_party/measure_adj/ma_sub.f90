@@ -942,7 +942,6 @@ contains
     real, dimension(:), allocatable :: x_sngl
 
     allocate(x_sngl(n))
-
     x_sngl(1:n) = sngl(x(1:n))
     !  delta_t_sngl = sngl(delta_t)
 
@@ -955,7 +954,10 @@ contains
     ! BU - butterworth
     ! BP - bandpass
     ! LQY: Shouldn't  delta_t_sngl = sngl(delta_t) still be done? same for f1,f2?
-    call xapiir(x_sngl,n,'BU',TRBDNDW,APARM,IORD,'BP',f1,f2,delta_t,PASSES)
+    !call xapiir(x_sngl,n,'BU',TRBDNDW,APARM,IORD,'BP',f1,f2,delta_t,PASSES)
+    call xapiir(x_sngl,n,'BU',sngl(TRBDNDW),sngl(APARM),&
+                IORD,'BP',sngl(f1),sngl(f2),sngl(delta_t),&
+                PASSES)
 
     x(1:n) = dble(x_sngl(1:n))
 
@@ -1025,10 +1027,10 @@ contains
        ! set minmax values in sac file
        xmin_sngl = minval(dat_sngl)
        xmax_sngl = maxval(dat_sngl)
-       call setfhv('depmin',xmin_sngl,nerr)
-       call setfhv('depmax',xmax_sngl,nerr)
+      !  call setfhv('depmin',xmin_sngl,nerr)
+      !  call setfhv('depmax',xmax_sngl,nerr)
 
-       call setnhv('npts',npt1,nerr)          ! sets number of points
+      !  call setnhv('npts',npt1,nerr)          ! sets number of points
        !call setfhv('b',ti_sngl(1),nerr)       ! sets begin
        !call setfhv('e',ti_sngl(npt1),nerr)    ! sets end
        !call setlhv('leven',.false.,nerr)        ! sets un-even sampling
@@ -1971,111 +1973,111 @@ contains
 
 !-------------------------------------------------------------------
 
-  subroutine get_sacfile_header(data_file,yr,jda,ho,mi,sec,ntw,sta, &
-                                comp,dist,az,baz,slat,slon)
+!   subroutine get_sacfile_header(data_file,yr,jda,ho,mi,sec,ntw,sta, &
+!                                 comp,dist,az,baz,slat,slon)
 
-    implicit none
-    character(len=*),intent(in) :: data_file
+!     implicit none
+!     character(len=*),intent(in) :: data_file
 
-    integer,intent(out):: yr,jda,ho,mi
-    double precision,intent(out):: sec,dist,az,baz,slat,slon
-    character(len=*),intent(out) :: ntw,sta,comp
-    real :: tmp
+!     integer,intent(out):: yr,jda,ho,mi
+!     double precision,intent(out):: sec,dist,az,baz,slat,slon
+!     character(len=*),intent(out) :: ntw,sta,comp
+!     real :: tmp
 
-    integer :: nsec,msec
-    integer :: nerr
+!     integer :: nsec,msec
+!     integer :: nerr
 
-    ! note here data_file is a dummy argument, and we rely on the earlier
-    ! call to rsac1() to retain header and waveform info in computer memory
-    ! for data_file trace.
+!     ! note here data_file is a dummy argument, and we rely on the earlier
+!     ! call to rsac1() to retain header and waveform info in computer memory
+!     ! for data_file trace.
 
 
-    !  integer header variables  (these values are not really used!)
-    call getnhv('nzyear',yr,nerr)
-    call getnhv('nzjday',jda,nerr)
-    call getnhv('nzhour',ho,nerr)
-    call getnhv('nzhour',mi,nerr)
-    call getnhv('nzmin',nsec,nerr)
-    call getnhv('nzmsec',msec,nerr)
+!     !  integer header variables  (these values are not really used!)
+!     call getnhv('nzyear',yr,nerr)
+!     call getnhv('nzjday',jda,nerr)
+!     call getnhv('nzhour',ho,nerr)
+!     call getnhv('nzhour',mi,nerr)
+!     call getnhv('nzmin',nsec,nerr)
+!     call getnhv('nzmsec',msec,nerr)
 
-    sec=nsec+msec/1000.0
+!     sec=nsec+msec/1000.0
 
-    ! string headers
-    call getkhv('knetwk',ntw,nerr)
-    if (nerr /= 0) then
-      write(*,*)'Error reading variable: knetwk'
-      call exit(-1)
-    endif
+!     ! string headers
+!     call getkhv('knetwk',ntw,nerr)
+!     if (nerr /= 0) then
+!       write(*,*)'Error reading variable: knetwk'
+!       call exit(-1)
+!     endif
 
-    call getkhv('kstnm',sta,nerr)
-    if (nerr /= 0) then
-      write(*,*)'Error reading variable: kstnm'
-      call exit(-1)
-    endif
+!     call getkhv('kstnm',sta,nerr)
+!     if (nerr /= 0) then
+!       write(*,*)'Error reading variable: kstnm'
+!       call exit(-1)
+!     endif
 
-    call getkhv('kcmpnm',comp,nerr)
-    if (nerr /= 0) then
-      write(*,*)'Error reading variable: kcmpnm'
-      call exit(-1)
-    endif
+!     call getkhv('kcmpnm',comp,nerr)
+!     if (nerr /= 0) then
+!       write(*,*)'Error reading variable: kcmpnm'
+!       call exit(-1)
+!     endif
 
-    ! decimal headers
-    call getfhv('dist',tmp,nerr)
-    if (nerr /= 0) then
-      write(*,*)'Error reading variable: dist'
-      call exit(-1)
-    endif
-    dist = tmp
+!     ! decimal headers
+!     call getfhv('dist',tmp,nerr)
+!     if (nerr /= 0) then
+!       write(*,*)'Error reading variable: dist'
+!       call exit(-1)
+!     endif
+!     dist = tmp
 
-    call getfhv('az',tmp,nerr)
-    if (nerr /= 0) then
-      write(*,*)'Error reading variable: az'
-      call exit(-1)
-    endif
-    az = tmp
+!     call getfhv('az',tmp,nerr)
+!     if (nerr /= 0) then
+!       write(*,*)'Error reading variable: az'
+!       call exit(-1)
+!     endif
+!     az = tmp
 
-    call getfhv('baz',tmp,nerr)
-    if (nerr /= 0) then
-      write(*,*)'Error reading variable: baz'
-      call exit(-1)
-    endif
-    baz = tmp
+!     call getfhv('baz',tmp,nerr)
+!     if (nerr /= 0) then
+!       write(*,*)'Error reading variable: baz'
+!       call exit(-1)
+!     endif
+!     baz = tmp
 
-    call getfhv('stlo',tmp,nerr)
-    if (nerr /= 0) then
-      write(*,*)'Error reading variable: stlo'
-      call exit(-1)
-    endif
-    slon = tmp
+!     call getfhv('stlo',tmp,nerr)
+!     if (nerr /= 0) then
+!       write(*,*)'Error reading variable: stlo'
+!       call exit(-1)
+!     endif
+!     slon = tmp
 
-    call getfhv('stla',tmp,nerr)
-    if (nerr /= 0) then
-      write(*,*)'Error reading variable: stla'
-      call exit(-1)
-    endif
-    slat = tmp
+!     call getfhv('stla',tmp,nerr)
+!     if (nerr /= 0) then
+!       write(*,*)'Error reading variable: stla'
+!       call exit(-1)
+!     endif
+!     slat = tmp
 
-!!$    !  integer header variables
-!!$    call saclst_iheader_f(data_file,'nzyear', yr)
-!!$    call saclst_iheader_f(data_file,'nzjday', jda)
-!!$    call saclst_iheader_f(data_file,'nzhour', ho)
-!!$    call saclst_iheader_f(data_file,'nzmin',  mi)
-!!$    call saclst_iheader_f(data_file,'nzsec',  nsec)
-!!$    call saclst_iheader_f(data_file,'nzmsec', msec)
-!!$
-!!$    sec=nsec+msec/1000.0
-!!$
-!!$    call saclst_kheader_f(data_file,'knetwk',ntw,klen)
-!!$    call saclst_kheader_f(data_file,'kstnm', sta,klen)
-!!$    call saclst_kheader_f(data_file,'kcmpnm',comp,klen)
-!!$
-!!$    call dsaclst_fheader_f(data_file,'dist',dist)
-!!$    call dsaclst_fheader_f(data_file,'az',  az)
-!!$    call dsaclst_fheader_f(data_file,'baz', baz)
-!!$    call dsaclst_fheader_f(data_file,'stlo',slon)
-!!$    call dsaclst_fheader_f(data_file,'stla',slat)
+! !!$    !  integer header variables
+! !!$    call saclst_iheader_f(data_file,'nzyear', yr)
+! !!$    call saclst_iheader_f(data_file,'nzjday', jda)
+! !!$    call saclst_iheader_f(data_file,'nzhour', ho)
+! !!$    call saclst_iheader_f(data_file,'nzmin',  mi)
+! !!$    call saclst_iheader_f(data_file,'nzsec',  nsec)
+! !!$    call saclst_iheader_f(data_file,'nzmsec', msec)
+! !!$
+! !!$    sec=nsec+msec/1000.0
+! !!$
+! !!$    call saclst_kheader_f(data_file,'knetwk',ntw,klen)
+! !!$    call saclst_kheader_f(data_file,'kstnm', sta,klen)
+! !!$    call saclst_kheader_f(data_file,'kcmpnm',comp,klen)
+! !!$
+! !!$    call dsaclst_fheader_f(data_file,'dist',dist)
+! !!$    call dsaclst_fheader_f(data_file,'az',  az)
+! !!$    call dsaclst_fheader_f(data_file,'baz', baz)
+! !!$    call dsaclst_fheader_f(data_file,'stlo',slon)
+! !!$    call dsaclst_fheader_f(data_file,'stla',slat)
 
-  end subroutine get_sacfile_header
+!   end subroutine get_sacfile_header
 
 !!==================================================
 

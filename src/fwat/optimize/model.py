@@ -8,7 +8,7 @@ def _Index(m,n):
     return idx
 
 class FwatModel:
-    def initialize(self,mdtype='iso',kltype=2) -> None:
+    def initialize(self,mdtype='iso',kltype=1) -> None:
         """
         initialize FwatModel
 
@@ -28,7 +28,7 @@ class FwatModel:
                 2. vph,vpv,vsh,vsv,rho,eta,gcp,gsp
         """
         self._mdtype = mdtype
-        self._kltype =kltype
+        self._kltype = kltype
 
         if mdtype not in ['iso','dtti']:
             print(f"not implemented for modeltype = {mdtype}")
@@ -78,7 +78,7 @@ class FwatModel:
                 # vp,vs,rho,gc_nodim,gs_nodim  Zhu et al 2015, GJI, (25,26) 
                 direc_list = ["dalpha","dbeta","drho","dGcp","dGsp"]
             elif self._kltype == 2:
-                direc_list = ["dalphah","dbetav","dalphah","dbetav","drho","deta","dGcp","dGsp"]
+                direc_list = ["dalphah","dalphav","dbetah","dbetav","drho","deta","dGcp","dGsp"]
 
             
         return direc_list
@@ -349,8 +349,8 @@ class FwatModel:
         elif self._kltype == 2:
             vph = md_new[0,...] * 1.
             vpv = md_new[1,...] * 1.
-            vsh  = md_new[2,...] * 1.
-            vsv  = md_new[3,...] * 1.
+            vsh = md_new[2,...] * 1.
+            vsv = md_new[3,...] * 1.
             rho = md_new[4,...] * 1.
             eta = md_new[5,...] * 1.
             gcp = md_new[6,...]

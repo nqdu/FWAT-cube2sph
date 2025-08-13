@@ -562,3 +562,89 @@ head%leven = 1      ! TRUE=1
 end subroutine sacio_newhead
 
 end module sacio
+
+subroutine rsac1(datafile,data_sngl,npt,b,dt,NDIM,nerr)
+  use sacio
+  implicit none
+
+  ! input
+  character(len=*),intent(in) :: datafile
+  integer,intent(in) :: NDIM
+  integer,intent(inout) :: npt,nerr 
+  real,intent(inout) :: b, dt
+  real,dimension(NDIM) :: data_sngl(NDIM)
+
+  ! local
+  type(sachead) :: head
+  real,dimension(:),allocatable :: data0 
+
+  ! read sac
+  call sacio_readsac(datafile,head,data0,nerr)
+  if(head % npts > NDIM) then 
+    print*,'sac npt > NDIM = ',NDIM
+    stop 
+  endif
+
+  ! copy data
+  data_sngl(1:head%npts) = data0(1:head%npts)
+  b = head % b 
+  dt = head % delta 
+  npt = head % npts 
+
+  ! free memory
+  deallocate(data0)
+
+end subroutine rsac1 
+
+subroutine wsac1(datafile,dat_sngl,npt1,b,dt,nerr)
+  use sacio
+  implicit none
+
+  ! input
+  character(len=*),intent(in) :: datafile
+  integer,intent(in) :: npt1 
+  real,intent(in) :: b, dt
+  integer,intent(inout) :: nerr 
+  real,dimension(npt1) :: dat_sngl
+
+  ! local
+  type(sachead) :: head 
+  call sacio_newhead(head,dt,npt1,b)
+
+  ! write
+  call sacio_writesac(datafile,head,dat_sngl,nerr)
+  
+end subroutine wsac1
+
+subroutine get_sacfile_header(data_file,yr,jda,ho,mi,sec,ntw,sta, &
+                            comp,dist,az,baz,slat,slon)
+  use sacio
+  implicit none
+
+  character(len=*),intent(in) :: data_file
+
+  integer,intent(out):: yr,jda,ho,mi
+  double precision,intent(out):: sec,dist,az,baz,slat,slon
+  character(len=*),intent(out) :: ntw,sta,comp
+
+  ! local
+  type(sachead) :: head 
+  integer :: ierr 
+  call sacio_readhead(data_file,head,ierr)
+
+  ! set value
+  yr = head%nzyear
+  jda = head % nzjday 
+  ho = head % nzhour 
+  mi = head % nzmin
+  sec = head % nzsec
+  ntw = head % knetwk
+  sta = head % kstnm
+  comp = head % kcmpnm
+  dist = head % dist 
+  az = head % az 
+  baz = head % baz 
+  slat = head % stla 
+  slon = head % stlo
+  
+end subroutine get_sacfile_header

@@ -8,7 +8,7 @@ This package is intended for advanced [SPECFEM3D](https://github.com/SPECFEM/spe
 Do **not** modify any other parameters unless you are certain of their effect.
 
 
-### **`setup/constants.h`**
+### `setup/constants.h`
 Several flags are enabled by default:
 
 #### ADE-PML Flags
@@ -60,7 +60,7 @@ Ensure that the PML thickness is an exact integer multiple of the element size. 
 
 #### Surface Mesh Resolution
 - **`NEX_XI`**, **`NEX_ETA`** – Number of elements at the surface along the mesh edges in the ξ and η directions.  
-  - Must be `8 × (multiple of NPROC)` for irregular meshes with doublings.  
+  - Must be `8 × (multiple of NPROC_XI/ETA)` for irregular meshes with doublings.  
   - Must be `(multiple of NPROC)` for regular meshes.
 - **`NPROC_XI`**, **`NPROC_ETA`** – Number of MPI processors along ξ and η directions. It should be fixed to 1, the partition will be done later.
 
@@ -128,7 +128,7 @@ Note if `INJECTION_TECHNIQUE_TYPE = 4` it will use the [wavefield discontinuity]
 
 Ensure that these boundaries match exactly the the element boundaries in non-PML region.
 
-### ***`Cube2sph_model_par`***
+### `Cube2sph_model_par`
 Only modified `ELLIPTICITY` if you required.
 
 ### Mesh Generation
@@ -139,4 +139,4 @@ Only modified `ELLIPTICITY` if you required.
 Congratulations! You have completed the mesh generation process.
 
 ## SpecFEM Simulations
-to be continued ...
+under construction

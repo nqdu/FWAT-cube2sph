@@ -25,8 +25,8 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "IntelLLVM")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -lstdc++" )
 endif()
 
-target_link_directories(libmeas PRIVATE ${SACHOME}/lib)
-target_link_libraries(libmeas PRIVATE sacio sac)
+# target_link_directories(libmeas PRIVATE ${SACHOME}/lib)
+# target_link_libraries(libmeas PRIVATE sacio sac)
 
 install(TARGETS libmeas
   COMPONENT python
