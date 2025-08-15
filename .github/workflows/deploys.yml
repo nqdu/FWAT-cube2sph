@@ -2,7 +2,7 @@ name: Build and Deploy Docs
 
 on:
   push:
-    branches: [lbfgs]
+    branches: [main]
 
 jobs:
   deploy:
