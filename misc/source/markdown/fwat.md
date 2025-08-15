@@ -441,7 +441,8 @@ Before running a forward or adjoint simulation, ensure the following items are p
 - **`./optimize/MODEL_M00`** – Directory containing your initial model (files in `DATABASES_MPI`) for FWI.
 - **`fwat_data`** - Data directory. All files must be provided in SAC format with all required headers. Seismograms for each event should be saved in a {NAME} directory, or in {NAME}_{RTZ} for multi-channel noise. For teleseismic data, the time t = 0 must correspond to the direct arrival time.
 
-## Visualization 
+## User-Defined Parameter Set
 under construction
 
-## 
+## Visualization 
+under construction

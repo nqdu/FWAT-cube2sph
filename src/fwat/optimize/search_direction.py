@@ -249,8 +249,12 @@ def get_search_direction(iter:int,paramfile:str):
     # current search direction is -grad
     iter_start:int = pdict['iter_start']
     if iter == iter_start:
+        if myrank == 0:
+            print(f"get gradient descent search direction for iteration {iter}")
         direc = get_sd_direction(iter,paramfile,M)
     else:
+        if myrank == 0:
+            print(f"get L-BFGS search direction for iteration {iter}")
         direc = get_lbfgs_direc(iter,paramfile,M)
 
     # get min/max
@@ -290,7 +294,7 @@ def run():
     KERNEL_DIR = f'{OPT_DIR}/SUM_KERNELS_M%02d'%(iter)
     if myrank == 0:  
         os.makedirs(KERNEL_DIR,exist_ok=True)
-        print(f"get L-BFGS search direction for iteration {iter}")
+    comm.Barrier()
     
     # get search direction
     get_search_direction(iter,LBFGS_FILE)

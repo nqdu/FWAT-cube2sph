@@ -1,4 +1,5 @@
 set -e 
+
 # include file
 source module_env
 source parameters.sh
@@ -145,16 +146,17 @@ $MPIRUN -np $NPROC $SEM_PATH/bin/xgenerate_databases
 # check if search method is GD
 OPT_METHOD=`fwat-utils getparam optimize/OPT_METHOD`
 if [ "$OPT_METHOD" == "GD" ]; then 
+  let iter1=iter+1
 	fwat-utils setparam flag INIT $FWATPARAM/lbfgs.yaml
-	fwat-utils setparam iter_start $iter $FWATPARAM/lbfgs.yaml
-	let iter1=iter+1
+	fwat-utils setparam iter_start $iter1 $FWATPARAM/lbfgs.yaml
 	fwat-utils setparam iter $iter1 $FWATPARAM/lbfgs.yaml
+  fwat-utils setparam alpha -1. $FWATPARAM/lbfgs.yaml
 	MODEL1=M`echo "$iter" |awk '{printf "%02d",$1+1}'`
 	mv $LSDIR ./optimize/MODEL_${MODEL1}
 
 	# save LOGS
 	cd LOG
-	mkdir LOG/$MODEL
+	mkdir -p $MODEL
   for f in  FWD_ADJ* POST* output_fwat[1,2]*;
   do 
     if [   -f $f ]; then 

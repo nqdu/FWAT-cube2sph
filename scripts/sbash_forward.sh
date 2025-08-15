@@ -1,17 +1,16 @@
-# script runs mesher,database generation and solver
-# using this example setup 
-#
 ###################################################
-source module_env
-. parameters.sh
-
 # error flag
 set -e 
 
+source module_env
+. parameters.sh
+
 if [ "$#" -ne 1 ]; then
-    echo "Usage: $0 sbash_forward simu_type"
-    exit 1
+  echo "Usage: $0 sbash_forward simu_type"
+  exit 1
 fi
+
+# input 
 simu_type=$1
 
 # params

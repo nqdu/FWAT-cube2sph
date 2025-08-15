@@ -197,7 +197,13 @@ class Tele_PreOP(FwatPreOP):
             i = ir + self._istart 
             for ic in range(self.ncomp):
                 # convolve with stf
-                glob_syn[i,ic,:] = dt_syn * convolve(glob_syn[i,ic,:],stf[ic,:],'same')
+                tmp = dt_syn * convolve(glob_syn[i,ic,:],stf[ic,:],'same')
+
+                # only keep data in the window
+                t0_inp = self.t_ref[i] - win_tb
+                tmp1 = interpolate_syn(tmp,t_inj,dt_syn,npt_syn,t0_inp,dt_syn,npt2)
+                tmp = interpolate_syn(tmp1,t0_inp,dt_syn,npt2,t_inj,dt_syn,npt_syn)
+                glob_syn[i,ic,:] = tmp
 
                 # time window
                 tstart[ir] = self.t_ref[i] - self.t_inj - win_tb

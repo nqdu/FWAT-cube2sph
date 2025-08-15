@@ -6,10 +6,7 @@
 
 1. **Compilers:** C++/Fortran compilers which support c++17 (tested on `GCC >=7.5`), `cmake >= 3.12`
 
-2. 3rd party package:
-* [SAC (Seismic Analysis Code)](https://ds.iris.edu/ds/nodes/dmc/forms/sac/).
-
-3. Python environment 
+2. Python environment 
 
 we recommend the users to install a new python environment for this package by using `conda`:
 ```bash
@@ -23,7 +20,7 @@ source fwat/bin/activate
 ```
 
 4. Install
-change `CXX`,`F90` and `SACHOME` in `INSTALL`, and run it like
+change `CXX` and `F90` in `INSTALL`, and run it like
 ```bash
 ./INSTALL INSTALL_DIR
 ```

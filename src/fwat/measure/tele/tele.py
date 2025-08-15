@@ -114,7 +114,7 @@ def seis_pca(stf_collect:np.ndarray):
 
 def compute_stf(glob_syn,glob_obs,dt_syn,freqmin,freqmax,components):
     # load stf function
-    from tele.deconit import time_decon
+    from fwat.measure.tele.deconit import time_decon
     from mpi4py import MPI
     from obspy import Trace
     from scipy.signal import convolve,correlate
@@ -159,7 +159,7 @@ def compute_stf(glob_syn,glob_obs,dt_syn,freqmin,freqmax,components):
     stf[1,:] = temp * 1.
 
     if myrank == 0:
-        print("\nPCA first component ratio = {}% ",w[0] / np.sum(w))
+        print("\nPCA first component ratio = %f" % (w[0] / np.sum(w)))
     
     # compute time shift between syn and obs
     time_shift = np.zeros((nsta))
