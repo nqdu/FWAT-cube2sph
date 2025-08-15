@@ -25,7 +25,7 @@ for iter in $run_indx;do
   for evt in `ls ${WORK_PREFIX}${ii}${lsflag}/`;
   do 
     workdir=${WORK_PREFIX}${ii}${lsflag}/$evt/GRADIENT
-    $MPIRUN -np 4 python $fwatlib/optimize/write_event_kernels.py $MODEL_DIR/MODEL_M${ii}${lsflag} $workdir $MDTYPE $KLTYPE
+    $MPIRUN -np 4  fwat-model kernel $MODEL_DIR/MODEL_M${ii}${lsflag} $workdir $MDTYPE $KLTYPE
 
     for param in $param_set ;do 
     for name in horiz verti ;  do

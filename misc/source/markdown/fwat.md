@@ -377,7 +377,6 @@ fwat_data/$NAME_[RTZ]
 
 All of the following files are stored in `INSTALL_DIR` during installation.
 
-
 ### `module_env`
 Contains the environment module commands required to load dependencies on the cluster.
 
@@ -410,13 +409,13 @@ Contains the environment module commands required to load dependencies on the cl
 - **`SIMU_TYPES_USER_WEIGHT`** – User-defined weights for each simulation type.  
   Example:  
   ```bash
-  SIMU_TYPES_USER_WEIGHT=(1. 1.)
+  SIMU_TYPES_USER_WEIGHT=(1.)
   ```
 
 - **`NJOBS_PER_JOBARRAY`** – Number of jobs per job array for each simulation type.  
   Example:  
   ```bash
-  NJOBS_PER_JOBARRAY=(1 1)
+  NJOBS_PER_JOBARRAY=(1)
   ```
 
 ### `run_fwi.sh` and `run_forward.sh`
@@ -440,3 +439,10 @@ Before running a forward or adjoint simulation, ensure the following items are p
 - **`OUTPUT_FILES`** – You can copy these from the mesh generation output.  
 - **`DATABASES_MPI`** – Required for forward simulation.  
 - **`./optimize/MODEL_M00`** – Directory containing your initial model (files in `DATABASES_MPI`) for FWI.
+- **`fwat_data`** - Data directory. All files must be provided in SAC format with all required headers. Seismograms for each event should be saved in a {NAME} directory, or in {NAME}_{RTZ} for multi-channel noise. For teleseismic data, the time t = 0 must correspond to the direct arrival time.
+
+## User-Defined Parameter Set
+under construction
+
+## Visualization 
+under construction

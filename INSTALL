@@ -9,9 +9,6 @@ CXX="g++"
 # CXX="icc"
 # F90="ifort"
 
-# SAC HOME
-SACHOME=${HOME}/software//sac/
-
 ### STOP HERE ##########
 
 
@@ -25,7 +22,7 @@ INSTALL_DIR=$1
 # compile measure_adj
 mkdir -p build
 cd build
-cmake .. -DCXX=$CXX -DFC=$F90 -DSACHOME=${SACHOME} -DPYTHON_EXECUTABLE=`which python`
+cmake .. -DCXX=$CXX -DFC=$F90 -DPYTHON_EXECUTABLE=`which python`
 make install -j4 
 cd ..
 rm -rf build 

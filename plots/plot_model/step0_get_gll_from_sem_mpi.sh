@@ -74,7 +74,7 @@ do
   awk  '{print $5,$6}' verti.$i.temp  > temp3.txt 
   paste temp2.txt temp3.txt > input/verti.$i.txt 
 
-  mpirun -np $NPROC  $specfem_dir/bin/xcreate_slice_loc input/verti.$i.txt  $DATABASE_DIR  temp.txt.loc
+  $MPIRUN -np $NPROC  $specfem_dir/bin/xcreate_slice_loc input/verti.$i.txt  $DATABASE_DIR  temp.txt.loc
 
   \rm temp1.txt rotation_nu
   mv temp.txt.loc input/verti.$i.loc

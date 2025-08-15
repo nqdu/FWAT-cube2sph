@@ -29,14 +29,20 @@ def compute_epc_dist(evla,evlo,statxt):
     return dist
 
 
-def plot_event(line:str,M1:str,solver:str,outdir:str,paramfile:str):
+def plot_event(line:str,M1:str,solver:str,
+               outdir:str,comp:str,
+               paramfile:str):
     import h5py 
     import yaml
+
+    # get comps
+    scomp = comp[0]
+    rcomp = comp[1]
 
     # get path
     info = line.split()
     evtid = info[0]
-    path2last = f"{solver}/{M1}/{evtid}/OUTPUT_FILES/"
+    path2last = f"{solver}/{M1}/{evtid}_{scomp}/OUTPUT_FILES/"
 
     # load paramfile
     with open(paramfile,"r") as f:
@@ -51,7 +57,7 @@ def plot_event(line:str,M1:str,solver:str,outdir:str,paramfile:str):
 
         # compute distance
         src_rec = f"{solver}/../src_rec/"
-        statxt = np.loadtxt(f"{src_rec}/STATIONS_{evtid}_globe",dtype=str,ndmin=2)
+        statxt = np.loadtxt(f"{src_rec}/STATIONS_{evtid}_{scomp}_globe",dtype=str,ndmin=2)
         dist = compute_epc_dist(float(info[1]),float(info[2]),statxt)
 
         # sort distance
@@ -83,7 +89,7 @@ def plot_event(line:str,M1:str,solver:str,outdir:str,paramfile:str):
 
         # loop each station
         for i,myname in enumerate(names):
-            name = myname  + 'Z'
+            name = myname  + rcomp
             synz = fsyn[name][:]
             obsz = fobs[name][:]
 
@@ -121,6 +127,7 @@ def plot_event(line:str,M1:str,solver:str,outdir:str,paramfile:str):
         ax1.legend(loc='upper left')
         fig.savefig(f"{outdir}/{evtid}.{band}.jpg",dpi=300)
         fig.clear()
+        plt.close(1)
 
         # close h5file
         fsyn.close()
@@ -135,6 +142,7 @@ def main():
     
     # set directory
     path = "../"
+    comp = 'ZZ'
 
     #### stop here
 
@@ -158,7 +166,7 @@ def main():
     # plot figures
     args = []
     for line in lines:
-        args.append((line,M1,solver,seisdir,paramfile))
+        args.append((line,M1,solver,seisdir,comp,paramfile))
     pool = Pool(4)
     pool.starmap(plot_event,args)
     pool.close()

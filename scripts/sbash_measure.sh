@@ -1,14 +1,17 @@
-# script runs mesher,database generation and solver
-# using this example setup 
-#
 ###################################################
-source module_env
-. parameters.sh
-
 # error flag
 set -e 
 
-#==== Comment out the following if running SEM mesh with new models====#
+source module_env
+. parameters.sh
+
+if [ "$#" -ne 1 ]; then
+  echo "Usage: $0 sbash_measure simu_type"
+  exit 1
+fi
+
+
+# input 
 simu_type=$1
 
 #### STOP HERE #### #
@@ -124,6 +127,7 @@ for i in `seq 1 $NJOBS`; do
       fwat-main bin2h5 $evtdir/GRADIENT $grad $NPROC 1
     done 
     \rm $evtdir/GRADIENT/*.bin
+    echo ""
 
     # delete useless information
     fwat-utils clean $MODEL $evtid_wk 

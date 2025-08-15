@@ -84,6 +84,9 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#checklist">Checklist</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#user-defined-parameter-set">User Defined Parameter set</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#visualization">Visualization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id3"></a></li>
 </ul>
 </li>
 </ul>
@@ -411,7 +414,6 @@ Possible values:</p>
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">LS</span></code></strong> – line search stage</p></li>
 </ul>
 </section>
-<hr class="docutils" />
 <section id="line-search-parameters">
 <h4>Line Search Parameters<a class="headerlink" href="#line-search-parameters" title="Link to this heading"></a></h4>
 <ul class="simple">
@@ -447,7 +449,6 @@ Example: <code class="docutils literal notranslate"><span class="pre">10</span><
 <li><p><code class="docutils literal notranslate"><span class="pre">evbur</span></code> – Event burial depth.</p></li>
 </ul>
 </section>
-<hr class="docutils" />
 <section id="create-the-station-file">
 <h3>Create the Station File<a class="headerlink" href="#create-the-station-file" title="Link to this heading"></a></h3>
 <p>Create a file named <code class="docutils literal notranslate"><span class="pre">src_rec/STATIONS_${NAME}_globe</span></code>, where <code class="docutils literal notranslate"><span class="pre">NAME</span></code> matches the <strong>first column</strong> in <code class="docutils literal notranslate"><span class="pre">sources.dat</span></code>.</p>
@@ -524,12 +525,10 @@ The stations in each <code class="docutils literal notranslate"><span class="pre
 <section id="cluster-parameters">
 <h2>Cluster Parameters<a class="headerlink" href="#cluster-parameters" title="Link to this heading"></a></h2>
 <p>All of the following files are stored in <code class="docutils literal notranslate"><span class="pre">INSTALL_DIR</span></code> during installation.</p>
-<hr class="docutils" />
 <section id="module-env">
 <h3><code class="docutils literal notranslate"><span class="pre">module_env</span></code><a class="headerlink" href="#module-env" title="Link to this heading"></a></h3>
 <p>Contains the environment module commands required to load dependencies on the cluster.</p>
 </section>
-<hr class="docutils" />
 <section id="parameters-sh">
 <h3><code class="docutils literal notranslate"><span class="pre">parameters.sh</span></code><a class="headerlink" href="#parameters-sh" title="Link to this heading"></a></h3>
 <ul>
@@ -560,19 +559,18 @@ Example:</p>
 </li>
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">SIMU_TYPES_USER_WEIGHT</span></code></strong> – User-defined weights for each simulation type.<br />
 Example:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">SIMU_TYPES_USER_WEIGHT</span><span class="o">=(</span><span class="m">1</span>.<span class="w"> </span><span class="m">1</span>.<span class="o">)</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">SIMU_TYPES_USER_WEIGHT</span><span class="o">=(</span><span class="m">1</span>.<span class="o">)</span>
 </pre></div>
 </div>
 </li>
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">NJOBS_PER_JOBARRAY</span></code></strong> – Number of jobs per job array for each simulation type.<br />
 Example:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">NJOBS_PER_JOBARRAY</span><span class="o">=(</span><span class="m">1</span><span class="w"> </span><span class="m">1</span><span class="o">)</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">NJOBS_PER_JOBARRAY</span><span class="o">=(</span><span class="m">1</span><span class="o">)</span>
 </pre></div>
 </div>
 </li>
 </ul>
 </section>
-<hr class="docutils" />
 <section id="run-fwi-sh-and-run-forward-sh">
 <h3><code class="docutils literal notranslate"><span class="pre">run_fwi.sh</span></code> and <code class="docutils literal notranslate"><span class="pre">run_forward.sh</span></code><a class="headerlink" href="#run-fwi-sh-and-run-forward-sh" title="Link to this heading"></a></h3>
 <p>These scripts implement several functions that add SLURM job headers, making them executable on a cluster.<br />
@@ -597,7 +595,19 @@ Edit these functions to match your working environment, for example, by adding G
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">OUTPUT_FILES</span></code></strong> – You can copy these from the mesh generation output.</p></li>
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">DATABASES_MPI</span></code></strong> – Required for forward simulation.</p></li>
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">./optimize/MODEL_M00</span></code></strong> – Directory containing your initial model (files in <code class="docutils literal notranslate"><span class="pre">DATABASES_MPI</span></code>) for FWI.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">fwat_data</span></code></strong> - Data directory. All files must be provided in SAC format with all required headers. Seismograms for each event should be saved in a {NAME} directory, or in {NAME}_{RTZ} for multi-channel noise. For teleseismic data, the time t = 0 must correspond to the direct arrival time.</p></li>
 </ul>
+</section>
+<section id="user-defined-parameter-set">
+<h2>User Defined Parameter set<a class="headerlink" href="#user-defined-parameter-set" title="Link to this heading"></a></h2>
+<p>under construction</p>
+</section>
+<section id="visualization">
+<h2>Visualization<a class="headerlink" href="#visualization" title="Link to this heading"></a></h2>
+<p>under construction</p>
+</section>
+<section id="id3">
+<h2><a class="headerlink" href="#id3" title="Link to this heading"></a></h2>
 </section>
 </section>
 

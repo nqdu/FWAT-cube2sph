@@ -1,8 +1,8 @@
 #!/bin/bash
 specfem_dir="${HOME}/specfem3d-cube2sph/"
 cube2sph_dir=$specfem_dir/utils/cube2sph/
-fwatlib="${HOME}/software/FWAT/fwatlib/"
-NPROC=80 
+NPROC=80
+MPIRUN=mpirun
 
 # horizontal slice
 NSLICE_HORIZ=1

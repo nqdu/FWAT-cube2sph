@@ -48,7 +48,7 @@
 <li class="toctree-l1"><a class="reference internal" href="install.html#installation">Installation</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Cube2sph Tutorial</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#cube2sph-mesh-generation">Cube2sph Mesh Generation</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#setup-constants-h"><strong><code class="docutils literal notranslate"><span class="pre">setup/constants.h</span></code></strong></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#setup-constants-h"><code class="docutils literal notranslate"><span class="pre">setup/constants.h</span></code></a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#ade-pml-flags">ADE-PML Flags</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#cube2sph-flags">Cube2sph Flags</a></li>
 </ul>
@@ -67,7 +67,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#injection-parameters">Injection Parameters</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="#cube2sph-model-par"><em><strong><code class="docutils literal notranslate"><span class="pre">Cube2sph_model_par</span></code></strong></em></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#cube2sph-model-par"><code class="docutils literal notranslate"><span class="pre">Cube2sph_model_par</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#mesh-generation">Mesh Generation</a></li>
 </ul>
 </li>
@@ -109,7 +109,7 @@
 <p><strong>Note:</strong><br />
 Do <strong>not</strong> modify any other parameters unless you are certain of their effect.</p>
 <section id="setup-constants-h">
-<h3><strong><code class="docutils literal notranslate"><span class="pre">setup/constants.h</span></code></strong><a class="headerlink" href="#setup-constants-h" title="Link to this heading"></a></h3>
+<h3><code class="docutils literal notranslate"><span class="pre">setup/constants.h</span></code><a class="headerlink" href="#setup-constants-h" title="Link to this heading"></a></h3>
 <p>Several flags are enabled by default:</p>
 <section id="ade-pml-flags">
 <h4>ADE-PML Flags<a class="headerlink" href="#ade-pml-flags" title="Link to this heading"></a></h4>
@@ -173,14 +173,13 @@ Example: <code class="docutils literal notranslate"><span class="pre">interfaces
 <ul class="simple">
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">NEX_XI</span></code></strong>, <strong><code class="docutils literal notranslate"><span class="pre">NEX_ETA</span></code></strong> – Number of elements at the surface along the mesh edges in the ξ and η directions.</p>
 <ul>
-<li><p>Must be <code class="docutils literal notranslate"><span class="pre">8</span> <span class="pre">×</span> <span class="pre">(multiple</span> <span class="pre">of</span> <span class="pre">NPROC)</span></code> for irregular meshes with doublings.</p></li>
+<li><p>Must be <code class="docutils literal notranslate"><span class="pre">8</span> <span class="pre">×</span> <span class="pre">(multiple</span> <span class="pre">of</span> <span class="pre">NPROC_XI/ETA)</span></code> for irregular meshes with doublings.</p></li>
 <li><p>Must be <code class="docutils literal notranslate"><span class="pre">(multiple</span> <span class="pre">of</span> <span class="pre">NPROC)</span></code> for regular meshes.</p></li>
 </ul>
 </li>
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">NPROC_XI</span></code></strong>, <strong><code class="docutils literal notranslate"><span class="pre">NPROC_ETA</span></code></strong> – Number of MPI processors along ξ and η directions. It should be fixed to 1, the partition will be done later.</p></li>
 </ul>
 </section>
-<hr class="docutils" />
 <section id="doubling-layers">
 <h4>Doubling Layers<a class="headerlink" href="#doubling-layers" title="Link to this heading"></a></h4>
 <ul class="simple">
@@ -267,21 +266,21 @@ Example:</p></li>
 </section>
 </section>
 <section id="cube2sph-model-par">
-<h3><em><strong><code class="docutils literal notranslate"><span class="pre">Cube2sph_model_par</span></code></strong></em><a class="headerlink" href="#cube2sph-model-par" title="Link to this heading"></a></h3>
+<h3><code class="docutils literal notranslate"><span class="pre">Cube2sph_model_par</span></code><a class="headerlink" href="#cube2sph-model-par" title="Link to this heading"></a></h3>
 <p>Only modified <code class="docutils literal notranslate"><span class="pre">ELLIPTICITY</span></code> if you required.</p>
 </section>
 <section id="mesh-generation">
 <h3>Mesh Generation<a class="headerlink" href="#mesh-generation" title="Link to this heading"></a></h3>
 <ol class="arabic simple">
 <li><p>In <code class="docutils literal notranslate"><span class="pre">step1_run_mesher.sh</span></code>, set <code class="docutils literal notranslate"><span class="pre">myprocs</span></code> to the desired number of MPI slices, then run the script.</p></li>
-<li><p>Update <code class="docutils literal notranslate"><span class="pre">cube2sph_params</span></code> based on the output from <code class="docutils literal notranslate"><span class="pre">step0</span></code>, then execute it using MPI.</p></li>
+<li><p>Update <code class="docutils literal notranslate"><span class="pre">cube2sph_params</span></code> in <code class="docutils literal notranslate"><span class="pre">step2_slurm_cube2sph.sh</span></code> based on the output from <code class="docutils literal notranslate"><span class="pre">step0</span></code>, then execute it using MPI.</p></li>
 </ol>
 <p>Congratulations! You have completed the mesh generation process.</p>
 </section>
 </section>
 <section id="specfem-simulations">
 <h2>SpecFEM Simulations<a class="headerlink" href="#specfem-simulations" title="Link to this heading"></a></h2>
-<p>to be continued …</p>
+<p>under construction</p>
 </section>
 </section>
 
