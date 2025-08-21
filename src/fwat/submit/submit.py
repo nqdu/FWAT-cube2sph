@@ -92,10 +92,10 @@ class FwatSubmitor:
         os.makedirs(f"{syndir}/{LOCAL_PATH}",exist_ok=True)
 
         # copy file to syndir
-        shutil.copy2(f'DATA/Par_file.{self.meatype}',f'{syndir}/DATA/Par_file')
+        shutil.copy(f'DATA/Par_file.{self.meatype}',f'{syndir}/DATA/Par_file')
         for f in os.listdir("OUTPUT_FILES/"):
             if '.h' in f:
-                shutil.copy2(f"OUTPUT_FILES/{f}",f'{syndir}/OUTPUT_FILES/{f}')
+                shutil.copy(f"OUTPUT_FILES/{f}",f'{syndir}/OUTPUT_FILES/{f}')
 
         # create softlink for mesh files
         if os.path.exists(f"{syndir}/DATA/meshfem3D_files"):
@@ -103,9 +103,12 @@ class FwatSubmitor:
         os.makedirs(f"{syndir}/DATA/meshfem3D_files")
         for f in os.listdir(f"DATA/meshfem3D_files/"):
             name = f"{syndir}/DATA/meshfem3D_files/{f}"
-            os.symlink(f"{self.cwd}/DATA/meshfem3D_files/{f}", name)
+            if f != "Mesh_Par_file":
+                os.symlink(f"{self.cwd}/DATA/meshfem3D_files/{f}", name)
+            else:
+                shutil.copy(f"{self.cwd}/DATA/meshfem3D_files/{f}", name)
 
-        # change local path
+            # change local path
         filename = f"{syndir}/DATA/Par_file"
         change_parfile(filename,LOCAL_PATH=LOCAL_PATH)
         filename = f"{syndir}/DATA/meshfem3D_files/Mesh_Par_file"
@@ -176,7 +179,7 @@ class FwatSubmitor:
             with open(f"{syndir}/DATA/STATIONS","w") as f:
                 for line in stations_list[ie]:
                     f.write(line + "\n")
-            shutil.copy2(f"{syndir}/DATA/STATIONS",
+            shutil.copy(f"{syndir}/DATA/STATIONS",
                          f"{syndir}/DATA/STATIONS_ADJOINT")
 
             # prepare source
@@ -208,7 +211,7 @@ class FwatSubmitor:
 
                 # copy FORCESOLUTION FILE
                 filename = f"{self.SRC_REC}/FORCESOLUTION_{evtid}"
-                shutil.copy2(filename,f"{syndir}/DATA/FORCESOLUTION")
+                shutil.copy(filename,f"{syndir}/DATA/FORCESOLUTION")
 
             else:
                 print("not implemented!")

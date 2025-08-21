@@ -20,7 +20,7 @@ def change_parfile(filename,**kargs):
     
         # check if value in it
         if not find_it:
-            print(f"{key} donnot exist in Par_file")
+            print(f"{key} donnot exist in {filename}")
             exit(1)
     if filename is None:
         return '\n'.join(lines)
