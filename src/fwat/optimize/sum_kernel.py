@@ -112,6 +112,19 @@ def run(argv):
             # check if it's noise source
             filenames = glob.glob(f'./{SOLVER}/{MODEL}/{srctxt[ievt,0]}_[NEZRT]')
             filenames.append(f'./{SOLVER}/{MODEL}/{srctxt[ievt,0]}')
+
+            # check if one of these files exists
+            file_exists = False
+            for j,f in enumerate(filenames):
+                filename = f + setname + '/GRADIENT/' + grad_list_base[i] + '.h5'
+                if os.path.exists(filename):
+                    file_exists = True 
+
+            if not file_exists:
+                if myrank == 0:
+                    print(f"no kernel found for {srctxt[ievt,0]}, name = {grad_list_base[i]}")
+                exit(1)
+                
             for f in filenames:
                 filename = f + '/GRADIENT/' + grad_list_base[i] + '.h5'
                 if not os.path.exists(filename): continue

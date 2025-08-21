@@ -1,32 +1,7 @@
 import numpy as np 
-from glob import glob 
+import os 
 import sys 
 import yaml
-
-def compute_misfits(evts:list,files:list,simu_type:str):
-    # loop every  events
-    sumf = 0.
-    sumn = 0
-    for ievt in range(len(evts)):
-        evid_list = [evts[ievt]]
-        if simu_type == 'noise':
-            evid_list = [f"{evts[ievt]}_{ch}" for ch in ['N','E','Z','R','T']]
-        
-        for i in range(len(files)):
-            # load misfit file 
-            d = np.loadtxt(files[i],usecols=[0,28],dtype=str,ndmin=2)
-            # print(d.shape,files[i])
-
-            # select matched events
-            for evid in evid_list:
-                idx = d[:,0] == evid
-                sumn += d[idx,0].shape[0]
-                sum0 = np.sum(np.float64(d[idx,1]))
-                if np.isnan(sum0):
-                    print(f"error in {evts[ievt]} {files[i]}")
-                sumf += sum0
-    
-    return sumf,sumn
 
 def run(argv):
     from fwat.const import PARAM_FILE,SRC_REC,MISFIT
@@ -56,16 +31,25 @@ def run(argv):
             band = "T%03g_T%03g" %(float(bands_short[i]),float(bands_high[i]))
             all_bands.append(band)
 
-    # now loop to compute misfits 
+    # now loop each event to compute misfits 
     sumf = 0.
     sumn = 0
-    for i in range(len(all_bands)):
-        band = all_bands[i]
-        evts = np.loadtxt(f"{SRC_REC}/sources.dat.{simu_type}",usecols=0,dtype=str)
-        files = glob(f"./{MISFIT}/{mod}/*_{band}_{simu_type}_window_chi")
-        chi,n = compute_misfits(evts,files,simu_type)
-        sumf += chi 
-        sumn += n
+    evts = np.loadtxt(f"{SRC_REC}/sources.dat.{simu_type}",usecols=0,dtype=str)
+    for ievt in range(len(evts)):
+        for ib in range(len(all_bands)):
+            band = all_bands[ib]
+            filename = f"./{MISFIT}/{mod}/{evts[ievt]}_{band}_{simu_type}_window_chi"
+            if os.path.exists(filename):
+                d = np.loadtxt(filename,usecols=28,ndmin=2)
+                chi = np.sum(d[:,0])
+                # print(band,evts[ievt],d.shape[0])
+                if np.isnan(chi):
+                    print(f"error in {evts[ievt]} {filename}")
+                n = d.shape[0]
+
+                # accumulate
+                sumf += chi 
+                sumn += n 
 
     print(sumf,sumn)
 
