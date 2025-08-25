@@ -1,4 +1,15 @@
 def change_parfile(filename,**kargs):
+    """
+    change parameter file with given key-value pairs
+
+    Parameters
+    ----------
+    filename : str
+        path to the parameter file, e.g., Par_file
+    kargs : dict
+        key-value pairs to change in the parameter file, e.g., NPROC=4
+
+    """
     with open(filename,"r") as fio:
         lines = fio.readlines()
 
@@ -29,6 +40,17 @@ def change_parfile(filename,**kargs):
             fio.writelines(lines)
 
 def get_param(filename:str,key:str):
+    """
+    get parameter value from Par_file
+    
+    Parameters
+    ----------
+    filename : str
+        path to the parameter file, e.g., Par_file
+    key : str
+        key to search in the parameter file, e.g., NPROC
+
+    """
     with open(filename,"r") as fio:
         lines = fio.readlines()
 
