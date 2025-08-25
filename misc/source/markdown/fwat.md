@@ -24,7 +24,7 @@ measure:
       - [5.,50.]
     TIME_WINDOW: [5.,45.] # before and after first arrival
     VERBOSE_MODE: True
-    IMEAS: 2 # 2 = L2 norm
+    ADJSRC_TYPE: 2 # 2,cross-conv
 
   noise: # multichannel noise 
     CC_COMPS: ['ZZ']  # {SOURCE-COMP}{RECEIVER-COMP}
@@ -35,15 +35,15 @@ measure:
       - [10.,20.]
       - [5.,15.]
     GROUPVEL_WIN:   # Time window, determined by group velocity, km/s, [v_min,vmax]
-      - [2.5,4.5]
-      - [2.5,4.5]
-      - [2.5,4.5]
-      - [2.5,4.5]
+      - [2.0,5.]
+      - [2.0,5.]
+      - [2.0,5.]
+      - [2.0,5.]
     USE_EGF: True   # if False, the input data is Cross-correlation, a negative derivative will be applied
     ADJ_SRC_NORM: False  # if true, the adjoint source wiil be normalized
     USE_NEAR_OFFSET: True # if FALSE, reset tstart
     VERBOSE_MODE: True
-    IMEAS: 5 #  = 5 cross correlation  =7 multitaper
+    ADJSRC_TYPE: 5 # 5/7/exp_phase
 
   # sks 
   sks:
@@ -53,7 +53,7 @@ measure:
       - [5.,50.]
     TIME_WINDOW: [5.,45.] # before and after first arrival
     VERBOSE_MODE: True
-    IMEAS: 2 # 2 = L2 norm
+    ADJSRC_TYPE: SI #  SI: splitting_intensity/Cross-convolution
   
   # receiver function
   rf:
@@ -67,7 +67,7 @@ measure:
     TIME_WINDOW: [5.,25.] # time window, before/after t= 0
     TSHIFT: 5.
     VERBOSE_MODE: True
-    IMEAS: 2 # 2 = L2 norm
+    ADJSRC_TYPE: 2   # only L2 norm
 
 # optimization
 optimize:
@@ -127,7 +127,7 @@ Each sub-block specifies settings for a particular measurement method.
 - **`TIME_WINDOW`** – Time window (in seconds) before and after the first arrival.  
   Example: `[5., 45.]`
 - **`VERBOSE_MODE`** – If `true`, enables verbose output. Currently it will do nothing.
-- **`IMEAS`** – Measurement type code (`2` = L2 norm). Refer to [measure_adj](https://github.com/SPECFEM/specfem3d/tree/master/utils/ADJOINT_TOMOGRAPHY_TOOLS/measure_adj) for further information.
+- **`ADJSRC_TYPE`** – Measurement type code (`2` = L2 norm, or  `cross-conv` = cross convolution). Refer to [measure_adj](https://github.com/SPECFEM/specfem3d/tree/master/utils/ADJOINT_TOMOGRAPHY_TOOLS/measure_adj) for further information.
 
 #### Multi-channel Ambient Noise (`noise`)
 - **`CC_COMPS`** – Cross-correlation components in `{SOURCE-COMP}{RECEIVER-COMP}` format. The station files used can be refered to {source section}`source-and-stations`. Example: `['ZZ','TT']`
@@ -152,7 +152,7 @@ Example:
 - **`ADJ_SRC_NORM`** – If `true`, normalizes the adjoint source.
 - **`USE_NEAR_OFFSET`** – If `false`, resets `tstart`.
 - **`VERBOSE_MODE`** – If `true`, enables verbose output.
-- **`IMEAS`** – Measurement type code (`5` = cross-correlation, or `7` = multitaper).
+- **`ADJSRC_TYPE`** – Measurement type code (`5` = cross-correlation, or `7` = multitaper, `exp_phase` = exponentiated phase).
 
 #### SKS SI-Splitting FWI (`sks`)
 - **`COMPS`** – List of components used.  
@@ -164,7 +164,7 @@ Example: `[[5., 50.]]`
 - **`TIME_WINDOW`** – Time window (in seconds) before and after the first arrival.  
 Example: `[5., 45.]`
 - **`VERBOSE_MODE`** – If `true`, enables verbose output.
-- **`IMEAS`** – Measurement type code (`2` = L2 norm).
+- **`ADJSRC_TYPE`** – Measurement type code (`SI` = splitting intensity).
 
 
 #### Receiver Functions (`rf`)
@@ -180,7 +180,7 @@ Example: `[[1.0]]`
 Example: `[5., 25.]`
 - **`TSHIFT`** – Time shift applied (in seconds).
 - **`VERBOSE_MODE`** – If `true`, enables verbose output.
-- **`IMEAS`** – Measurement type code (`2` = L2 norm).
+- **`ADJSRC_TYPE`** – Measurement type code (`2` = L2 norm).
 
 ### Optimization block
 The `optimize` block defines parameters for the optimization process in FWI.
