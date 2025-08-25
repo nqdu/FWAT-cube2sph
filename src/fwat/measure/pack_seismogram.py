@@ -30,26 +30,26 @@ def run(argv):
             if ncomp * (nt * 2 * 8 + 512 + 8) != fsize:
                 print("format error !\n")
                 exit(1)
-            print(nt,ncomp)
-            print(fsize,ncomp * (nt * 2 * 4 + 512))
+            # print(nt,ncomp)
+            # print(fsize,ncomp * (nt * 2 * 4 + 512))
             
             with open(filename,"rb") as fio:
                 for ir in range(ncomp):
-                    data = np.zeros((nt,2))
+                    # read name 
                     _ = np.fromfile(fio,'i4',count=1)[0]
                     name = np.fromfile(fio,dtype='S512',count=1)[0]
                     _ = np.fromfile(fio,'i4',count=1)[0]
-
                     name = str(name.decode('utf-8')).rstrip()
-                    print(name,len(name),type(name))
-                    for it in range(nt):
-                        _ = np.fromfile(fio,'f4',count=1)[0]
-                        data[it,:] = np.fromfile(fio,dtype='f4',count=2)
-                        _ = np.fromfile(fio,'i4',count=1)[0]
+
+                    # read data
+                    data = np.zeros((nt,2))
+                    temp = np.fromfile(fio,'f4',count=nt*4).reshape((nt,4)) 
+                    data[:,:] = temp[:,1:3] 
                     
                     fout.create_dataset(name,dtype='f4',shape=data.shape)
                         
                     fout[name][:,:] = data[:,:]
+
         elif 'all_seismograms.ascii' in filename:
             # get how many components
             ncomp = 0

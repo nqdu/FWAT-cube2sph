@@ -141,7 +141,7 @@ def get_window_info(t0,dt,tstart,tend):
 
     return left_pt,right_pt 
 
-def taper_window(t0,dt,tstart,tend,p=0.05):
+def taper_window(t0,dt,nt,tstart,tend,p=0.05):
     """
     get window start/end sample index
 
@@ -149,6 +149,8 @@ def taper_window(t0,dt,tstart,tend,p=0.05):
     -----------
     t0,dt: float
         start time and sampling interval
+    nt: int
+        no. of points in total
     tstart,tend: float
         start/end time of this window
     p: float
@@ -163,7 +165,11 @@ def taper_window(t0,dt,tstart,tend,p=0.05):
 
     nlen = int((tend - tstart) / dt) + 1
     left_pt = int(np.floor(tstart - t0) / dt)
+    if left_pt < 0:
+        left_pt = 0
     right_pt = left_pt + nlen
+    if right_pt > nt:
+        right_pt = nt
 
     win = sac_cos_taper(nlen,p*2)
 

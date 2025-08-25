@@ -19,6 +19,16 @@ class Tele_PreOP(FwatPreOP):
             self.evla,self.evlo,self.evdp,
             self.stla,self.stlo,phase
         )
+    
+    def _sanity_check(self):
+        super()._sanity_check()
+
+        # make sure adjsrc_type in [2,'cross-conv']
+        if self.adjsrc_type not in ['cross-conv',2]:
+            if self.myrank == 0:
+                print("only L2 norm (imeas = 2) and cross-conv adjoint source are supported!")
+                print(f"adjsrc_type = {self.adjsrc_type}")
+            exit(1)
 
     def save_forward(self):
         import os 
@@ -32,7 +42,6 @@ class Tele_PreOP(FwatPreOP):
         dt_syn = self.dt_syn
         npt_syn = self.npt_syn
         t0_syn = self.t0_syn
-        myrank = self.myrank
         
         # init a sac header
         tr = SACTrace(
@@ -81,8 +90,8 @@ class Tele_PreOP(FwatPreOP):
                 # save to sac
                 filename = f"{outdir}/{code}.sac"
                 tr.write(filename)
-    
-    def cal_adj_source(self,ib:int):
+
+    def _cal_adj_source_l2(self,ib:int):
         from obspy.io.sac import SACTrace
         from .utils import interpolate_syn
         from .utils import bandpass
@@ -90,13 +99,9 @@ class Tele_PreOP(FwatPreOP):
         from scipy.signal import convolve,correlate
         from .tele.tele import compute_stf,get_average_amplitude
         import os 
-        bandname = self._get_bandname(ib)
-        if self.myrank == 0:
-            print(f"preprocessing for band {bandname} ...")
-            os.makedirs(f"{self.syndir}/OUTPUT_FILES/{bandname}",exist_ok=True)
-        MPI.COMM_WORLD.Barrier()
 
         # get frequency band
+        bandname = self._get_bandname(ib)
         freqmin = 1. / self.Tmax[ib]
         freqmax = 1. / self.Tmin[ib]
         out_dir = f"{self.syndir}/OUTPUT_FILES/"
@@ -255,5 +260,133 @@ class Tele_PreOP(FwatPreOP):
         am_chi *= dt_syn / avgamp**2
         win_chi[:,:,14] *= dt_syn / avgamp**2
 
-        # print info and save MEASUREMENTS file
         self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,win_chi)
+    
+    def _cal_adj_source_user(self,ib:int):
+        from obspy.io.sac import SACTrace
+        from .utils import interpolate_syn
+        from .measure import measure_adj_cross_conv
+
+        # get frequency band
+        bandname = self._get_bandname(ib)
+        out_dir = f"{self.syndir}/OUTPUT_FILES/"
+
+        # get vars
+        t0_syn = self.t0_syn
+        dt_syn = self.dt_syn
+        npt_syn = self.npt_syn
+        t_inj = self.t_inj
+
+        # get time window 
+        win_tb,win_te = self.pdict['TIME_WINDOW']
+        npt2 = int((win_te + win_tb) / dt_syn)
+        if npt2 // 2 * 2 != npt2:
+            npt2 += 1
+        
+        # allocate global arrays 
+        nsta = self.nsta 
+        nsta_loc = self.nsta_loc
+
+        # misfits
+        ncomp = self.ncomp
+        tstart = np.zeros((nsta_loc))
+        tend = np.zeros((nsta_loc))
+        win_chi = np.zeros((nsta_loc,1,20))
+        tr_chi = np.zeros((nsta_loc,1))
+        am_chi = np.zeros((nsta_loc,1))
+
+        # glob arrays
+        ncomp = self.ncomp
+        glob_obs = np.zeros((nsta_loc,ncomp,npt_syn))
+        glob_syn = np.zeros((nsta_loc,ncomp,npt_syn))
+
+        # loop each station
+        for ir in range(nsta_loc):
+            i = ir + self._istart
+            for ic in range(ncomp):
+                name = self._get_station_code(i,ic)
+
+                # read data
+                syn_data = np.load(f"{out_dir}/{name}.sem.npy")[:,1]
+                obs_tr = SACTrace.read(f"{self.DATA_DIR}/{self.evtid}/{name}.sac")
+                t0_obs = obs_tr.b 
+                dt_obs = obs_tr.delta 
+                npt_obs = obs_tr.npts 
+                obs_data = obs_tr.data
+
+                # interpolate the obs/syn data to the same sampling of syn data
+                t0_inp = self.t_ref[i] - win_tb
+                u1 = interpolate_syn(obs_data,t0_obs + self.t_ref[i],dt_obs,npt_obs,t0_inp,dt_syn,npt2)
+                w1 = interpolate_syn(syn_data,t_inj,dt_syn,npt_syn,t0_inp,dt_syn,npt2)
+                u = interpolate_syn(u1,t0_inp,dt_syn,npt2,t_inj,dt_syn,npt_syn)
+                w = interpolate_syn(w1,t0_inp,dt_syn,npt2,t_inj,dt_syn,npt_syn)     
+
+                # save to  global array   
+                glob_obs[ir,ic,:] = u
+                glob_syn[ir,ic,:] = w 
+
+            # get info
+            tstart[ir] = self.t_ref[i] - self.t_inj - win_tb
+            tend[ir] = self.t_ref[i] - self.t_inj + win_te
+            
+            # call exponentiated phase function
+            ic_z = self.components.index('Z')
+            ic_r = self.components.index('R')
+            tr_chi[ir, 0],am_chi[ir, 0],  \
+            win_chi[ir, 0, :],adj_r,adj_z  = \
+                measure_adj_cross_conv(
+                    glob_obs[ir, ic_z, :],
+                    glob_syn[ir, ic_z, :],
+                    glob_obs[ir, ic_r, :],
+                    glob_syn[ir, ic_r, :],
+                    t0_syn,
+                    dt_syn,
+                    self.Tmin[ib],
+                    self.Tmax[ib],
+                    tstart[ir],
+                    tend[ir],
+                )
+
+            # save adjoint source
+            data = np.zeros((npt_syn,2))
+            data[:,0] = t0_syn + np.arange(npt_syn) * dt_syn
+            data[:,1] = adj_z
+            name = self._get_station_code(i,ic_z) + ".adj.sem.npy"
+            np.save(f"{out_dir}/{bandname}/{name}",data)
+            data[:,1] = adj_r
+            name = self._get_station_code(i,ic_r) + ".adj.sem.npy"
+            np.save(f"{out_dir}/{bandname}/{name}",data)
+
+            # save obs and synthetic data
+            for ic in range(self.ncomp):
+                # init a sac header
+                tr = SACTrace(
+                    evla=self.evla,evlo=self.evlo,
+                    evdp=self.evdp,stla=self.stla[i],
+                    stlo=self.stlo[i],stel=0,lcalda=1,
+                    delta = dt_syn,b=t0_syn,
+                    t0 = self.t_ref[i] - t_inj,
+                    knetwk=self.netwk[i],
+                    kstnm = self.stnm[i],
+                    kcmpnm = self.chcode + self.components[ic]
+                )
+                name = self._get_station_code(i,ic)
+                tr.data = glob_obs[i,ic,:]
+                tr.write(f"{out_dir}/{bandname}/{name}.sac.obs")
+                tr.data = glob_syn[i,ic,:]
+                tr.write(f"{out_dir}/{bandname}/{name}.sac.syn")
+
+        self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,win_chi)
+    
+    def cal_adj_source(self,ib:int):
+        import os 
+        bandname = self._get_bandname(ib)
+        if self.myrank == 0:
+            print(f"preprocessing for band {bandname} ...")
+            os.makedirs(f"{self.syndir}/OUTPUT_FILES/{bandname}",exist_ok=True)
+        MPI.COMM_WORLD.Barrier()
+
+        if self.adjsrc_type == 2:
+            self._cal_adj_source_l2(ib)
+        else:
+            self._cal_adj_source_user(ib)
