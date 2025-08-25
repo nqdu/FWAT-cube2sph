@@ -4,6 +4,22 @@ import sys
 import yaml
 
 def run(argv):
+    """
+    run the misfit calculation for a given model and simulation type
+    
+    Parameters 
+    ----------
+    argv : list
+        list of arguments, should contain two elements:
+        1. model name (e.g., M00)
+        2. simulation type (e.g., rf, ss, etc.)
+    Returns
+    -------
+    None
+        This function prints the total misfit and the number of data points processed.
+
+
+    """
     from fwat.const import PARAM_FILE,SRC_REC,MISFIT
 
     # check input args
