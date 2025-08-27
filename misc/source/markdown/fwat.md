@@ -39,11 +39,12 @@ measure:
       - [2.0,5.]
       - [2.0,5.]
       - [2.0,5.]
+    SNR_THRESHOLD: [0.,0.,0.,0.] # exclude data when SNR < SNR_THRESHOLD in a each band 
     USE_EGF: True   # if False, the input data is Cross-correlation, a negative derivative will be applied
-    ADJ_SRC_NORM: False  # if true, the adjoint source wiil be normalized
+    ADJ_SRC_NORM: False  # if true, the adjoint source will be normalized
     USE_NEAR_OFFSET: True # if FALSE, reset tstart
     VERBOSE_MODE: True
-    ADJSRC_TYPE: 5 # 5/7/exp_phase
+    ADJSRC_TYPE: 5 # 5/7/exp_phase/cc_time
 
   # sks 
   sks:
@@ -53,7 +54,7 @@ measure:
       - [5.,50.]
     TIME_WINDOW: [5.,45.] # before and after first arrival
     VERBOSE_MODE: True
-    ADJSRC_TYPE: SI #  SI: splitting_intensity/Cross-convolution
+    ADJSRC_TYPE: SI #  SI (splitting_intensity),cross-conv
   
   # receiver function
   rf:
@@ -148,11 +149,13 @@ Example:
 [2.5, 4.5],
 [2.5, 4.5]]
 `
+- **`SNR_THRESHOLD`** - SNR threshold for each frequency band
 - **`USE_EGF`** – If `false`, the input data is cross-correlation; a negative derivative will be applied.
 - **`ADJ_SRC_NORM`** – If `true`, normalizes the adjoint source.
 - **`USE_NEAR_OFFSET`** – If `false`, resets `tstart`.
 - **`VERBOSE_MODE`** – If `true`, enables verbose output.
-- **`ADJSRC_TYPE`** – Measurement type code (`5` = cross-correlation, or `7` = multitaper, `exp_phase` = exponentiated phase).
+- **`ADJSRC_TYPE`** – Measurement type code (`5` = cross-correlation, or `7` = multitaper, `exp_phase` = exponentiated phase), `cc_time` = 
+cross-correlation time misfit
 
 #### SKS SI-Splitting FWI (`sks`)
 - **`COMPS`** – List of components used.  
@@ -164,7 +167,7 @@ Example: `[[5., 50.]]`
 - **`TIME_WINDOW`** – Time window (in seconds) before and after the first arrival.  
 Example: `[5., 45.]`
 - **`VERBOSE_MODE`** – If `true`, enables verbose output.
-- **`ADJSRC_TYPE`** – Measurement type code (`SI` = splitting intensity).
+- **`ADJSRC_TYPE`** – Measurement type code (`SI` = splitting intensity, `cross-conv`).
 
 
 #### Receiver Functions (`rf`)
