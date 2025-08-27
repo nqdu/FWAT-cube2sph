@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 from scipy.signal import convolve
 
-from fwat.measure.measure import measure_adj_cross_conv
+from fwat.adjoint.cross_conv import measure_adj_cross_conv
 from fwat.measure.utils import taper_window,bandpass
 
 def shift_data(a,dt,t0):
@@ -29,7 +29,7 @@ def measure_adj_cross_conv_mis(
     assert len(obs_h) == len(obs_v), "Observed_h and observed_r must have the same length"
 
     # get window info
-    lpt, rpt, taper0 = taper_window(t0, dt, nt, tstart, tend, p=0.1)
+    lpt, rpt, taper0 = taper_window(t0, dt, nt, tstart, tend, p=0.05)
 
     # get windowed data
     vsyn = syn_v[lpt:rpt] * taper0 
@@ -79,7 +79,7 @@ def main():
         # tstart,tend,maxit:int
 
     taper = np.zeros((nt))
-    lpt,rpt,taper0 = taper_window(0,dt,len(t),tstart,tend,0.1)
+    lpt,rpt,taper0 = taper_window(0,dt,len(t),tstart,tend,0.05)
     taper[lpt:rpt] = taper0 * 1.
 
     # fd approx

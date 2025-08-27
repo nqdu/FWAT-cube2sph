@@ -58,7 +58,7 @@ def run(argv):
         
         # convert to user model
         md_new,all_names = M.convert_md_visual(md)
-        md_new = np.float32(md_new)
+        md_new = np.asarray(md_new,dtype='f4')
 
         # write user model
         nker = len(all_names)

@@ -173,7 +173,7 @@ def rotate_seismo_fwd(fn_matrix:str,from_dir:str,to_dir:str,
                 continue
 
             dname = from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp])
-            arr =  np.float64(fio[dname][:])
+            arr =  fio[dname][:] * 1.
             seis[:,i_comp] = arr[:,1]
 
 
@@ -340,7 +340,7 @@ def rotate_seismo_fwd1(fn_matrix:str,from_dir:str,to_dir:str,
                 continue
 
             dname = from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp])
-            arr =  np.float64(fio[dname][:])
+            arr =  fio[dname][:] * 1.
             seis[:,i_comp] = arr[:,1]
 
 

@@ -60,6 +60,9 @@ class NoiseMC_PreOP():
         # backup pdict for further usage
         self.pdict = pdict
 
+        # adjoint source
+        self.adjsrc_type = pdict['ADJSRC_TYPE']
+
         # path to simulation directory
         mdir = "M%02d" %(iter)
         if self.run_opt == 2:
@@ -70,7 +73,7 @@ class NoiseMC_PreOP():
         self._get_mc_channel()
 
         # adjoint source
-        self.adjsrc_type:str = self.pdict['ADJSRC_TYPE']
+        self.adjsrc_type = self.pdict['ADJSRC_TYPE']
 
         # read sourcer/receiver locations below
         # ---------------------
@@ -153,9 +156,9 @@ class NoiseMC_PreOP():
             exit(1)
 
         # check adjsrc_type
-        if self.adjsrc_type not in [5,7,'exp_phase']:
+        if self.adjsrc_type not in [5,7,'exp_phase','cc_time']:
             if self.myrank == 0:
-                print(f"only [5,7,'exp_phase'] adjoint sources are supported!")
+                print(f"only [5,7,'exp_phase','cc_time'] adjoint sources are supported!")
                 print(f"adjsrc_type = {self.adjsrc_type}")
             exit(1)
 
@@ -365,7 +368,6 @@ class NoiseMC_PreOP():
         from .utils import interpolate_syn,dif1
         from .utils import bandpass,alloc_mpi_jobs
         from .utils import rotate_EN_to_RT
-        from .measure import measure_adj,measure_adj_exphase
         import os 
 
         # get vars
@@ -378,6 +380,11 @@ class NoiseMC_PreOP():
         t0_inp = -10.
         t1_inp = t0_syn + (npt_syn - 1) * dt_syn
         npt_cut = int((t1_inp - t0_inp) / dt_inp) + 1
+
+        # get snr
+        snr_threshold:float = -1.
+        if 'SNR_THRESHOLD' in self.pdict:
+            snr_threshold = self.pdict['SNR_THRESHOLD'][ib]
 
         # band name
         bandname = self._get_bandname(ib)
@@ -508,14 +515,27 @@ class NoiseMC_PreOP():
                 # preprocess
                 dat_inp = bandpass(dat_inp,dt_inp,freqmin,freqmax)
                 syn_inp = bandpass(syn_inp,dt_inp,freqmin,freqmax)
-        
-                # normalize my amplitude of the window
+
+                # find amplitude of the in the window to normalize
                 dist = obs_tr.dist
                 win_b = np.floor((dist / vmax_list[ib] - self.Tmax[ib] / 2. + t0_inp) / dt_inp)
                 win_e = np.floor((dist / vmin_list[ib] + self.Tmax[ib] / 2. - t0_inp) / dt_inp)
                 win_b = int(max(win_b,0))
                 win_e = int(min(win_e,len(dat_inp)-1))
-                dat_inp *= np.max(np.abs(syn_inp[win_b:win_e])) / np.max(np.abs(dat_inp[win_b:win_e]))
+                amp = np.max(np.abs(dat_inp[win_b:win_e]))
+
+                # check snr
+                std_in_tail = np.std(dat_inp[win_e+1:])
+                if std_in_tail < 1.0e-20:
+                    snr = 1.0e20
+                else:
+                    snr = amp / std_in_tail
+                if snr > snr_threshold:
+                    dat_inp *= np.max(np.abs(syn_inp[win_b:win_e])) / amp
+                else:
+                    # set dat/syn to zero, it will contribute nothing
+                    dat_inp *= 0. 
+                    syn_inp *= 0.
 
                 # compute time window
                 tstart[ir] = dist / vmax_list[ib] - self.Tmax[ib] * 0.5 
@@ -525,6 +545,7 @@ class NoiseMC_PreOP():
 
                 # compute misfits and adjoint source
                 if self.adjsrc_type == 'exp_phase':
+                    from fwat.adjoint.exp_phase_misfit import measure_adj_exphase
                     tr_chi[ir,ic],am_chi[ir,ic],win_chi[ir,ic,:],adjsrc =  \
                         measure_adj_exphase(dat_inp,syn_inp,
                                             t0_inp,dt_inp,npt_cut,
@@ -534,7 +555,19 @@ class NoiseMC_PreOP():
                     # reinterpolate adjoint source
                     adjsrc = interpolate_syn(adjsrc,t0_inp,dt_inp,npt_cut,
                                              t0_syn,dt_syn,npt_syn)
+                elif self.adjsrc_type == 'cc_time':
+                    from fwat.adjoint.cc_misfit import measure_adj_cc
+                    tr_chi[ir,ic],am_chi[ir,ic],win_chi[ir,ic,:],adjsrc =  \
+                        measure_adj_cc(dat_inp,syn_inp,
+                                       t0_inp,dt_inp,npt_cut,
+                                       self.Tmin[ib],self.Tmax[ib],
+                                       tstart[ir],tend[ir]
+                        )
+                    # reinterpolate adjoint source
+                    adjsrc = interpolate_syn(adjsrc,t0_inp,dt_inp,npt_cut,
+                                             t0_syn,dt_syn,npt_syn)
                 else:
+                    from .measure import measure_adj
                     verbose = (self.myrank == 0) and (ir == 0)
                     tr_chi[ir,ic],am_chi[ir,ic],win_chi[ir,ic,:],adjsrc =   \
                         measure_adj(t0_inp,dt_inp,npt_cut,t0_syn,dt_syn,npt_syn,

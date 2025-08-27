@@ -1,12 +1,12 @@
 import numpy as np 
 import matplotlib.pyplot as plt 
 from fwat.measure.utils import bandpass,taper_window
-from fwat.measure.measure import measure_adj_exphase
+from fwat.adjoint.exp_phase_misfit import measure_adj_exphase
 
 def exphase_misfit(obs,syn,t0,dt,nt,
                min_period,max_period,
                tstart,tend,water=0.1,
-               taper_ratio = 0.1):
+               taper_ratio = 0.05):
     """
     Parameters
     ------------
@@ -36,7 +36,6 @@ def exphase_misfit(obs,syn,t0,dt,nt,
     """
     from scipy.signal import hilbert
     from fwat.measure.utils import bandpass,taper_window
-    from fwat.measure.utils import interpolate_syn
     from scipy.integrate import trapezoid
 
     # make sure len(obs) == len(syn)

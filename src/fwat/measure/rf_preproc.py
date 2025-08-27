@@ -250,7 +250,6 @@ class RF_PreOP(FwatPreOP):
 
             # compute adjoint source
             tp = self.t_ref[i] - self.t_inj
-            self._rf_adj_src()
             adj_r,adj_z,amp  = \
                 _rf_adj_src(
                     rf_syn,rf_obs,syn_data[idx_z,:],

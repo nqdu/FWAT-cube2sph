@@ -114,8 +114,9 @@ def run(argv):
             print(f"writing to file {filename} ")
             print("=======================\n")
 
+        model_out = np.asarray(model_out,dtype='f4')
         f = FortranFile(filename,'w') 
-        f.write_record(np.float32(model_out))
+        f.write_record(model_out)
         f.close()
 
 

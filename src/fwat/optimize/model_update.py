@@ -50,7 +50,7 @@ def run(argv):
         mname_user[i] = mname_user[i][1:]
     
     # get direc_max
-    direc_max0 = np.float32(-1.0)
+    direc_max0 = -1.
     array_size = 0
     for i in range(nker):
         filename = KERNEL_DIR + dname_list[i] + ".h5"
@@ -106,7 +106,7 @@ def run(argv):
         f.close()
 
     # convert model if required
-    vec = np.float32(M.convert_md(vec0,False))
+    vec = np.asarray(M.convert_md(vec0,False),dtype='f4')
 
     # read search direction
     direc = np.zeros((nker,size),'f4')
@@ -120,7 +120,7 @@ def run(argv):
     vec = M.model_update(vec,step_fac * direc)
 
     # convert back if required
-    vec0 = np.float32(M.convert_md(vec,True))
+    vec0 = np.asarray(M.convert_md(vec,True),dtype='f4')
 
     # write base model
     for i in range(nmod):

@@ -348,6 +348,12 @@ class FwatPreOP:
                     np.save(filename,data)
         MPI.COMM_WORLD.Barrier()
 
+    def save_forward(self):
+        pass
+
+    def cal_adj_source(self,ib:int):
+        pass
+
     def execute(self):
         # rotate seismograms from XYZ to ZNE
         self._rotate_XYZ_to_ZNE()

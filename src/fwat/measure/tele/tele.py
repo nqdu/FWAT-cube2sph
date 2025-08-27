@@ -14,24 +14,6 @@ def get_injection_time(evtid:str):
     
     return t_inj 
 
-
-def compute_ak135_time(evla:float,evlo:float,evdp:float,statxt,phase='P'):
-    from obspy.taup import TauPyModel
-    
-    nsta = statxt.shape[0]
-    t_ref = np.zeros((nsta))
-
-    # create taup model
-    model = TauPyModel("ak135")
-    
-    for i in range(nsta):
-        stla = float(statxt[i,2])
-        stlo = float(statxt[i,3])
-        t_ref[i] = model.get_travel_times_geo(evdp,evla,evlo,stla,stlo,[phase])[0].time
-    
-
-    return t_ref
-
 def compute_ak135_time(evla:float,evlo:float,evdp:float,stla,stlo,phase='P'):
     from obspy.taup import TauPyModel
     
@@ -94,7 +76,7 @@ def seis_pca(stf_collect:np.ndarray):
     w,v = np.linalg.eig(rec @ rec.T / nt)
 
     # sort eigenvalues
-    w = w.real 
+    w = np.real(w) 
     idx = np.argsort(w)[::-1]
     w = w[idx]
     v = v[:,idx]
@@ -142,7 +124,7 @@ def compute_stf(glob_syn,glob_obs,dt_syn,freqmin,freqmax,components):
             #stf1 = deconit(u,w,dt_syn,0.,1.5)
             tr = Trace(stf1); tr.stats.delta = dt_syn
             tr.filter("bandpass",freqmin=freqmin,freqmax=freqmax,zerophase = True,corners=4)
-            stf1 = np.float32(tr.data) 
+            stf1 = np.asarray(tr.data,dtype='f4')
 
             # save stf
             stf_collect[i,:] = stf1 * 1.

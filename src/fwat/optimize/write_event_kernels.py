@@ -63,8 +63,8 @@ def run(argv):
         
         # convert to plotting kernels
         _,direc = M.convert_kl(md,grad)
-        direc = np.float32(-direc) # we need search direction
-        
+        direc = np.asarray(-direc,dtype='f4') # we need search direction
+
         # get search direction names
         dname_list = M.get_direc_names()
         nker = len(dname_list)

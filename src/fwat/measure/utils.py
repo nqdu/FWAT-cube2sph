@@ -25,11 +25,26 @@ def read_params(paramfile:str):
     
     return pdict
 
+def hann_taper(npts,p):
+    from scipy.signal import windows
+    max_len = int(npts * p)
+    max_len = min(max_len, int(npts / 2))
+
+    # get hann window
+    wlen = max_len * 2 
+    if wlen < npts:
+        wlen += 1
+
+    win = np.ones(npts)
+    hanwindow = windows.hann(wlen)
+    win[:max_len] = hanwindow[:max_len]
+    win[npts-max_len:] = hanwindow[wlen-max_len:]
+
+    return win
+
 def sac_cos_taper(npts,p):
-    if p == 0.0 or p == 1.0:
-        frac = int(npts * p / 2.0)
-    else:
-        frac = int(npts * p / 2.0 + 0.5)
+    frac = int(npts * p) 
+    frac = min(frac,int(npts/2) - 1)
 
     idx1 = 0
     idx2 = frac - 1
@@ -62,7 +77,12 @@ def sac_cos_taper(npts,p):
         cos_win[idx3] = 0.0
     return cos_win
 
-def interpolate_syn(data,t1,dt1,npt1,t2,dt2,npt2,max_percentage=0.05):
+_TAPER_ENTRY_POINT = {
+    "hann": hann_taper,
+    "cos": sac_cos_taper
+}
+
+def interpolate_syn(data,t1,dt1,npt1,t2,dt2,npt2,max_percentage=0.05,type_='hann'):
     """
     interpolate data from (t1, dt1, npt1) to a new data (t2,dt2,npt2)
 
@@ -73,14 +93,15 @@ def interpolate_syn(data,t1,dt1,npt1,t2,dt2,npt2,max_percentage=0.05):
     
     """
     # taper input data if required
-    data1 = np.float32(data)
+    data1 = data * 1.
     if max_percentage > 0.:
-        cos_tp = sac_cos_taper(npt1,max_percentage*2)
+        func = _TAPER_ENTRY_POINT[type_]
+        cos_tp = func(npt1,max_percentage)
         data1 = data1 * cos_tp
 
     temp = np.zeros((npt2))
     time = t2 + np.arange(npt2) * dt2 
-    idx = np.logical_and(time > t1,time < t1 + (npt1-1) * dt1)
+    idx = np.logical_and(time > t1,time < t1 + (npt1-2) * dt1)
     ii = np.int64((time[idx] - t1) / dt1)
     tt = time[idx] - (ii * dt1 + t1) 
     temp[idx] = (data1[ii+1] - data1[ii]) * tt / dt1 + data1[ii]
@@ -88,20 +109,64 @@ def interpolate_syn(data,t1,dt1,npt1,t2,dt2,npt2,max_percentage=0.05):
     return temp
 
 
-def bandpass(u,dt,freqmin,freqmax):
-    import obspy
-    tr = obspy.Trace(data = u * 1.)
-    tr.stats.delta = dt 
+def bandpass(u,dt,freqmin,freqmax,max_percentage=0.05,type_='hann'):
+    """
+    Apply a SAC-like bandpass filter with pre-processing to a 1D signal.
 
-    tr.detrend("demean")
-    tr.detrend("linear")
-    tr.taper(0.05)
-    tr.filter("bandpass",freqmin=freqmin,freqmax=freqmax,zerophase=True,corners=4)
-    tr.detrend("demean")
-    tr.detrend("linear")
-    tr.taper(0.05)
+    This function performs the following steps:
+        1. Detrends and demeans the input signal to remove linear trends and DC offset.
+        2. Applies a Hann taper to the signal to reduce edge effects.
+        3. Applies a zero-phase Butterworth bandpass filter between `freqmin` and `freqmax`.
+        4. Detrends, demeans, and tapers the signal again after filtering.
 
-    return tr.data
+    Parameters
+    ----------
+    u : array_like
+        Input 1D signal to be filtered.
+    dt : float
+        Sampling interval (in seconds).
+    freqmin : float
+        Lower frequency bound of the bandpass filter (in Hz).
+    freqmax : float
+        Upper frequency bound of the bandpass filter (in Hz).
+    max_percentage : float
+        Maximum percentage of taper to apply at both ends of the signal.
+    type_ : str
+        Type of tapering window to use ('hann' or 'cos').
+
+    Returns
+    -------
+    u1 : ndarray
+        The filtered signal after bandpass filtering and pre/post-processing.
+
+    Notes
+    -----
+    - The function uses a 4th-order Butterworth filter implemented with second-order sections (SOS) for numerical stability.
+    - The Hann taper is applied with a default fraction of 0.05 (5%) at both ends of the signal.
+    - The function assumes the existence of a `hann_taper` function for tapering.
+    """
+    from scipy import signal 
+    assert type_ in ['hann','cos'], "type_ should be one of hann/cos"
+
+    # detrend/demean
+    u1 = u - np.mean(u)
+    u1 = signal.detrend(u1,type='linear')
+
+    # taper 
+    func = _TAPER_ENTRY_POINT[type_]
+    win = func(len(u1),max_percentage)
+    u1 = u1 * win
+
+    # filter
+    sos = signal.butter(4, [freqmin,freqmax], btype='bandpass', fs=1.0/dt, output='sos')
+    u1 = signal.sosfiltfilt(sos, u1)
+
+    # detrend/demean and taper 
+    u1 = u1 - np.mean(u1)
+    u1 = signal.detrend(u1,type='linear')
+    u1 = u1 * win 
+
+    return u1
 
 # diff function,central difference 1-st order 
 def dif1(data,dt):
@@ -141,7 +206,7 @@ def get_window_info(t0,dt,tstart,tend):
 
     return left_pt,right_pt 
 
-def taper_window(t0,dt,nt,tstart,tend,p=0.05):
+def taper_window(t0,dt,nt,tstart,tend,p=0.05,type_='hann'):
     """
     get window start/end sample index
 
@@ -155,6 +220,8 @@ def taper_window(t0,dt,nt,tstart,tend,p=0.05):
         start/end time of this window
     p: float
         ratio of data to be tapered on one side
+    type_: str
+        type of tapering window, either 'hann' or 'cos'
 
     Returns
     -----------
@@ -162,6 +229,7 @@ def taper_window(t0,dt,nt,tstart,tend,p=0.05):
         the window sample index [left_pt,right_pt)
     """
     assert tend >= tstart, "window is reversed!"
+    assert type_ in ['hann','cos'], "type_ should be one of hann/cos"
 
     nlen = int((tend - tstart) / dt) + 1
     left_pt = int(np.floor(tstart - t0) / dt)
@@ -171,7 +239,8 @@ def taper_window(t0,dt,nt,tstart,tend,p=0.05):
     if right_pt > nt:
         right_pt = nt
 
-    win = sac_cos_taper(nlen,p*2)
+    func = _TAPER_ENTRY_POINT[type_]
+    win = func(nlen,p)
 
     return left_pt,right_pt,win 
 

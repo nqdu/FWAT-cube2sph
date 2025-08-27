@@ -265,7 +265,7 @@ class Tele_PreOP(FwatPreOP):
     def _cal_adj_source_user(self,ib:int):
         from obspy.io.sac import SACTrace
         from .utils import interpolate_syn
-        from .measure import measure_adj_cross_conv
+        from fwat.adjoint.cross_conv import measure_adj_cross_conv
 
         # get frequency band
         bandname = self._get_bandname(ib)
