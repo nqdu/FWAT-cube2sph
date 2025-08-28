@@ -1,0 +1,29 @@
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.env
+
+# OS files
+.DS_Store
+
+# C/C++ build files
+*.o
+*.out
+*.a
+*.so
+*.exe
+
+# Logs
+*.log
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+
+# Jupyter notebooks
+.ipynb_checkpoints/

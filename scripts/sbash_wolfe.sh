@@ -104,7 +104,7 @@ if [ "$flag" == "GRAD" ]; then
   # save LOGS
   mkdir -p LOG/$MODEL LOG/M$inext
   cd LOG
-  for f in  FWD_ADJ* POST* output_fwat[1,2]*;
+  for f in  ADJ* POST* output_fwat[1,2]*;
   do 
     if [   -f $f ]; then 
       mv $f $MODEL/

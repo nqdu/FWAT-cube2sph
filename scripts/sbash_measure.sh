@@ -89,8 +89,8 @@ for i in `seq 1 $NJOBS`; do
     # merge all seismograms to one big file
     echo " "
     echo "packing seismograms for $evtid_wk ..."
-    fwat-main pack OUTPUT_FILES/seismograms.h5 OUTPUT_FILES/all_seismograms.ascii
-    \rm -rf OUTPUT_FILES/all_seismograms.ascii
+    fwat-main pack OUTPUT_FILES/seismograms.h5 OUTPUT_FILES/all_seismograms.*
+    \rm -rf OUTPUT_FILES/all_seismograms.*
     cd $work_dir
   done 
 

@@ -40,8 +40,8 @@ class RF_PreOP(FwatPreOP):
         super().__init__(measure_type, iter, evtid, run_opt)
     
         # read tref and t_inj for teleseismic events
-        from tele.tele import get_injection_time
-        from tele.tele import compute_ak135_time
+        from .tele.tele import get_injection_time
+        from .tele.tele import compute_ak135_time
         self.t_inj = get_injection_time(self.evtid)
 
         if "_" in self.evtid:
@@ -80,12 +80,18 @@ class RF_PreOP(FwatPreOP):
         code = f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}R.{bandname}"
 
         return code 
+    
+    def _sanity_check(self):
+        super()._sanity_check()
+
+        # make sure adjsrc_type = 2
+        assert self.pdict['ADJSRC_TYPE'] == '2', f"For receiver function, the ADJSRC_TYPE should be 2"
 
     def save_forward(self):
         import os 
         from obspy.io.sac import SACTrace
-        from tele.deconit import deconit
-        from utils import interpolate_syn,bandpass
+        from .tele.deconit import deconit
+        from .utils import interpolate_syn,bandpass
 
         # get some vars
         evtid = self.evtid 
@@ -169,10 +175,9 @@ class RF_PreOP(FwatPreOP):
 
     def cal_adj_source(self,ib:int):
         from obspy.io.sac import SACTrace
-        from utils import interpolate_syn
-        from utils import bandpass,taper_window
-        from measure import measure_adj
-        from tele.deconit import deconit
+        from fwat.measure.utils import interpolate_syn,bandpass,taper_window
+        from fwat.measure.measure import measure_adj
+        from fwat.measure.tele.deconit import deconit
         import os 
         bandname = self._get_bandname(ib)
         if self.myrank == 0:
@@ -245,7 +250,6 @@ class RF_PreOP(FwatPreOP):
 
             # compute adjoint source
             tp = self.t_ref[i] - self.t_inj
-            self._rf_adj_src()
             adj_r,adj_z,amp  = \
                 _rf_adj_src(
                     rf_syn,rf_obs,syn_data[idx_z,:],
@@ -256,7 +260,7 @@ class RF_PreOP(FwatPreOP):
 
             # taper  RF
             taper = np.zeros((npt_syn))
-            lpt,rpt,taper0 = taper_window(0,dt_syn,tstart[ir],tend[ir])
+            lpt,rpt,taper0 = taper_window(0,dt_syn,npt_syn,tstart[ir],tend[ir])
             taper[lpt:rpt] = taper0 * 1.
             rf_obs *= taper / amp 
             rf_syn *= taper / amp 
@@ -274,7 +278,7 @@ class RF_PreOP(FwatPreOP):
             adj_z = bandpass(adj_z,dt_syn,freqmin,freqmax)
             adj_r = bandpass(adj_r,dt_syn,freqmin,freqmax)
             taper[:] = 0.
-            lpt,rpt,taper0 = taper_window(0,dt_syn,tp - win_tb,tp + win_te,)
+            lpt,rpt,taper0 = taper_window(0,dt_syn,npt_syn,tp - win_tb,tp + win_te,)
             taper[lpt:rpt] = taper0 * 1.
             adj_r *= taper
             adj_z *= taper

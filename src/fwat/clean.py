@@ -3,6 +3,17 @@ from .system.system import sys_remove
 from .system.specfem import get_param
 
 def run(args:list[str]):
+    """
+    clean the simulation directory for a given model and event id
+
+    Parameters
+    ----------
+    args : list[str]
+        list of arguments, should contain two or three elements:
+        1. model name (e.g., M00)
+        2. event id (e.g., P0001)
+        3. (optional) deepclean (True/False), if True, remove the entire model directory 
+    """
     if len(args) !=3 and len(args) !=2 :
         print("Usage: fwat clean MODEL(M00) evtid (deepclean)")
         exit(1)

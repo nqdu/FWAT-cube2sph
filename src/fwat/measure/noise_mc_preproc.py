@@ -69,6 +69,9 @@ class NoiseMC_PreOP():
         # get all synthetic directories
         self._get_mc_channel()
 
+        # adjoint source
+        self.adjsrc_type:str = str(self.pdict['ADJSRC_TYPE'])
+
         # read sourcer/receiver locations below
         # ---------------------
         # source loc
@@ -148,6 +151,14 @@ class NoiseMC_PreOP():
         if ('N' in rcomps or 'E' in rcomps) and (('R' in rcomps or 'T' in rcomps)):
             print("[NE] and [RT] cannot both exist in receiver-side CC-components")
             exit(1)
+
+        # check adjsrc_type
+        if self.adjsrc_type not in ['5','7','exp_phase','cc_time']:
+            if self.myrank == 0:
+                print(f"only [5,7,'exp_phase','cc_time'] adjoint sources are supported!")
+                print(f"adjsrc_type = {self.adjsrc_type}")
+            exit(1)
+
     
     def _get_station_info(self):
         from .utils  import cal_dist_az_baz
@@ -354,7 +365,6 @@ class NoiseMC_PreOP():
         from .utils import interpolate_syn,dif1
         from .utils import bandpass,alloc_mpi_jobs
         from .utils import rotate_EN_to_RT
-        from .measure import measure_adj
         import os 
 
         # get vars
@@ -368,6 +378,11 @@ class NoiseMC_PreOP():
         t1_inp = t0_syn + (npt_syn - 1) * dt_syn
         npt_cut = int((t1_inp - t0_inp) / dt_inp) + 1
 
+        # get snr
+        snr_threshold:float = -1.
+        if 'SNR_THRESHOLD' in self.pdict:
+            snr_threshold = self.pdict['SNR_THRESHOLD'][ib]
+
         # band name
         bandname = self._get_bandname(ib)
         freqmin = 1. / self.Tmax[ib]
@@ -376,7 +391,6 @@ class NoiseMC_PreOP():
         # group velocity window
         vmin_list = [x[0] for x in self.pdict['GROUPVEL_WIN']]
         vmax_list = [x[1] for x in self.pdict['GROUPVEL_WIN']]
-        imeas = self.pdict['IMEAS']
 
         # log
         if self.myrank == 0:
@@ -498,14 +512,27 @@ class NoiseMC_PreOP():
                 # preprocess
                 dat_inp = bandpass(dat_inp,dt_inp,freqmin,freqmax)
                 syn_inp = bandpass(syn_inp,dt_inp,freqmin,freqmax)
-        
-                # normalize my amplitude of the window
+
+                # find amplitude of the in the window to normalize
                 dist = obs_tr.dist
                 win_b = np.floor((dist / vmax_list[ib] - self.Tmax[ib] / 2. + t0_inp) / dt_inp)
                 win_e = np.floor((dist / vmin_list[ib] + self.Tmax[ib] / 2. - t0_inp) / dt_inp)
                 win_b = int(max(win_b,0))
                 win_e = int(min(win_e,len(dat_inp)-1))
-                dat_inp *= np.max(np.abs(syn_inp[win_b:win_e])) / np.max(np.abs(dat_inp[win_b:win_e]))
+                amp = np.max(np.abs(dat_inp[win_b:win_e]))
+
+                # check snr
+                std_in_tail = np.std(dat_inp[win_e+1:])
+                if std_in_tail < 1.0e-20:
+                    snr = 1.0e20
+                else:
+                    snr = amp / std_in_tail
+                if snr > snr_threshold:
+                    dat_inp *= np.max(np.abs(syn_inp[win_b:win_e])) / amp
+                else:
+                    # set dat/syn to zero, it will contribute nothing
+                    dat_inp *= 0. 
+                    syn_inp *= 0.
 
                 # compute time window
                 tstart[ir] = dist / vmax_list[ib] - self.Tmax[ib] * 0.5 
@@ -514,12 +541,37 @@ class NoiseMC_PreOP():
                 tend[ir] = min(tend[ir],t0_obs+(npt_obs-1)*dt_obs)
 
                 # compute misfits and adjoint source
-                verbose = (self.myrank == 0) and (ir == 0)
-                tr_chi[ir,ic],am_chi[ir,ic],win_chi[ir,ic,:],adjsrc =   \
-                    measure_adj(t0_inp,dt_inp,npt_cut,t0_syn,dt_syn,npt_syn,
-                                tstart[ir],tend[ir],imeas,self.Tmax[ib]*1.01,
-                                self.Tmin[ib]*0.99,verbose,dat_inp,
-                                syn_inp)
+                if self.adjsrc_type == 'exp_phase':
+                    from fwat.adjoint.exp_phase_misfit import measure_adj_exphase
+                    tr_chi[ir,ic],am_chi[ir,ic],win_chi[ir,ic,:],adjsrc =  \
+                        measure_adj_exphase(dat_inp,syn_inp,
+                                            t0_inp,dt_inp,npt_cut,
+                                            self.Tmin[ib],self.Tmax[ib],
+                                            tstart[ir],tend[ir]
+                        )
+                    # reinterpolate adjoint source
+                    adjsrc = interpolate_syn(adjsrc,t0_inp,dt_inp,npt_cut,
+                                             t0_syn,dt_syn,npt_syn)
+                elif self.adjsrc_type == 'cc_time':
+                    from fwat.adjoint.cc_misfit import measure_adj_cc
+                    tr_chi[ir,ic],am_chi[ir,ic],win_chi[ir,ic,:],adjsrc =  \
+                        measure_adj_cc(dat_inp,syn_inp,
+                                       t0_inp,dt_inp,npt_cut,
+                                       self.Tmin[ib],self.Tmax[ib],
+                                       tstart[ir],tend[ir]
+                        )
+                    # reinterpolate adjoint source
+                    adjsrc = interpolate_syn(adjsrc,t0_inp,dt_inp,npt_cut,
+                                             t0_syn,dt_syn,npt_syn)
+                else:
+                    from .measure import measure_adj
+                    verbose = (self.myrank == 0) and (ir == 0)
+                    imeas = int(self.adjsrc_type)
+                    tr_chi[ir,ic],am_chi[ir,ic],win_chi[ir,ic,:],adjsrc =   \
+                        measure_adj(t0_inp,dt_inp,npt_cut,t0_syn,dt_syn,npt_syn,
+                                    tstart[ir],tend[ir],imeas,self.Tmax[ib]*1.01,
+                                    self.Tmin[ib]*0.99,verbose,dat_inp,
+                                    syn_inp)
 
                 # save adjoint source to adj_src_all
                 adj_src_all[i_s,i_r,:] = adjsrc.copy()
@@ -566,13 +618,32 @@ class NoiseMC_PreOP():
         self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,win_chi)
 
 
-    def _print_measure_info(self,bandname,tstart,tend,tr_chi,am_chi,window_chi):
+    def _print_measure_info(self,bandname:str,tstart:np.ndarray,tend:np.ndarray,
+                            tr_chi:np.ndarray,am_chi:np.ndarray,
+                            window_chi:np.ndarray):
+        """ 
+        print measure_adj info and save to file 
+        
+        Parameters
+        ----------
+        bandname: str
+            band name
+        tstart: np.ndarray, shape(nsta_loc,)
+            start time of measurement window
+        tend: np.ndarray,shape(nsta_loc,)
+            end time of measurement window
+        tr_chi: np.ndarray,shape(nsta_loc,ncomp)
+            travel-time chi
+        am_chi: np.ndarray,shape(nsta_loc,ncomp)
+            amplitude chi
+        window_chi: np.ndarray,shape(nsta_loc,ncomp,20)
+            window chi and adjoint source info  (20 values)
+        """
         import os 
         from .utils import alloc_mpi_jobs 
         
         ncomp = tr_chi.shape[1]
         nsta_loc = len(tstart)
-        imeas = self.pdict['IMEAS']
 
         # create directory
         if self.myrank == 0:
@@ -623,13 +694,13 @@ class NoiseMC_PreOP():
                         print(f'{name}.{self.chcode}{chr} CC comp = {self.cc_comps[ic]}')
                         print("Measurement window No.  1")
                         print("start and end time of window: %f %f" %(tstart[ir],tend[ir]) )
-                        print(f"adjoint source and chi value for imeas = {imeas}")
+                        print(f"adjoint source and chi value for type = {self.adjsrc_type}")
                         print("%e" %(window_chi[ir,ic,6]))
                         print("tr_chi = %e am_chi = %e" %(tr_chi[ir,ic],am_chi[ir,ic]))
                         print("")
 
                         net,stnm = name.split('.')
-                        fio.write(f"{self.evtid}_{chs} {net} {stnm} {self.chcode}{chr} 1 {imeas} ")
+                        fio.write(f"{self.evtid}_{chs} {net} {stnm} {self.chcode}{chr} 1 {self.adjsrc_type} ")
                         fio.write("%g %g " %(tstart[ir],tend[ir]))
                         for j in range(20):
                             fio.write("%g " %(window_chi[ir,ic,j]))

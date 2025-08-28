@@ -104,14 +104,24 @@ def run(argv):
     nmod = len(grad_list_base)
     for i in range(nmod):
         if myrank == 0: print(f'sum kernel {grad_list_base[i]}')
-        kl = np.float32(0.)
+        kl = np.array([0])
         for ievt in range(nevts):
-            # read kernel from h5
-            setname = '/' + srctxt[ievt,0]
-
             # check if it's noise source
             filenames = glob.glob(f'./{SOLVER}/{MODEL}/{srctxt[ievt,0]}_[NEZRT]')
             filenames.append(f'./{SOLVER}/{MODEL}/{srctxt[ievt,0]}')
+
+            # check if one of these files exists
+            file_exists = False
+            for j,f in enumerate(filenames):
+                filename = f + '/GRADIENT/' + grad_list_base[i] + '.h5'
+                if os.path.exists(filename):
+                    file_exists = True 
+
+            if not file_exists:
+                if myrank == 0:
+                    print(f"no kernel found for {srctxt[ievt,0]}, name = {grad_list_base[i]}")
+                exit(1)
+                
             for f in filenames:
                 filename = f + '/GRADIENT/' + grad_list_base[i] + '.h5'
                 if not os.path.exists(filename): continue
@@ -127,13 +137,14 @@ def run(argv):
         # write out
         outname = KERNEL_DIR + "/proc%06d"%myrank + '_' + grad_list_base[i] + '.bin'
         f = FortranFile(outname,"w")
-        kl = np.float32(kl)
+        kl = np.asarray(kl,dtype='f4')
         f.write_record(kl)
         f.close()
 
         if i == 0 and PRECOND == 'none':
-            kl = np.float32(kl * 0 + 1.)
+            kl = kl * 0 + 1
             outname = KERNEL_DIR + "/proc%06d"%myrank + "_hess_kernel" + '.bin'
+            kl = np.asarray(kl,dtype='f4')
             f = FortranFile(outname,"w")
             f.write_record(kl)
             f.close()
@@ -142,7 +153,7 @@ def run(argv):
         outname = KERNEL_DIR + "/proc%06d"%myrank + "_hess_kernel" + '.bin'
         kl = compute_zpred_hess(iter_cur)
         f = FortranFile(outname,"w")
-        kl = np.float32(kl)
+        kl = np.asarray(kl,dtype='f4')
         f.write_record(kl)
         f.close()
 
@@ -152,27 +163,43 @@ def run(argv):
         idx = np.logical_not(kl == 1.0e-8)
         kl[idx] = kl[idx]**2
         f = FortranFile(outname,"w")
-        kl = np.float32(kl)
+        kl = np.asarray(kl,dtype='f4')
         f.write_record(kl)
         f.close()
 
     # sum hess if required
     if PRECOND == 'default':
-        kl = np.float32(0.)
+        kl = np.array([0])
         for ievt in range(nevts):
-            setname = '/' + srctxt[ievt,0]
-            filename = f'./{SOLVER}/{MODEL}' + setname + '/GRADIENT/' + 'hess_kernel.h5'
 
-            fio = h5py.File(filename,'r')
-            arr = fio[str(myrank)][:]
-            fio.close()
+            # check if it's noise source
+            filenames = glob.glob(f'./{SOLVER}/{MODEL}/{srctxt[ievt,0]}_[NEZRT]')
+            filenames.append(f'./{SOLVER}/{MODEL}/{srctxt[ievt,0]}')
+
+            for f in filenames:
+                filename = f + '/GRADIENT/hess_kernel.h5'
+                if not os.path.exists(filename): continue
+
+                # read 
+                fio = h5py.File(filename,"r")
+                arr = np.asarray(fio[str(myrank)][:],dtype='f4')
+                fio.close()
+
+                # sum kernel
+                kl = kl + arr * weight[ievt]
+
+                # filename = f'./{SOLVER}/{MODEL}' + setname + '/GRADIENT/' + 'hess_kernel.h5'
+
+                # fio = h5py.File(filename,'r')
+                # arr = fio[str(myrank)][:]
+                # fio.close()
                 
-            # get hessian norm
-            s = np.sum(arr * arr)
-            s_all = comm.allreduce(s,MPI.SUM)
-            if myrank == 0:
-                print(f'event {ievt + 1} of {nevts}, hessian norm = {np.sqrt(s_all)}')
-            kl = kl + np.abs(arr)
+                # get hessian norm
+                s = np.sum(arr * arr)
+                s_all = comm.allreduce(s,MPI.SUM)
+                if myrank == 0:
+                    print(f'event {ievt + 1} of {nevts}, hessian norm = {np.sqrt(s_all)}')
+                kl = kl + np.abs(arr)
         
         outname = KERNEL_DIR + "/proc%06d"%myrank + "_hess_kernel" + '.bin'
         
@@ -194,7 +221,7 @@ def run(argv):
         kl[idx1] = 1. / THRESHOLD_HESS
 
         f = FortranFile(outname,"w")
-        kl = np.float32(kl)
+        kl = np.asarray(kl,dtype='f4')
         f.write_record(kl)
         f.close()
 

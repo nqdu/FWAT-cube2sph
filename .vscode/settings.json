@@ -1,3 +1,31 @@
 {
-    "python.analysis.include": ["src"]
+  // Keep Pylance from scanning junk
+  "python.analysis.exclude": [
+    "**/.git/**",
+    "**/.hg/**",
+    "**/.svn/**",
+    "**/__pycache__/**",
+    "**/.mypy_cache/**",
+    "**/.pytest_cache/**",
+    "**/build/**",
+    "**/dist/**",
+    "**/node_modules/**",
+    "**/data/**",
+    "**/logs/**",
+    "**/.venv/**"   // adjust if your env lives inside the repo
+  ],
+  "files.watcherExclude": {
+    "**/.git/**": true,
+    "**/node_modules/**": true,
+    "**/.venv/**": true,
+    "**/data/**": true,
+    "**/logs/**": true
+  },
+
+  // Tame heavy features
+  "python.analysis.typeCheckingMode": "basic",        // or "off" for max speed
+  "python.analysis.autoImportCompletions": false,     // speeds up IntelliSense
+  "python.analysis.useLibraryCodeForTypes": false,    // faster, less precise
+  "python.analysis.indexing": false,                  // disable global indexing if startup is slow
+
 }

@@ -80,9 +80,17 @@ class FwatSubmitor:
         self.run_opt = run_opt
 
         # nprocs and path
-        self.nprocs:int = get_param(f'./DATA/Par_file.{self.meatype}','NPROC')
+        self.nprocs = get_param(f'./DATA/Par_file.{self.meatype}','NPROC')
 
     def _prepare_model_and_parfile(self,evtid:str):
+        """
+        prepare SPECFEM model and parameter files for a given source name  
+
+        Parameters
+        ----------
+        evtid : str
+            source name, e.g., P0001, P0002, etc. 
+        """
         # create directories
         syndir:str = f"{self.SOLVER}/{self.mod}/{evtid}/"
         LOCAL_PATH = './DATABASES_MPI/'
@@ -92,10 +100,10 @@ class FwatSubmitor:
         os.makedirs(f"{syndir}/{LOCAL_PATH}",exist_ok=True)
 
         # copy file to syndir
-        shutil.copy2(f'DATA/Par_file.{self.meatype}',f'{syndir}/DATA/Par_file')
+        shutil.copy(f'DATA/Par_file.{self.meatype}',f'{syndir}/DATA/Par_file')
         for f in os.listdir("OUTPUT_FILES/"):
             if '.h' in f:
-                shutil.copy2(f"OUTPUT_FILES/{f}",f'{syndir}/OUTPUT_FILES/{f}')
+                shutil.copy(f"OUTPUT_FILES/{f}",f'{syndir}/OUTPUT_FILES/{f}')
 
         # create softlink for mesh files
         if os.path.exists(f"{syndir}/DATA/meshfem3D_files"):
@@ -103,9 +111,12 @@ class FwatSubmitor:
         os.makedirs(f"{syndir}/DATA/meshfem3D_files")
         for f in os.listdir(f"DATA/meshfem3D_files/"):
             name = f"{syndir}/DATA/meshfem3D_files/{f}"
-            os.symlink(f"{self.cwd}/DATA/meshfem3D_files/{f}", name)
+            if f != "Mesh_Par_file":
+                os.symlink(f"{self.cwd}/DATA/meshfem3D_files/{f}", name)
+            else:
+                shutil.copy(f"{self.cwd}/DATA/meshfem3D_files/{f}", name)
 
-        # change local path
+            # change local path
         filename = f"{syndir}/DATA/Par_file"
         change_parfile(filename,LOCAL_PATH=LOCAL_PATH)
         filename = f"{syndir}/DATA/meshfem3D_files/Mesh_Par_file"
@@ -160,6 +171,9 @@ class FwatSubmitor:
         return evtid_list,stations_list
 
     def prepare_fwd(self):
+        """
+        prepare files and attributes for SPECFEM forward simulation 
+        """
         import glob 
 
         evtid_list,stations_list = self._get_simulation_list(True)
@@ -176,7 +190,7 @@ class FwatSubmitor:
             with open(f"{syndir}/DATA/STATIONS","w") as f:
                 for line in stations_list[ie]:
                     f.write(line + "\n")
-            shutil.copy2(f"{syndir}/DATA/STATIONS",
+            shutil.copy(f"{syndir}/DATA/STATIONS",
                          f"{syndir}/DATA/STATIONS_ADJOINT")
 
             # prepare source
@@ -208,7 +222,7 @@ class FwatSubmitor:
 
                 # copy FORCESOLUTION FILE
                 filename = f"{self.SRC_REC}/FORCESOLUTION_{evtid}"
-                shutil.copy2(filename,f"{syndir}/DATA/FORCESOLUTION")
+                shutil.copy(filename,f"{syndir}/DATA/FORCESOLUTION")
 
             else:
                 print("not implemented!")
@@ -231,19 +245,26 @@ class FwatSubmitor:
             # forward simulation
             filename = f"{syndir}/DATA/Par_file"
             NSTEP = get_param(filename,"NSTEP")
-            change_parfile(filename,
-                        SUBSAMPLE_FORWARD_WAVEFIELD=SUBSAMPLE,
-                        SAVE_FORWARD=SAVE_FORWARD,
-                        GPU_MODE=GPU_MODE,
-                        SIMULATION_TYPE=1,
-                        APPROXIMATE_HESS_KL=".false.",
-                        WRITE_SEISMOGRAMS_BY_MASTER=".TRUE.",
-                        SAVE_ALL_SEISMOS_IN_ONE_FILE=".true.",
-                        NTSTEP_BETWEEN_OUTPUT_SEISMOS=NSTEP)
+            change_parfile(
+                filename,
+                SUBSAMPLE_FORWARD_WAVEFIELD=SUBSAMPLE,
+                SAVE_FORWARD=SAVE_FORWARD,
+                GPU_MODE=GPU_MODE,
+                SIMULATION_TYPE=1,
+                APPROXIMATE_HESS_KL=".false.",
+                WRITE_SEISMOGRAMS_BY_MASTER=".true.",
+                USE_BINARY_FOR_SEISMOGRAMS = '.true.', 
+                SAVE_MESH_FILES = '.false.', 
+                SAVE_ALL_SEISMOS_IN_ONE_FILE=".true.",
+                NTSTEP_BETWEEN_OUTPUT_SEISMOS=NSTEP
+            )
             
         return evtid_list
 
     def prepare_adj(self):
+        """
+        prepare files and attributes for SPECFEM adjoint simulation 
+        """
         evtid_list,_ = self._get_simulation_list(False)
 
         # loop each evtid list
@@ -268,17 +289,21 @@ class FwatSubmitor:
                     COUPLE_WITH_INJECTION = ".true."
             
             filename = f"{syndir}/DATA/Par_file"
-            change_parfile(filename,
-                        COUPLE_WITH_INJECTION_TECHNIQUE=COUPLE_WITH_INJECTION,
-                        SUBSAMPLE_FORWARD_WAVEFIELD=SUBSAMPLE,
-                        SAVE_FORWARD=SAVE_FORWARD,
-                        GPU_MODE=GPU_MODE,
-                        SIMULATION_TYPE=3,
-                        APPROXIMATE_HESS_KL=".true.")
+            change_parfile(
+                filename,
+                COUPLE_WITH_INJECTION_TECHNIQUE=COUPLE_WITH_INJECTION,
+                SUBSAMPLE_FORWARD_WAVEFIELD=SUBSAMPLE,
+                SAVE_FORWARD=SAVE_FORWARD,
+                USE_BINARY_FOR_SEISMOGRAMS = '.false.', 
+                GPU_MODE=GPU_MODE,
+                SIMULATION_TYPE=3,
+                SAVE_MESH_FILES = '.false.', 
+                APPROXIMATE_HESS_KL=".true."
+            )
 
         return evtid_list
 
-    def _get_timestamp():
+    def _get_timestamp(self):
         from datetime import datetime
 
         # Get the current date and time

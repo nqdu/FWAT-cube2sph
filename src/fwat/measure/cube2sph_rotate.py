@@ -5,6 +5,20 @@ from mpi4py import MPI
 import h5py
 
 def _get_first_dim_npy(filename):
+    """Read the first dimension of a numpy binary file (.npy).
+    This function reads the header of a numpy binary file to determine the size of the first dimension.
+    It is useful for files that are not too large to fit into memory.
+
+    Parameters
+    ----------
+    filename : str
+        The path to the numpy binary file.
+
+    Returns
+    -------
+    int
+        The size of the first dimension of the array stored in the file.
+"""
     import numpy.lib.format
 
     with open(filename,"rb") as fobj:
@@ -19,6 +33,20 @@ def _get_first_dim_npy(filename):
 
 
 def _count_lines(filename):
+    """
+    Count the number of lines in a file, handling the case where the last line may not end with a newline character.
+    
+    Parameters
+    ----------
+    filename : str
+        The path to the file.
+
+    Returns
+    -------
+    int
+        The number of lines in the file.
+    
+    """
     with open(filename, 'rb') as f:
         count = 0
         while True:
@@ -33,6 +61,20 @@ def _count_lines(filename):
         return count
     
 def _read_rotation_file(filename):
+    """
+    Read a rotation matrix file and return a dictionary with keys as station names and values as rotation matrices.
+    The file format is expected to have the first line with network and station name (e.g., TA A01) followed by three lines representing a 3x3 matrix.
+    
+    Parameters
+    ----------
+    filename : str
+        The path to the rotation matrix file.
+
+    Returns
+    -------
+    dict
+        A dictionary where keys are station names (e.g., "TA.A01") and values are 3x3 numpy arrays representing the rotation matrices.
+    """
     data = {}
     with open(filename) as f:
         lines = [line.strip() for line in f if line.strip()]  # remove blank lines
@@ -59,6 +101,26 @@ def _read_rotation_file(filename):
 
 def rotate_seismo_fwd(fn_matrix:str,from_dir:str,to_dir:str,
                       from_template_str:str,to_template_str:str):
+    """
+    Function to rotate the forward seismograms from the Cube2sph system to the local Geographic system, MPI parallelized.
+
+    Parameters
+    ----------
+    fn_matrix : str
+        Path to the rotation matrix file produced by the write_station_file program. Rows: (N, E, Z) in geographic system; Columns: (x, y, z) in Cartesian system.
+    from_dir : str
+        Input directory containing the seismograms.h5 in the Cube2sph system.
+    to_dir : str
+        Output directory where the rotated seismograms will be saved in the local Geographic system, saved as .npy files.
+    from_template_str : str
+        File name template for input seismograms. Should include placeholders for network, station, and component, e.g., '${nt}.${sta}.BX${comp}.semd'.
+    to_template_str : str
+        File name template for output seismograms. Should include placeholders for network, station, and component, e.g., '${nt}.${sta}.BX${comp}.sem.ascii'.
+
+    Returns
+    -------
+    None
+    """
     # input is hdf5
     #--MPI-
     comm = MPI.COMM_WORLD
@@ -111,7 +173,7 @@ def rotate_seismo_fwd(fn_matrix:str,from_dir:str,to_dir:str,
                 continue
 
             dname = from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp])
-            arr =  np.float64(fio[dname][:])
+            arr =  fio[dname][:] * 1.
             seis[:,i_comp] = arr[:,1]
 
 
@@ -132,6 +194,23 @@ def rotate_seismo_fwd(fn_matrix:str,from_dir:str,to_dir:str,
 
 def rotate_seismo_adj(fn_matrix:str,from_dir:str,to_dir:str,
                       from_template_str:str,to_template_str:str):
+    """
+    Function to rotate the adjoint sources from the local Geographic system back to the Cube2sph system, MPI parallelized.
+    
+    Parameters
+    ----------
+    fn_matrix : str
+        Path to the rotation matrix file produced by the write_station_file program.
+    from_dir : str
+        Input directory containing the *.adj.npy in the local Geographic system.
+    to_dir : str
+        Output directory where the rotated seismograms will be saved in the Cube2sph system, saved as .txt file.
+    from_template_str : str
+        File name template for input seismograms. Should include placeholders for network, station, and component, e.g., '${nt}.${sta}.BX${comp}.sem.ascii'.
+    to_template_str : str
+        File name template for output seismograms. Should include placeholders for network, station, and component, e.g., '${nt}.${sta}.BX${comp}.semd'.
+    
+    """
 
     #--MPI-
     comm = MPI.COMM_WORLD
@@ -261,7 +340,7 @@ def rotate_seismo_fwd1(fn_matrix:str,from_dir:str,to_dir:str,
                 continue
 
             dname = from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp])
-            arr =  np.float64(fio[dname][:])
+            arr =  fio[dname][:] * 1.
             seis[:,i_comp] = arr[:,1]
 
 

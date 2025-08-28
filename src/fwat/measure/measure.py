@@ -1,4 +1,5 @@
-from .lib import libmeas
+import numpy as np 
+from typing import Final
 
 def measure_adj(t0_inp,dt_inp,npt_inp,
                 t0_syn,dt_syn,npt_syn,
@@ -17,6 +18,10 @@ def measure_adj(t0_inp,dt_inp,npt_inp,
                 dt_max_scale = 3.5,
                 ncyle_in_window=1.5,
                 use_physical_disp=False):
+    """
+    MEASURE ADJ wrapper
+    """
+    from .lib import libmeas
     
     if imeas == 5:
         itaper = 2

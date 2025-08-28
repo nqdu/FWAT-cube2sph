@@ -84,9 +84,8 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#checklist">Checklist</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#user-defined-parameter-set">User Defined Parameter set</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#user-defined-parameter-set">User-Defined Parameter Set</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#visualization">Visualization</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#id3"></a></li>
 </ul>
 </li>
 </ul>
@@ -140,7 +139,7 @@
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">5.</span><span class="p p-Indicator">,</span><span class="nv">50.</span><span class="p p-Indicator">]</span>
 <span class="w">    </span><span class="nt">TIME_WINDOW</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">5.</span><span class="p p-Indicator">,</span><span class="nv">45.</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="c1"># before and after first arrival</span>
 <span class="w">    </span><span class="nt">VERBOSE_MODE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">True</span>
-<span class="w">    </span><span class="nt">IMEAS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w"> </span><span class="c1"># 2 = L2 norm</span>
+<span class="w">    </span><span class="nt">ADJSRC_TYPE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w"> </span><span class="c1"># 2,cross-conv</span>
 
 <span class="w">  </span><span class="nt">noise</span><span class="p">:</span><span class="w"> </span><span class="c1"># multichannel noise </span>
 <span class="w">    </span><span class="nt">CC_COMPS</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;ZZ&#39;</span><span class="p p-Indicator">]</span><span class="w">  </span><span class="c1"># {SOURCE-COMP}{RECEIVER-COMP}</span>
@@ -151,15 +150,15 @@
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">10.</span><span class="p p-Indicator">,</span><span class="nv">20.</span><span class="p p-Indicator">]</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">5.</span><span class="p p-Indicator">,</span><span class="nv">15.</span><span class="p p-Indicator">]</span>
 <span class="w">    </span><span class="nt">GROUPVEL_WIN</span><span class="p">:</span><span class="w">   </span><span class="c1"># Time window, determined by group velocity, km/s, [v_min,vmax]</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">2.5</span><span class="p p-Indicator">,</span><span class="nv">4.5</span><span class="p p-Indicator">]</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">2.5</span><span class="p p-Indicator">,</span><span class="nv">4.5</span><span class="p p-Indicator">]</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">2.5</span><span class="p p-Indicator">,</span><span class="nv">4.5</span><span class="p p-Indicator">]</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">2.5</span><span class="p p-Indicator">,</span><span class="nv">4.5</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">2.0</span><span class="p p-Indicator">,</span><span class="nv">5.</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">2.0</span><span class="p p-Indicator">,</span><span class="nv">5.</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">2.0</span><span class="p p-Indicator">,</span><span class="nv">5.</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">2.0</span><span class="p p-Indicator">,</span><span class="nv">5.</span><span class="p p-Indicator">]</span>
 <span class="w">    </span><span class="nt">USE_EGF</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">True</span><span class="w">   </span><span class="c1"># if False, the input data is Cross-correlation, a negative derivative will be applied</span>
 <span class="w">    </span><span class="nt">ADJ_SRC_NORM</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">False</span><span class="w">  </span><span class="c1"># if true, the adjoint source wiil be normalized</span>
 <span class="w">    </span><span class="nt">USE_NEAR_OFFSET</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">True</span><span class="w"> </span><span class="c1"># if FALSE, reset tstart</span>
 <span class="w">    </span><span class="nt">VERBOSE_MODE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">True</span>
-<span class="w">    </span><span class="nt">IMEAS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span><span class="w"> </span><span class="c1">#  = 5 cross correlation  =7 multitaper</span>
+<span class="w">    </span><span class="nt">ADJSRC_TYPE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span><span class="w"> </span><span class="c1"># 5/7/exp_phase</span>
 
 <span class="w">  </span><span class="c1"># sks </span>
 <span class="w">  </span><span class="nt">sks</span><span class="p">:</span>
@@ -169,7 +168,7 @@
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">5.</span><span class="p p-Indicator">,</span><span class="nv">50.</span><span class="p p-Indicator">]</span>
 <span class="w">    </span><span class="nt">TIME_WINDOW</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">5.</span><span class="p p-Indicator">,</span><span class="nv">45.</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="c1"># before and after first arrival</span>
 <span class="w">    </span><span class="nt">VERBOSE_MODE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">True</span>
-<span class="w">    </span><span class="nt">IMEAS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w"> </span><span class="c1"># 2 = L2 norm</span>
+<span class="w">    </span><span class="nt">ADJSRC_TYPE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SI</span><span class="w"> </span><span class="c1">#  SI: splitting_intensity/Cross-convolution</span>
 <span class="w">  </span>
 <span class="w">  </span><span class="c1"># receiver function</span>
 <span class="w">  </span><span class="nt">rf</span><span class="p">:</span>
@@ -183,7 +182,7 @@
 <span class="w">    </span><span class="nt">TIME_WINDOW</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">5.</span><span class="p p-Indicator">,</span><span class="nv">25.</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="c1"># time window, before/after t= 0</span>
 <span class="w">    </span><span class="nt">TSHIFT</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5.</span>
 <span class="w">    </span><span class="nt">VERBOSE_MODE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">True</span>
-<span class="w">    </span><span class="nt">IMEAS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w"> </span><span class="c1"># 2 = L2 norm</span>
+<span class="w">    </span><span class="nt">ADJSRC_TYPE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w">   </span><span class="c1"># only L2 norm</span>
 
 <span class="c1"># optimization</span>
 <span class="nt">optimize</span><span class="p">:</span>
@@ -246,7 +245,7 @@ Example: <code class="docutils literal notranslate"><span class="pre">[[5.,</spa
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">TIME_WINDOW</span></code></strong> – Time window (in seconds) before and after the first arrival.<br />
 Example: <code class="docutils literal notranslate"><span class="pre">[5.,</span> <span class="pre">45.]</span></code></p></li>
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">VERBOSE_MODE</span></code></strong> – If <code class="docutils literal notranslate"><span class="pre">true</span></code>, enables verbose output. Currently it will do nothing.</p></li>
-<li><p><strong><code class="docutils literal notranslate"><span class="pre">IMEAS</span></code></strong> – Measurement type code (<code class="docutils literal notranslate"><span class="pre">2</span></code> = L2 norm). Refer to <a class="reference external" href="https://github.com/SPECFEM/specfem3d/tree/master/utils/ADJOINT_TOMOGRAPHY_TOOLS/measure_adj">measure_adj</a> for further information.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">ADJSRC_TYPE</span></code></strong> – Measurement type code (<code class="docutils literal notranslate"><span class="pre">2</span></code> = L2 norm, or  <code class="docutils literal notranslate"><span class="pre">cross-conv</span></code> = cross convolution). Refer to <a class="reference external" href="https://github.com/SPECFEM/specfem3d/tree/master/utils/ADJOINT_TOMOGRAPHY_TOOLS/measure_adj">measure_adj</a> for further information.</p></li>
 </ul>
 </section>
 <section id="multi-channel-ambient-noise-noise">
@@ -265,7 +264,7 @@ Example:
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">ADJ_SRC_NORM</span></code></strong> – If <code class="docutils literal notranslate"><span class="pre">true</span></code>, normalizes the adjoint source.</p></li>
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">USE_NEAR_OFFSET</span></code></strong> – If <code class="docutils literal notranslate"><span class="pre">false</span></code>, resets <code class="docutils literal notranslate"><span class="pre">tstart</span></code>.</p></li>
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">VERBOSE_MODE</span></code></strong> – If <code class="docutils literal notranslate"><span class="pre">true</span></code>, enables verbose output.</p></li>
-<li><p><strong><code class="docutils literal notranslate"><span class="pre">IMEAS</span></code></strong> – Measurement type code (<code class="docutils literal notranslate"><span class="pre">5</span></code> = cross-correlation, or <code class="docutils literal notranslate"><span class="pre">7</span></code> = multitaper).</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">ADJSRC_TYPE</span></code></strong> – Measurement type code (<code class="docutils literal notranslate"><span class="pre">5</span></code> = cross-correlation, or <code class="docutils literal notranslate"><span class="pre">7</span></code> = multitaper, <code class="docutils literal notranslate"><span class="pre">exp_phase</span></code> = exponentiated phase).</p></li>
 </ul>
 </section>
 <section id="sks-si-splitting-fwi-sks">
@@ -280,7 +279,7 @@ Example: <code class="docutils literal notranslate"><span class="pre">[[5.,</spa
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">TIME_WINDOW</span></code></strong> – Time window (in seconds) before and after the first arrival.<br />
 Example: <code class="docutils literal notranslate"><span class="pre">[5.,</span> <span class="pre">45.]</span></code></p></li>
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">VERBOSE_MODE</span></code></strong> – If <code class="docutils literal notranslate"><span class="pre">true</span></code>, enables verbose output.</p></li>
-<li><p><strong><code class="docutils literal notranslate"><span class="pre">IMEAS</span></code></strong> – Measurement type code (<code class="docutils literal notranslate"><span class="pre">2</span></code> = L2 norm).</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">ADJSRC_TYPE</span></code></strong> – Measurement type code (<code class="docutils literal notranslate"><span class="pre">SI</span></code> = splitting intensity).</p></li>
 </ul>
 </section>
 <section id="receiver-functions-rf">
@@ -298,7 +297,7 @@ Example: <code class="docutils literal notranslate"><span class="pre">[[1.0]]</s
 Example: <code class="docutils literal notranslate"><span class="pre">[5.,</span> <span class="pre">25.]</span></code></p></li>
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">TSHIFT</span></code></strong> – Time shift applied (in seconds).</p></li>
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">VERBOSE_MODE</span></code></strong> – If <code class="docutils literal notranslate"><span class="pre">true</span></code>, enables verbose output.</p></li>
-<li><p><strong><code class="docutils literal notranslate"><span class="pre">IMEAS</span></code></strong> – Measurement type code (<code class="docutils literal notranslate"><span class="pre">2</span></code> = L2 norm).</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">ADJSRC_TYPE</span></code></strong> – Measurement type code (<code class="docutils literal notranslate"><span class="pre">2</span></code> = L2 norm).</p></li>
 </ul>
 </section>
 </section>
@@ -599,15 +598,12 @@ Edit these functions to match your working environment, for example, by adding G
 </ul>
 </section>
 <section id="user-defined-parameter-set">
-<h2>User Defined Parameter set<a class="headerlink" href="#user-defined-parameter-set" title="Link to this heading"></a></h2>
+<h2>User-Defined Parameter Set<a class="headerlink" href="#user-defined-parameter-set" title="Link to this heading"></a></h2>
 <p>under construction</p>
 </section>
 <section id="visualization">
 <h2>Visualization<a class="headerlink" href="#visualization" title="Link to this heading"></a></h2>
 <p>under construction</p>
-</section>
-<section id="id3">
-<h2><a class="headerlink" href="#id3" title="Link to this heading"></a></h2>
 </section>
 </section>
 

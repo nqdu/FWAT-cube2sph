@@ -1,5 +1,7 @@
 from typing import Final
 
+"""Constants for FWAT project"""
+
 SOLVER: Final = "./solver/"
 SRC_REC: Final = "./src_rec/"
 DATA_DIR: Final =  "./fwat_data/"

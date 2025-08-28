@@ -31,7 +31,7 @@ def run(argv):
         from .rf_preproc import RF_PreOP
         op = RF_PreOP(mtype,iter0,evtid,run_opt)
     else:
-        print("not implemented!")
+        print(f"{mtype} is not implemented!")
         exit(1)
 
     # run

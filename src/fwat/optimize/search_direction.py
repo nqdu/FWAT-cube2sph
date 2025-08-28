@@ -42,10 +42,10 @@ def get_model_grad(iter:int,nspec:int,M:FwatModel):
 
     # convert kernel and model to required type
     mod_vec1,ker_vec1 = M.convert_kl(mod_vec,ker_vec)
-    ker_vec1 = np.float32(ker_vec1)
+    ker_vec1 = np.asarray(ker_vec1,dtype='f4')
 
     # convert model to required optimzed type
-    mod_vec1 = np.float32(M.get_used_model(mod_vec1))
+    mod_vec1 = np.asarray(M.get_used_model(mod_vec1),dtype='f4')
 
     return mod_vec1,ker_vec1
 
@@ -104,7 +104,8 @@ def get_lbfgs_direc(iter:int,paramfile:str,M:FwatModel):
     f.close()
 
     # alloc space for temporary vars 
-    a = np.zeros((1000),dtype='f4'); p = a * np.float32(1.) 
+    a = np.zeros((1000),dtype='f4')
+    p = np.ones_like(a)
 
     # read current gradient
     _,q_vec = get_model_grad(iter,nspec,M)
@@ -229,7 +230,7 @@ def get_sd_direction(iter:int,paramfile:str,M:FwatModel):
 
     # get gradient
     _,q_vec = get_model_grad(iter,nspec,M)
-    q_vec = np.float32(-q_vec)
+    q_vec = np.asarray(-q_vec,dtype='f4')
 
     return q_vec
 
@@ -270,7 +271,7 @@ def get_search_direction(iter:int,paramfile:str):
             print(f"search direction : {direc_list[i]} min/max = %g %g"%(min_all,max_all))
     
     # save search
-    direc = np.float32(direc)
+    direc = np.asarray(direc,dtype='f4')
     ndirec = direc.shape[0]
     for i in range(ndirec):
         outname =  f'{OPT_DIR}/SUM_KERNELS_M%02d'%(iter) + '/proc%06d'%(myrank) + '_' + direc_list[i] + ".bin"

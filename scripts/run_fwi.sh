@@ -16,8 +16,8 @@ EOF
 #SBATCH --ntasks-per-node=40
 #SBATCH --array=1-$narray%5
 #SBATCH --time=$walltime
-#SBATCH --job-name=FWD_ADJ.$flag.$stype
-#SBATCH --output=LOG/FWD_ADJ.$flag.$stype-%j_set%a.txt
+#SBATCH --job-name=ADJ.$flag.$stype
+#SBATCH --output=LOG/ADJ.$flag.$stype-%j_set%a.txt
 #SBATCH --account=rrg-liuqy
 #SBATCH --partition=compute
 #SBATCH --mem=12G
@@ -29,7 +29,7 @@ EOF
 #!/bin/bash -l
 #PBS -l nodes=2:ppn=80
 #PBS -l walltime=01:30:00
-#PBS -N FWD_ADJ.$flag.$stype
+#PBS -N ADJ.$flag.$stype
 #PBS -J 1-$narray
 #PBS -q starq
 #PBS -j oe
@@ -117,7 +117,7 @@ RUN_SEM()
 
     # submit and get job id
     if [ "$PLATFORM"  == "local"  ]; then 
-      bash $fwd $simu_type > LOG/FWD_ADJ.$flag.$simu_type.$iter.txt
+      bash $fwd $simu_type > LOG/ADJ.$flag.$simu_type.$iter.txt
     else 
       local jid=$(sbatch $fwd $simu_type |cut -d ' ' -f4 ) 
       job_ids+=($jid)
@@ -169,7 +169,7 @@ WAIT_FINISH() {
   if [[ "$PLATFORM"  == "local" ]];  then 
     echo ""
   else 
-    srun --dependency=afterok:${job_post} --nodes=1 --time=00:01:05 --ntasks=1 --job-name=wait  ./wait.sh
+    srun --dependency=afterok:${job_post} --nodes=1 --time=00:00:30 --ntasks=1 --job-name=wait  ./wait.sh
   fi
 }
 

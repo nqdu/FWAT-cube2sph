@@ -1,27 +1,32 @@
-from fwat.measure.FwatPreOP import FwatPreOP
+from .FwatPreOP import FwatPreOP
 import numpy as np 
 from mpi4py import MPI
-
-def splitting_intensity(Rsyn,Tsyn,dt_syn,cal_adj_source=False,si_obs = 0.,weight = 1.):
+    
+def _splitting_intensity(Rsyn:np.ndarray,Tsyn:np.ndarray,dt_syn:float):
     from .utils import dif1
     dRsyn = dif1(Rsyn,dt_syn)
     norm_syn = np.sum(dRsyn**2)
     norm_syn = 1. / (norm_syn + 1.0e-30)
     si_syn = -2. * np.sum(dRsyn * Tsyn) * norm_syn 
 
-    if cal_adj_source:
-        si_diff = (si_syn - si_obs) * weight
-        dTcomp = dif1(Tsyn,dt_syn)
-        ddRsyn = dif1(dRsyn,dt_syn)
-        adjsrc_T = -2. * si_diff * dRsyn * norm_syn
-        adjsrc_R = -2. * si_diff * (  
-            2. * np.sum(dRsyn * Tsyn) * norm_syn**2 * ddRsyn - 
-            dTcomp * norm_syn
-        )
-        return si_syn,adjsrc_R,adjsrc_T
-    else:
-        return si_syn
-    
+    return si_syn
+
+def _splitting_intensity_adjsrc(Rsyn,Tsyn,dt_syn,si_obs = 0.,weight = 1.):
+    from .utils import dif1
+    dRsyn = dif1(Rsyn,dt_syn)
+    norm_syn = np.sum(dRsyn**2)
+    norm_syn = 1. / (norm_syn + 1.0e-30)
+    si_syn = -2. * np.sum(dRsyn * Tsyn) * norm_syn 
+
+    si_diff = (si_syn - si_obs) * weight
+    dTcomp = dif1(Tsyn,dt_syn)
+    ddRsyn = dif1(dRsyn,dt_syn)
+    adjsrc_T = -2. * si_diff * dRsyn * norm_syn
+    adjsrc_R = -2. * si_diff * (  
+        2. * np.sum(dRsyn * Tsyn) * norm_syn**2 * ddRsyn - 
+        dTcomp * norm_syn
+    )
+    return si_syn,adjsrc_R,adjsrc_T
 
 class SKS_PreOP(FwatPreOP):
     def __init__(self, measure_type, iter, evtid, run_opt):
@@ -41,10 +46,33 @@ class SKS_PreOP(FwatPreOP):
             self.stla,self.stlo,phase
         )
 
-        # check if CAL_OBS_SI exists
-        self._cal_obs_si = True
-        if 'CAL_OBS_SI' in self.pdict:
-            self._cal_obs_si =  self.pdict['CAL_OBS_SI']
+    def _write_si_obs(self,si_syn:np.ndarray):
+        # save si
+        for irank in range(self.nprocs):
+            if irank == self.myrank:
+                outfile = f"{self.DATA_DIR}/{self.evtid}/si_obs.txt"
+
+                # open file
+                if irank == 0:
+                    fio = open(outfile,"w")
+                else:
+                    fio = open(outfile,"a")
+                
+                for ir in range(self.nsta_loc):
+                    i = ir + self._istart
+                    name = f"{self.netwk[i]}.{self.stnm[i]}"
+                    fio.write(f"{name} %f 1. \n" %(si_syn[ir]))
+                
+                # close
+                fio.close()
+                
+            # sync
+            MPI.COMM_WORLD.Barrier()
+
+    def _sanity_check(self):
+        super()._sanity_check()
+
+        assert self.adjsrc_type in ["SI","cross-conv"], f"Invalid ADJSRC_TYPE: {self.adjsrc_type}"
 
     def save_forward(self):
         import os 
@@ -85,7 +113,7 @@ class SKS_PreOP(FwatPreOP):
             taper = np.zeros((npt_syn))
             tstart = self.t_ref[i] - self.t_inj - win_tb
             tend = self.t_ref[i] - self.t_inj + win_te
-            lpt,rpt,taper0 = taper_window(0,dt_syn,tstart,tend)
+            lpt,rpt,taper0 = taper_window(0,dt_syn,npt_syn,tstart,tend)
             taper[lpt:rpt] = taper0 * 1.
 
             for ic in range(ncomp):
@@ -100,8 +128,7 @@ class SKS_PreOP(FwatPreOP):
                 tr.data = data[:,1] * 1.
 
                 # syn data
-                if not self._cal_obs_si:
-                    syn_data[ic,:] = data[:,1] * 1.
+                syn_data[ic,:] = data[:,1] * 1.
 
                 # channel and others
                 tr.kcmpnm = f"{self.chcode}{ch}"
@@ -114,43 +141,22 @@ class SKS_PreOP(FwatPreOP):
                 filename = f"{outdir}/{code}.sac"
                 tr.write(filename)
             
-            if not self._cal_obs_si:
-                for ib in range(self.Tmax):
-                    freqmin = 1. / self.Tmax[ib]
-                    freqmax = 1. / self.Tmin[ib]
-                    syn_data[ic,:] = bandpass(data[:,1],dt_syn,freqmin,freqmax)
+            for ib in range(len(self.Tmax)):
+                freqmin = 1. / self.Tmax[ib]
+                freqmax = 1. / self.Tmin[ib]
+                syn_data[ic,:] = bandpass(data[:,1],dt_syn,freqmin,freqmax)
 
-                    # compute si
-                    ic_r = self.components.index("R")
-                    ic_t = self.components.index("T")
+                # compute si
+                ic_r = self.components.index("R")
+                ic_t = self.components.index("T")
 
-                    R = bandpass(syn_data[ic_r],dt_syn,freqmin,freqmax)
-                    T = bandpass(syn_data[ic_t],dt_syn,freqmin,freqmax)
+                R = bandpass(syn_data[ic_r],dt_syn,freqmin,freqmax)
+                T = bandpass(syn_data[ic_t],dt_syn,freqmin,freqmax)
 
-                    si_syn[ir] += splitting_intensity(R,T,dt_syn)
+                si_syn[ir] += _splitting_intensity(R,T,dt_syn)
         
-        # save si if required
-        if not self._cal_obs_si: 
-            for irank in range(self.nprocs):
-                if irank == self.myrank:
-                    outfile = f"{self.DATA_DIR}/{self.evtid}/si_obs.txt"
-
-                    # open file
-                    if irank == 0:
-                        fio = open(outfile,"w")
-                    else:
-                        fio = open(outfile,"a")
-                    
-                    for ir in range(self.nsta_loc):
-                        i = ir + self._istart
-                        name = f"{self.netwk[i]}.{self.stnm[i]}"
-                        fio.write(f"{name} %f 1. \n" %(si_syn[ir]))
-                    
-                    # close
-                    fio.close()
-                    
-                # sync
-                MPI.COMM_WORLD.Barrier()
+        # save si
+        self._write_si_obs(si_syn)
     
     def cal_adj_source(self,ib:int):
         from obspy.io.sac import SACTrace
@@ -187,11 +193,19 @@ class SKS_PreOP(FwatPreOP):
         tr_chi = np.zeros((nsta_loc,1))
         am_chi = np.zeros((nsta_loc,1))
 
-        # load si if required
-        if not self._cal_obs_si:
-            si_obs_evt = np.loadtxt(f"{self.DATA_DIR}/{self.evtid}/si_obs.txt",dtype=str,ndmin=2)
+        # load si if it exists
+        cal_obs_si = False
+        filename = f"{self.DATA_DIR}/{self.evtid}/si_obs.txt"
+        si_obs_data = np.zeros((nsta_loc))
+        if os.path.exists(filename):
+            tmp = np.loadtxt(filename,dtype=str,ndmin=2)
+            si_obs_evt = {}
+            for i in range(tmp.shape[0]):
+                si_obs_evt[tmp[0]] = np.float64(tmp[1:])
         else:
-            si_obs_evt = ['']
+            si_obs_evt = {}
+            cal_obs_si = True
+            
 
         # loop each station
         for ir in range(nsta_loc):
@@ -203,7 +217,7 @@ class SKS_PreOP(FwatPreOP):
             taper = np.zeros((npt_syn))
             tstart[ir] = self.t_ref[i] - t_inj - win_tb
             tend[ir] = self.t_ref[i] - t_inj + win_te
-            lpt,rpt,taper0 = taper_window(0,dt_syn,tstart[ir],tend[ir])
+            lpt,rpt,taper0 = taper_window(0,dt_syn,npt_syn,tstart[ir],tend[ir])
             taper[lpt:rpt] = taper0 * 1.
 
             for ic in range(self.ncomp):
@@ -215,7 +229,7 @@ class SKS_PreOP(FwatPreOP):
                 syn_data[ic,:] = sdata * taper 
 
                 # obs data
-                if self._cal_obs_si:
+                if cal_obs_si:
                     obs_tr = SACTrace.read(f"{self.DATA_DIR}/{self.evtid}/{name}.sac")
                     # obs info
                     t0_obs = obs_tr.b 
@@ -248,7 +262,7 @@ class SKS_PreOP(FwatPreOP):
                 tr.write(f"{out_dir}/{bandname}/{name}.sac.syn")
 
                 # save obs
-                if self._cal_obs_si:
+                if cal_obs_si:
                     tr.data = obs_data[ic,:]
                     tr.write(f"{out_dir}/{bandname}/{name}.sac.obs")
 
@@ -258,33 +272,30 @@ class SKS_PreOP(FwatPreOP):
 
             # compute si for obs if required
             weight = 1.
-            if self._cal_obs_si:
-                SI_obs = splitting_intensity(
+            if cal_obs_si:
+                SI_obs = _splitting_intensity(
                     obs_data[ic_r,:],
                     obs_data[ic_t,:],
                     dt_syn
                 )
+
+                # save to it
+                si_obs_data[ir] = SI_obs
             else:
-                i_find_you = -1
-                for i in range(si_obs_evt.shape[0]):
-                    name = f"{self.netwk[ir]}.{self.stnm[ir]}"
-                    if si_obs_evt[i,0] == name:
-                        i_find_you = i 
-                        break 
-                if i_find_you < 0:
+                name = f"{self.netwk[ir]}.{self.stnm[ir]}"
+                if name not in si_obs_evt:
                     print(f"cannot locate {self.netwk[ir]}.{self.stnm[ir]} in  {self.DATA_DIR}/{self.evtid}!")
                     exit(1)
-                
-                SI_obs = float(si_obs_evt[i_find_you,1])
-                if si_obs_evt.shape[1] > 2:
-                    weight = 1. / float(si_obs_evt[i_find_you,2])
+                tmp = si_obs_evt[name][0]
+                SI_obs = tmp[0]
+                if len(tmp) > 2:
+                    weight = 1. / float(tmp[1])
 
             # compute si for syn data and adjoint source
-            SI_syn,adjsrc_R,adjsrc_T = splitting_intensity(
+            SI_syn,adjsrc_R,adjsrc_T = _splitting_intensity_adjsrc(
                 syn_data[ic_r,:],
                 syn_data[ic_t,:],
                 dt_syn,
-                cal_adj_source=True,
                 si_obs=SI_obs,
                 weight=weight
             )
@@ -309,6 +320,9 @@ class SKS_PreOP(FwatPreOP):
             data[:,1] = adjsrc_R
             outname = f"{out_dir}/{bandname}/{self.netwk[i]}.{self.stnm[i]}.{self.chcode}R.adj.sem.npy"
             np.save(outname,data)
+
+        # save SI 
+        if cal_obs_si: self._write_si_obs(si_obs_data)
         
         # save measurement files
         self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,win_chi)

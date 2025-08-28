@@ -20,6 +20,13 @@ def help_function():
     print("\trepack h5 kernel to binary")
     print("\tmpi should be enabled")
     print("\tusage: mpirun -np 4 fwat-model kernel M06 GRADIENT mdtype kltype")
+
+    print()
+    print("fwat-model reslice input_dir output_dir param")
+    print("\treslice the model from nprocs1 mpi slices to nprocs2 slices")
+    print("\tmpi should be enabled, the ")
+    print("\texample: mpirun -np 100 fwat-utils reslice DATABASES_MPI_100cores DATABASES_MPI_4cores vp")
+
     exit(1)
 
 def main():
@@ -39,7 +46,9 @@ def main():
         from fwat.optimize import write_visual_models
         write_visual_models.run(args)
         pass 
-    elif cmd == "kernel":
+    elif cmd == "reslice":
+        from fwat.scripts import reslice_model
+        reslice_model.run(args)
         pass
     else:
         print(f"{cmd} is not a function in fwat!")

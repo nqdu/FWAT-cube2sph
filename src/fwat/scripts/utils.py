@@ -100,4 +100,7 @@ def main():
     elif cmd == "clean":
         from fwat import clean
         clean.run(args)
-    
+    else:
+        print(f"module {cmd} not exist")
+        help_function()
+        sys.exit(1)
