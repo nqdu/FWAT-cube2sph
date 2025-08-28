@@ -85,7 +85,7 @@ class RF_PreOP(FwatPreOP):
         super()._sanity_check()
 
         # make sure adjsrc_type = 2
-        assert self.pdict['ADJSRC_TYPE'] == 2, f"For receiver function, the ADJSRC_TYPE should be 2"
+        assert self.pdict['ADJSRC_TYPE'] == '2', f"For receiver function, the ADJSRC_TYPE should be 2"
 
     def save_forward(self):
         import os 

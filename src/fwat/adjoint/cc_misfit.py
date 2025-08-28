@@ -266,8 +266,6 @@ def measure_adj_cc(obs,syn,t0,dt,nt,
     win_chi[15-1] = tr_chi 
     win_chi[20-1] = nt * dt
 
-    # reinterpolate adjoint source
-
     return tr_chi,am_chi,win_chi,adjsrc
 
 def measure_adj_cc_dd(

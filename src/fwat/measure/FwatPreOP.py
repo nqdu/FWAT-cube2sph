@@ -51,7 +51,7 @@ class FwatPreOP:
         self.pdict = pdict
 
         # adjoint source type 
-        self.adjsrc_type:str = self.pdict['ADJSRC_TYPE']
+        self.adjsrc_type:str = str(self.pdict['ADJSRC_TYPE'])
 
         ### end ##########
 

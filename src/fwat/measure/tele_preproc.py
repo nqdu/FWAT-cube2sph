@@ -24,7 +24,7 @@ class Tele_PreOP(FwatPreOP):
         super()._sanity_check()
 
         # make sure adjsrc_type in [2,'cross-conv']
-        if self.adjsrc_type not in ['cross-conv',2]:
+        if self.adjsrc_type not in ['cross-conv','2']:
             if self.myrank == 0:
                 print("only L2 norm (imeas = 2) and cross-conv adjoint source are supported!")
                 print(f"adjsrc_type = {self.adjsrc_type}")
@@ -95,7 +95,7 @@ class Tele_PreOP(FwatPreOP):
         from obspy.io.sac import SACTrace
         from .utils import interpolate_syn
         from .utils import bandpass
-        from .measure import measure_adj
+        from fwat.adjoint.l2_misfit import measure_adj_l2
         from scipy.signal import convolve,correlate
         from .tele.tele import compute_stf,get_average_amplitude
         import os 
@@ -214,15 +214,14 @@ class Tele_PreOP(FwatPreOP):
                 tstart[ir] = self.t_ref[i] - self.t_inj - win_tb
                 tend[ir] = self.t_ref[i] - self.t_inj + win_te
 
-                # verboase
-                verbose = (self.myrank == 0) and (ir == 0) and (ic == 0)
-                
+                # measure
+
                 tr_chi[ir,ic],am_chi[ir,ic],win_chi[ir,ic,:],adjsrc =  \
-                    measure_adj(t0_syn,dt_syn,npt_syn,
-                                t0_syn,dt_syn,npt_syn,
-                                tstart[ir],tend[ir],2,
-                                1.01*self.Tmax[ib],0.99*self.Tmin[ib],verbose,
-                                glob_obs[i,ic,:],glob_syn[i,ic,:])
+                    measure_adj_l2(
+                        glob_obs[i,ic,:],glob_syn[i,ic,:],
+                        t0_syn,dt_syn,npt_syn,
+                        tstart[ir],tend[ir]
+                    )
 
                 # contributions on stf
                 adjsrc /= avgamp 
@@ -386,7 +385,7 @@ class Tele_PreOP(FwatPreOP):
             os.makedirs(f"{self.syndir}/OUTPUT_FILES/{bandname}",exist_ok=True)
         MPI.COMM_WORLD.Barrier()
 
-        if self.adjsrc_type == 2:
+        if self.adjsrc_type == '2':
             self._cal_adj_source_l2(ib)
         else:
             self._cal_adj_source_user(ib)

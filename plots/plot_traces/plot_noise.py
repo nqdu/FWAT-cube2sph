@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt 
+from matplotlib.ticker import MaxNLocator
 import sys 
 import os
 from multiprocessing import Pool
@@ -120,7 +121,7 @@ def plot_event(line:str,M1:str,solver:str,
         
         #ax1.set_ylim(np.min(dist)*0.95,np.max(dist)*1.05)
         ax1.set_ylim(-1,len(names))
-        ax1.yaxis.set_major_locator(mpl.ticker.MaxNLocator(integer=True))
+        ax1.yaxis.set_major_locator(MaxNLocator(integer=True))
         ax1.set_title(f"Model {M1} : {evtid} {band} ")
         ax1.set_xlabel("Time (s)")
         ax1.set_ylabel("Station No.")

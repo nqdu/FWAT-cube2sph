@@ -31,12 +31,6 @@ def help_function():
     print("\tget parameters in the file")
     print("\texample: fwat-param get measure/tele/CH_CODE ")
 
-    print()
-    print("fwat-utils reslice input_dir output_dir param")
-    print("mpi should be enabled")
-    print("\treslice model from input_dir to output_dir for param")
-    print("\texample: mpirun -np 100 fwat-utils reslice DATABASES_MPI_100cores DATABASES_MPI_4cores vp")
-
 def set_param(argv):
     if len(argv) !=3 and len(argv) != 2:
         print("Usage: fwat-param set paramloc value [file=fwat_params/fwat.yaml]")
@@ -106,9 +100,6 @@ def main():
     elif cmd == "clean":
         from fwat import clean
         clean.run(args)
-    elif cmd == "reslice":
-        from fwat.system import reslice_model
-        reslice_model.run(args)
     else:
         print(f"module {cmd} not exist")
         help_function()

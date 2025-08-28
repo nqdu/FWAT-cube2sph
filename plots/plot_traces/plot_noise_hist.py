@@ -57,8 +57,8 @@ def main():
 
         # create figures
         fig,ax = plt.subplots(1,1,figsize=(12,5))
-        ax.hist(data0,bins=30,range=[-1,1],label='M00')
-        ax.hist(data,bins=30,range=[-1,1],label=f'{M1}',color='gray',alpha=0.5)
+        ax.hist(data0,bins=30,range=(-5.5,5.5),label='M00')
+        ax.hist(data,bins=30,range=(-5.5,5.5),label=f'{M1}',color='gray',alpha=0.5)
         ax.legend()
         fig.savefig(f"{seisdir}/{M1}.{band}.jpg")
         fig.clear()

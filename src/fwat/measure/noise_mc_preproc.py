@@ -60,9 +60,6 @@ class NoiseMC_PreOP():
         # backup pdict for further usage
         self.pdict = pdict
 
-        # adjoint source
-        self.adjsrc_type = pdict['ADJSRC_TYPE']
-
         # path to simulation directory
         mdir = "M%02d" %(iter)
         if self.run_opt == 2:
@@ -73,7 +70,7 @@ class NoiseMC_PreOP():
         self._get_mc_channel()
 
         # adjoint source
-        self.adjsrc_type = self.pdict['ADJSRC_TYPE']
+        self.adjsrc_type:str = str(self.pdict['ADJSRC_TYPE'])
 
         # read sourcer/receiver locations below
         # ---------------------
@@ -156,7 +153,7 @@ class NoiseMC_PreOP():
             exit(1)
 
         # check adjsrc_type
-        if self.adjsrc_type not in [5,7,'exp_phase','cc_time']:
+        if self.adjsrc_type not in ['5','7','exp_phase','cc_time']:
             if self.myrank == 0:
                 print(f"only [5,7,'exp_phase','cc_time'] adjoint sources are supported!")
                 print(f"adjsrc_type = {self.adjsrc_type}")
@@ -569,9 +566,10 @@ class NoiseMC_PreOP():
                 else:
                     from .measure import measure_adj
                     verbose = (self.myrank == 0) and (ir == 0)
+                    imeas = int(self.adjsrc_type)
                     tr_chi[ir,ic],am_chi[ir,ic],win_chi[ir,ic,:],adjsrc =   \
                         measure_adj(t0_inp,dt_inp,npt_cut,t0_syn,dt_syn,npt_syn,
-                                    tstart[ir],tend[ir],self.adjsrc_type,self.Tmax[ib]*1.01,
+                                    tstart[ir],tend[ir],imeas,self.Tmax[ib]*1.01,
                                     self.Tmin[ib]*0.99,verbose,dat_inp,
                                     syn_inp)
 

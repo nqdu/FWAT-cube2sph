@@ -80,7 +80,7 @@ class FwatSubmitor:
         self.run_opt = run_opt
 
         # nprocs and path
-        self.nprocs:int = get_param(f'./DATA/Par_file.{self.meatype}','NPROC')
+        self.nprocs = get_param(f'./DATA/Par_file.{self.meatype}','NPROC')
 
     def _prepare_model_and_parfile(self,evtid:str):
         """
@@ -303,7 +303,7 @@ class FwatSubmitor:
 
         return evtid_list
 
-    def _get_timestamp():
+    def _get_timestamp(self):
         from datetime import datetime
 
         # Get the current date and time
