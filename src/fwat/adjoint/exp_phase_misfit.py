@@ -53,10 +53,12 @@ def measure_adj_exphase(obs,syn,t0,dt,nt,
     Ed = np.abs(obs_a)
 
     # determine waterlevel threshold
-    w_s = water * np.max(Es)
-    w_d = water * np.max(Ed)
-    Es_wtr = Es + w_s 
-    Ed_wtr = Ed + w_d 
+    max_es = np.max(Es) 
+    max_ed = np.max(Ed)
+    w_s = water * max_es
+    w_d = water * max_ed
+    Es_wtr = Es + w_s
+    Ed_wtr = Ed + w_d
 
     # get real/imag part
     dR = d / Ed_wtr - s / Es_wtr 

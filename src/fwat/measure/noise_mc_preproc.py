@@ -2,6 +2,44 @@ import numpy as np
 from mpi4py import MPI 
 from fwat.const import PARAM_FILE
 
+def _get_snr(data:np.ndarray,win_b:int,win_e:int):
+    """
+    Get signal-to-noise ratio (SNR) from data within a specified window.
+
+    Parameters
+    -----------
+    data: np.ndarray
+        Input data array.
+    win_b,win_e: int
+        Start and end indices of the signal window.
+
+    Returns
+    -----------
+    snr: float
+        Signal-to-noise ratio, if data is very clean, return 1.0e20.
+    """
+    # compute max amplitude in signal window
+    amp = np.max(abs(data[win_b:win_e]))
+
+    # get noise std
+    n = 0 
+    std_in_noise = 1.0e-20 
+    if win_b > 0:
+        std_in_noise += np.std(data[0:win_b])
+        n += 1
+    if win_e < len(data) - 1:
+        std_in_noise += np.std(data[win_e+1:])
+        n += 1 
+    if n > 0:
+        std_in_noise /= n
+    
+    if std_in_noise <= 1.0e-20:
+        snr = 1.0e20
+    else: 
+        snr = amp / std_in_noise
+
+    return snr
+
 def _get_rotate_matrix(azd,bazd,rotate_src=True,rotate_sta = True):
     from numpy import sin,cos
     R_s = np.eye(3,3)
@@ -60,6 +98,9 @@ class NoiseMC_PreOP():
         # backup pdict for further usage
         self.pdict = pdict
 
+        # adjoint source
+        self.adjsrc_type:str = str(self.pdict['ADJSRC_TYPE'])
+
         # path to simulation directory
         mdir = "M%02d" %(iter)
         if self.run_opt == 2:
@@ -68,9 +109,6 @@ class NoiseMC_PreOP():
 
         # get all synthetic directories
         self._get_mc_channel()
-
-        # adjoint source
-        self.adjsrc_type:str = str(self.pdict['ADJSRC_TYPE'])
 
         # read sourcer/receiver locations below
         # ---------------------
@@ -522,17 +560,13 @@ class NoiseMC_PreOP():
                 amp = np.max(np.abs(dat_inp[win_b:win_e]))
 
                 # check snr
-                std_in_tail = np.std(dat_inp[win_e+1:])
-                if std_in_tail < 1.0e-20:
-                    snr = 1.0e20
-                else:
-                    snr = amp / std_in_tail
+                snr = _get_snr(dat_inp,win_b,win_e)
                 if snr > snr_threshold:
                     dat_inp *= np.max(np.abs(syn_inp[win_b:win_e])) / amp
                 else:
                     # set dat/syn to zero, it will contribute nothing
-                    dat_inp *= 0. 
-                    syn_inp *= 0.
+                    dat_inp  = dat_inp * 0. + 1.0e-10 
+                    syn_inp  = syn_inp * 0. + 1.0e-10
 
                 # compute time window
                 tstart[ir] = dist / vmax_list[ib] - self.Tmax[ib] * 0.5 
