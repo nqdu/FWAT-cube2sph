@@ -89,7 +89,7 @@ def main():
         from fwat.optimize import sum_kernel
         sum_kernel.run(args)
     elif cmd == "prepare":
-        from fwat.submit.submit import prepare_adj,prepare_fwd
+        from fwat.submit import prepare_adj,prepare_fwd
         assert (args[0] in ['forward','adjoint'])
         if args[0] == "forward":
             evtlist = prepare_fwd(args[1:])

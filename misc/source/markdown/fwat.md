@@ -116,7 +116,11 @@ This block defines parameters used for measurements, including computing misfits
 -   SKS SI-splitting FWI  
 -   Ambient noise (single-channel and multi-channel) FWI  
 -   Receiver function FWI
-Each sub-block specifies settings for a particular measurement method.
+Each sub-block specifies settings for a particular measurement method. 
+
+**Note:**  
+The `ADJSRC_TYPE` parameter now supports both the [measure_adj](https://github.com/SPECFEM/specfem3d/tree/master/utils/ADJOINT_TOMOGRAPHY_TOOLS/measure_adj) input arguments (1–8) as well as text-based adjoint source types.
+
 
 #### Teleseismic Waveform Inversion (`tele`)
 - **`COMPS`** – List of components used.  
@@ -431,6 +435,12 @@ The functions include:
 
 **Note:**  
 Edit these functions to match your working environment, for example, by adding GPU-specific flags, account information, or other SLURM parameters.
+
+## Data Preparation
+### Teleseismic Waveform Data
+All observed waveforms must be provided in **SAC** format, including all necessary headers (e.g., distance, source and receiver locations, with `lcalda = 1`). Both **R** and **Z** components should be prepared. The reference time (`t = 0`) should be aligned with the theoretical travel times.
+
+under construction
 
 ## Checklist
 
