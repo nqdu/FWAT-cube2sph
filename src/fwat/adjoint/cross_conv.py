@@ -30,6 +30,10 @@ def measure_adj_cross_conv(
         no. of iter-decon iterations 
     taper_ratio: float
         taper of the window, default = 0.1
+    cc_vohs: np.ndarray
+        cross-correlation between observed vertical and synthetic horizontal data
+    cc_hovs: np.ndarray
+        cross-correlation between synthetic vertical and observed horizontal data
 
     Returns
     ----------------
@@ -96,4 +100,10 @@ def measure_adj_cross_conv(
     win_chi[15-1] = tr_chi 
     win_chi[20-1] = nt * dt
 
-    return tr_chi,am_chi,win_chi,adj_r,adj_z
+    # also return the cross-conv for visualization
+    cc1 = obs_v * 0.
+    cc1[lpt:rpt] = chi1 * taper0 
+    cc2 = obs_v * 0. 
+    cc2[lpt:rpt] = chi2 * taper0
+
+    return tr_chi,am_chi,win_chi,adj_r,adj_z,cc1,cc2

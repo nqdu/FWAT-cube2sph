@@ -29,6 +29,13 @@ class Tele_PreOP(FwatPreOP):
                 print("only L2 norm (imeas = 2) and cross-conv adjoint source are supported!")
                 print(f"adjsrc_type = {self.adjsrc_type}")
             exit(1)
+        
+        # make sure Z/R components are used
+        if self.components != ['R','Z']:
+            if self.myrank == 0:
+                print("R/Z components must be used!")
+                print(f"components = {self.components}")
+            exit(1)
 
     def save_forward(self):
         import os 
@@ -262,6 +269,14 @@ class Tele_PreOP(FwatPreOP):
         self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,win_chi)
     
     def _cal_adj_source_user(self,ib:int):
+        """
+        compute adjoint source by using cross-convolution for a given frequency band
+
+        Parameters
+        ------------
+        ib: int
+            frequency band index
+        """
         from obspy.io.sac import SACTrace
         from .utils import interpolate_syn
         from fwat.adjoint.cross_conv import measure_adj_cross_conv
@@ -332,7 +347,7 @@ class Tele_PreOP(FwatPreOP):
             ic_z = self.components.index('Z')
             ic_r = self.components.index('R')
             tr_chi[ir, 0],am_chi[ir, 0],  \
-            win_chi[ir, 0, :],adj_r,adj_z  = \
+            win_chi[ir, 0, :],adj_r,adj_z,cc1,cc2 = \
                 measure_adj_cross_conv(
                     glob_obs[ir, ic_z, :],
                     glob_syn[ir, ic_z, :],
@@ -357,7 +372,7 @@ class Tele_PreOP(FwatPreOP):
             np.save(f"{out_dir}/{bandname}/{name}",data)
 
             # save obs and synthetic data
-            for ic in range(self.ncomp):
+            for ic in range(1): # only one component
                 # init a sac header
                 tr = SACTrace(
                     evla=self.evla,evlo=self.evlo,
@@ -370,9 +385,9 @@ class Tele_PreOP(FwatPreOP):
                     kcmpnm = self.chcode + self.components[ic]
                 )
                 name = self._get_station_code(i,ic)
-                tr.data = glob_obs[i,ic,:]
+                tr.data = cc1
                 tr.write(f"{out_dir}/{bandname}/{name}.sac.obs")
-                tr.data = glob_syn[i,ic,:]
+                tr.data = cc2
                 tr.write(f"{out_dir}/{bandname}/{name}.sac.syn")
 
         self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,win_chi)

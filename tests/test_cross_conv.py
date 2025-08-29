@@ -53,7 +53,7 @@ def main():
     t = np.linspace(0,10,nt)
     dt = t[1]-t[0]
     src = np.exp(-((t-5)/0.5)**2)
-    src_t = np.exp(-((t-5)/0.5)**2) + 0.2 * np.exp(-((t-4)/0.3)**2) - 0.2 * np.exp(-((t-6)/0.3)**2)
+    src_t = np.exp(-((t-5.5)/0.5)**2) + 0.2 * np.exp(-((t-4)/0.3)**2) - 0.2 * np.exp(-((t-6)/0.3)**2)
 
     # h/v components
     t0 = 4.5
@@ -65,15 +65,19 @@ def main():
     vobs = convolve(v,src_t,'same') * dt
 
     # syn data 
-    hsyn = convolve(shift_data(h,dt,-0.5),src,'same') * dt
-    vsyn = convolve(shift_data(v,dt,-0.5),src,'same') * dt
+    # hsyn = convolve(shift_data(h,dt,-0.5),src,'same') * dt
+    # vsyn = convolve(shift_data(v,dt,-0.5),src,'same') * dt
+    t0 = 5.5
+    hsyn = (t > t0) * (t-t0) * np.exp(-(t -t0) / 0.2 )
+    vsyn = np.exp(-((t-5.2)/0.5)**2)
+
 
     # compute adjoint source 
     Tmin = 5
     Tmax = 50.
     tstart = 3.
     tend = 8.
-    chi,_,_,adj_r,adj_z = measure_adj_cross_conv(vobs,vsyn,hobs,hsyn,0,dt,Tmin,Tmax,tstart,tend,120)
+    chi,_,_,adj_r,adj_z,cc1,cc2 = measure_adj_cross_conv(vobs,vsyn,hobs,hsyn,0,dt,Tmin,Tmax,tstart,tend,120)
         # obs_v,syn_v,obs_h,syn_h,
         # t0,dt,min_period,max_period,
         # tstart,tend,maxit:int
@@ -123,16 +127,22 @@ def main():
 
     plt.figure(1,figsize=(14,10))
     plt.subplot(211)
-    plt.plot(t,adj_z)
-    plt.plot(t,adj_z_fd / dt,label='fd')
+    plt.plot(t,adj_z,label='adj_z')
+    plt.plot(t,adj_z_fd / dt,label='adj_z_fd')
     plt.legend()
 
     plt.subplot(212)
-    plt.plot(t,adj_r)
-    plt.plot(t,adj_r_fd / dt,label='fd')
+    plt.plot(t,adj_r,label='adj_r')
+    plt.plot(t,adj_r_fd / dt,label='adj_r_fd')
     plt.legend()
 
     plt.savefig("cross-conv.jpg",dpi=300)
+
+    plt.figure(2,figsize=(14,6))
+    plt.plot(t,cc1,label='vobs * hsyn')
+    plt.plot(t,cc2,label='vsyn * hobs',ls='--')
+    plt.legend()
+    plt.savefig("cross-conv-cc.jpg",dpi=300)
 
 if __name__ == "__main__":
     main()
