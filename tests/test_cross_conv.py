@@ -30,12 +30,14 @@ def measure_adj_cross_conv_mis(
 
     # get window info
     lpt, rpt, taper0 = taper_window(t0, dt, nt, tstart, tend, p=0.05)
+    taper = obs_v * 0 
+    taper[lpt:rpt] = taper0 
 
     # get windowed data
-    vsyn = syn_v[lpt:rpt] * taper0 
-    hsyn = syn_h[lpt:rpt] * taper0 
-    vobs = obs_v[lpt:rpt] * taper0
-    hobs = obs_h[lpt:rpt] * taper0 
+    vsyn = syn_v * taper 
+    hsyn = syn_h * taper 
+    vobs = obs_v * taper
+    hobs = obs_h * taper 
 
     # compute convolution of h/v
     chi1 = convolve(vobs,hsyn,'same') * dt
@@ -71,9 +73,8 @@ def main():
     hsyn = (t > t0) * (t-t0) * np.exp(-(t -t0) / 0.2 )
     vsyn = np.exp(-((t-5.2)/0.5)**2)
 
-
     # compute adjoint source 
-    Tmin = 5
+    Tmin = 1.
     Tmax = 50.
     tstart = 3.
     tend = 8.

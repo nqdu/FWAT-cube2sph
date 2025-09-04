@@ -11,22 +11,23 @@ def _Index(m,n):
 class FwatModel:
     def initialize(self,mdtype='iso',kltype=1) -> None:
         """
-        initialize FwatModel
+        Initialize the FwatModel.
 
         Parameters
         ----------
+        mdtype : str
+            Model type. Supported values:
+            - 'iso'  : Isotropic
+            - 'dtti' : Transversely isotropic model 
+        kltype : int
+            Kernel type. Supported values:
+            For iso:
+                - 1 : vp, vs, rho
+                - 2 : vp/vs, vs, rho
 
-        mdtype: str
-            currently support [iso,dtti]
-        kltype: int
-            iso configuration
-                0: kappa,mu,rho
-                1: vp,vs,rho
-                2: vp/vs,vs,rho
-            dtti configuration:
-                0: c11-c66,rho
-                1: vp,vs,rho,gcp,gsp
-                2. vph,vpv,vsh,vsv,rho,eta,gcp,gsp
+            For dtti:
+                * 1 : vp, vs, rho, gcp, gsp
+                * 2 : vph, vpv, vsh, vsv, rho, eta, gcp, gsp
         """
         self._mdtype = mdtype
         self._kltype = kltype
@@ -66,7 +67,6 @@ class FwatModel:
     def get_direc_names(self):
         if self._mdtype == 'iso':
             direc_list = ['dalpha','dbeta','drho']
-            #grad_list = ['alpha_kernel_smooth','beta_kernel_smooth','rhop_kernel_smooth']
             if self._kltype == 2:
                 direc_list[0] = 'dvpvs'
         elif self._mdtype == "dtti":
@@ -203,7 +203,22 @@ class FwatModel:
 
         return model_new
     
-    def convert_md(self,model:np.ndarray,backward=False):
+    def convert_model(self,model:np.ndarray,backward=False):
+        """
+        transform from base model to user defined model or vice versa
+
+        Parameters
+        -----------
+        model: np.ndarray
+            base model or user defined model
+        backward: bool
+            if True, convert from user defined model to base model
+
+        Returns
+        --------------
+        model_new : np.ndarray
+            user defined model or base model
+        """
         if self._mdtype == "iso":
             model_new = model.copy()
             if self._kltype == 2:
@@ -220,9 +235,9 @@ class FwatModel:
         
         return model_new
     
-    def convert_md_visual(self,model:np.ndarray):
+    def convert_to_visual(self,model:np.ndarray):
         """
-        convert from base models to modesl for visualization
+        convert from base models to models for visualization
 
         Parameters
         -----------
@@ -236,15 +251,15 @@ class FwatModel:
         plot_names: list[str]
             names for visualization
         """
-        model_new = self.convert_md(model)
+        model_user = self.convert_model(model)
         plot_names = self.get_direc_names()
         for i in range(len(plot_names)):
             plot_names[i] = plot_names[i][1:]
 
         if self._mdtype == "dtti":
             if self._kltype == 1: # vp,vs,rho,gcp,gsp
-                gcp = model_new[3,...]
-                gsp = model_new[4,...]
+                gcp = model_user[3,...]
+                gsp = model_user[4,...]
                 phi = 0.5 * np.arctan2(gsp,gcp)
                 g0p = np.hypot(gsp,gcp)
                 
@@ -253,29 +268,39 @@ class FwatModel:
                 phi[idx] = 0.
 
                 # copy back to model_new
-                model_new[3,...] = phi * 1.
-                model_new[4,...] = g0p * 1.
+                model_user[3,...] = phi * 1.
+                model_user[4,...] = g0p * 1.
                 plot_names[3] = "phi"
                 plot_names[4] = "G0"
 
             elif self._kltype == 2: # vph,vpv,vsh,vsv,rho,eta,gcp,gsp
-                gcp = model_new[6,...]
-                gsp = model_new[7,...]
+                gcp = model_user[6,...]
+                gsp = model_user[7,...]
                 phi = 0.5 * np.arctan2(gsp,gcp)
                 g0p = np.hypot(gsp,gcp)
 
-                # copy back to model_new
-                model_new[5,...] = phi * 1.
-                model_new[6,...] = g0p * 1.
+                # copy back to model_user
+                model_user[5,...] = phi * 1.
+                model_user[6,...] = g0p * 1.
                 plot_names[5] = "phi"
                 plot_names[6] = "G0"
 
-        return model_new,plot_names
-    
-    def get_used_model(self,md:np.ndarray):
+        return model_user,plot_names
+
+    def get_opt_model(self, md: np.ndarray):
         """
-        get model used in gradient based optimizer, return md for dimensionless parameter,
-        and log(md) for others
+        Get the model used in gradient-based optimizers. Returns md for dimensionless parameters,
+        and log(md) for others.
+
+        Parameters
+        -------------
+        md: np.ndarray
+            current user defined model
+        
+        Returns
+        -------------
+        md_used: np.ndarray
+            model vector used in optimization
         """
         # initilize 
         md_used = md * 1
@@ -294,25 +319,37 @@ class FwatModel:
         
         return md_used
     
-    def model_update(self,md:np.ndarray,direc:np.ndarray):
+    def model_update(self,md_opt:np.ndarray,direc:np.ndarray):
         """
         update model by given direction
+
+        Parameters
+        -------------
+        md_opt: np.ndarray
+            current user defined model used in optimization
+        direc: np.ndarray
+            search direction in user defined model
+        
+        Returns
+        -------------
+        md_update: np.ndarray
+            updated user defined model
         """
-        md_update = md * 1.
+        md_update = md_opt * 1.
         if self._mdtype == "iso":
             if self._kltype == 1: # vp,vs,rho
-                md_update = md * np.exp(direc)
+                md_update = md_opt * np.exp(direc)
             elif self._kltype == 2: # vp/vs,vs,rho
-                md_update[0,...] = md[0,...] + direc[0,...]
-                md_update[1:,...] = md[1:,...] * np.exp(direc[1:,...])
+                md_update[0,...] = md_opt[0,...] + direc[0,...]
+                md_update[1:,...] = md_opt[1:,...] * np.exp(direc[1:,...])
         
         elif self._mdtype == "dtti":
             if self._kltype == 1: # vp,vs,rho,gcp,gsp
-                md_update[3:,...] = md[3:,...] + direc[3:,...]
-                md_update[:3,...] = md[:3,...] * np.exp(direc[:3,...])
+                md_update[3:,...] = md_opt[3:,...] + direc[3:,...]
+                md_update[:3,...] = md_opt[:3,...] * np.exp(direc[:3,...])
             elif self._kltype == 2: # vph,vpv,vsh,vsv,rho,eta,gcp,gsp
-                md_update[5:,...] = md[5:,...] + direc[5:,...]
-                md_update[:5,...] = md[:5,...] * np.exp(direc[:5,...])
+                md_update[5:,...] = md_opt[5:,...] + direc[5:,...]
+                md_update[:5,...] = md_opt[:5,...] * np.exp(direc[:5,...])
 
         return md_update
     
@@ -382,7 +419,7 @@ class FwatModel:
     
     def convert_kl(self,md:np.ndarray,md_kl:np.ndarray):
         """
-        convert original kernels/models to parameter set used
+        convert base kernels/models to user defined kernels/models
 
         Parameters
         -------------
@@ -393,26 +430,26 @@ class FwatModel:
 
         Returns
         -------------
-        md_new: np.ndarray
+        md_usr: np.ndarray
             user defined model
-        md_newkl: np.ndarray
+        kl_usr: np.ndarray
             kernels for user defined model
         """
-        # first convert model to base one
-        md_new = self.convert_md(md)
+        # first convert model to user defined model
+        md_usr = self.convert_model(md)
 
         if self._mdtype == 'iso':
-            md_newkl = md_kl.copy()
+            kl_usr = md_kl.copy()
             if self._kltype == 2: # vpvs_vs_rho
-                md_newkl[0,...] = md_kl[0,...] / md_new[0,...]
-                md_newkl[1,...] = md_kl[0,...] + md_kl[1,...] 
+                kl_usr[0,...] = md_kl[0,...] / md_usr[0,...]
+                kl_usr[1,...] = md_kl[0,...] + md_kl[1,...] 
             pass
 
         elif self._mdtype == "dtti":
-            md_newkl = self._cijkl_kl2dtti(md_new,md_kl)
+            kl_usr = self._cijkl_kl2dtti(md_usr,md_kl)
 
 
         # mask part of the kernels
-        md_newkl[self._mask_vars,...] = 0.
+        kl_usr[self._mask_vars,...] = 0.
 
-        return md_new,md_newkl
+        return md_usr,kl_usr

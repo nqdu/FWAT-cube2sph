@@ -173,6 +173,8 @@ def measure_adj_cc(obs,syn,t0,dt,nt,
                tstart,tend,
                return_type = 'dt',
                taper_ratio = 0.05,
+               tshift_min = -4.5,
+               tshift_max = 4.5,
                weight_by_uncertainty = True,
                dt_sigma_min = 1.,
                dlna_sigma_min = 0.5):
@@ -193,6 +195,10 @@ def measure_adj_cc(obs,syn,t0,dt,nt,
         type of return value, either 'dt' or 'am'
     taper_ratio: float
         taper of the window, default = 0.05
+    tshift_min: float
+        minimum time shift
+    tshift_max: float
+        maximum time shift
     weight_by_uncertainty: bool
         whether to weight the shift by uncertainty
     dt_sigma_min: float
@@ -229,6 +235,13 @@ def measure_adj_cc(obs,syn,t0,dt,nt,
 
     # calculate time shift
     tshift,dlna,sigma_dt,sigma_dlna = _cc_shift(d,s,dt,dt_sigma_min,dlna_sigma_min,weight_by_uncertainty)
+
+    # limit the tshift in [tshift_min,tshift_max]
+    if tshift < tshift_min or tshift > tshift_max:
+        tshift = 0.
+        dlna = 0. 
+        sigma_dt = 1.
+        sigma_dlna = 1.
 
     # misfit
     misfit_p = 0.5 * (tshift / sigma_dt) **2 

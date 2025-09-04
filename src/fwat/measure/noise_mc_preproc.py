@@ -561,12 +561,9 @@ class NoiseMC_PreOP():
 
                 # check snr
                 snr = _get_snr(dat_inp,win_b,win_e)
-                if snr > snr_threshold:
-                    dat_inp *= np.max(np.abs(syn_inp[win_b:win_e])) / amp
-                else:
-                    # set dat/syn to zero, it will contribute nothing
-                    dat_inp  = dat_inp * 0. + 1.0e-10 
-                    syn_inp  = syn_inp * 0. + 1.0e-10
+
+                # normalize
+                dat_inp *= np.max(np.abs(syn_inp[win_b:win_e])) / amp
 
                 # compute time window
                 tstart[ir] = dist / vmax_list[ib] - self.Tmax[ib] * 0.5 
@@ -606,6 +603,13 @@ class NoiseMC_PreOP():
                                     tstart[ir],tend[ir],imeas,self.Tmax[ib]*1.01,
                                     self.Tmin[ib]*0.99,verbose,dat_inp,
                                     syn_inp)
+
+                # make sure the snr > snr_threshold
+                if snr < snr_threshold:
+                    adjsrc *= 0.
+                    tr_chi[ir,ic] = 0.
+                    am_chi[ir,ic] = 0.
+                    win_chi[ir,ic,6] *= 0.
 
                 # save adjoint source to adj_src_all
                 adj_src_all[i_s,i_r,:] = adjsrc.copy()

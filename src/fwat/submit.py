@@ -52,6 +52,13 @@ class FwatSubmitor:
             self.pdict = param['simulation']
             self.mdict = param['measure'][meatype]
 
+        # sanity check 
+        if self.pdict['DUMP_WAVEFIELDS'] and   \
+            self.pdict['optimize']['PRECOND_TYPE'] == 'default':
+            print("DUMP_WAVEFIELDS is true, PRECOND_TYPE cannot be default!")
+            print("exit!")
+            exit(1)
+
         # get GPU_MODE in DATA/Par_file.{meatype}
         from fwat.system.specfem import get_param
         mode = get_param(f'DATA/Par_file.{meatype}','GPU_MODE').lower()

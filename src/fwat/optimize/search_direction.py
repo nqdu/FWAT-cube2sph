@@ -45,13 +45,13 @@ def get_model_grad(iter:int,nspec:int,M:FwatModel):
     ker_vec1 = np.asarray(ker_vec1,dtype='f4')
 
     # convert model to required optimzed type
-    mod_vec1 = np.asarray(M.get_used_model(mod_vec1),dtype='f4')
+    mod_vec1 = np.asarray(M.get_opt_model(mod_vec1),dtype='f4')
 
     return mod_vec1,ker_vec1
 
 def compute_inner_dot(a,b,weights,jaco):
     """
-    compute inner product for mpi vector
+    compute functional inner product <a,b> = int a*b* weight * J dV
     """
     # compute normalize vector 
     comm = MPI.COMM_WORLD
@@ -207,7 +207,7 @@ def get_lbfgs_direc(iter:int,paramfile:str,M:FwatModel):
             print("The search direction is not accepted!")
             print("clear previous information !")
             print("use negative grad as search direction")
-            direc = -grad_bak
+            direc = -grad_bak * hess
 
             # write new info 
             pdict['iter_start'] = iter
@@ -228,9 +228,19 @@ def get_sd_direction(iter:int,paramfile:str,M:FwatModel):
     nspec = f.read_ints('i4')[0]
     f.close()
 
+    # read hess from hdf5
+    filename = f'{OPT_DIR}/SUM_KERNELS_M%02d'%(iter)
+    filename += "/hess_kernel.h5"
+    if myrank == 0: print(f"reading hess from {filename}")
+    fio = h5py.File(filename,"r")
+    hess = fio[str(myrank)][:].reshape(nspec,NGLL3)
+    fio.close()
+
     # get gradient
     _,q_vec = get_model_grad(iter,nspec,M)
-    q_vec = np.asarray(-q_vec,dtype='f4')
+
+    # apply hess
+    q_vec = -hess * q_vec
 
     return q_vec
 
