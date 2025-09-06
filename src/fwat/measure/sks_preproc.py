@@ -128,7 +128,7 @@ class SKS_PreOP(FwatPreOP):
                 tr.data = data[:,1] * 1.
 
                 # syn data
-                syn_data[ic,:] = data[:,1] * 1.
+                syn_data[ic,:] = data[:,1] * taper
 
                 # channel and others
                 tr.kcmpnm = f"{self.chcode}{ch}"
@@ -144,7 +144,6 @@ class SKS_PreOP(FwatPreOP):
             for ib in range(len(self.Tmax)):
                 freqmin = 1. / self.Tmax[ib]
                 freqmax = 1. / self.Tmin[ib]
-                syn_data[ic,:] = bandpass(data[:,1],dt_syn,freqmin,freqmax)
 
                 # compute si
                 ic_r = self.components.index("R")
@@ -205,7 +204,6 @@ class SKS_PreOP(FwatPreOP):
         else:
             si_obs_evt = {}
             cal_obs_si = True
-            
 
         # loop each station
         for ir in range(nsta_loc):
