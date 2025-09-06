@@ -150,8 +150,8 @@ class SKS_PreOP(FwatPreOP):
                 ic_r = self.components.index("R")
                 ic_t = self.components.index("T")
 
-                R = bandpass(syn_data[ic_r],dt_syn,freqmin,freqmax)
-                T = bandpass(syn_data[ic_t],dt_syn,freqmin,freqmax)
+                R = bandpass(syn_data[ic_r,:],dt_syn,freqmin,freqmax) * taper
+                T = bandpass(syn_data[ic_t,:],dt_syn,freqmin,freqmax) * taper 
 
                 si_syn[ir] += _splitting_intensity(R,T,dt_syn)
         
