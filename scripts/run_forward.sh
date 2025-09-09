@@ -12,15 +12,14 @@ EOF
   local walltime=$3
     cat << EOF
 #!/bin/bash
-#SBATCH --nodes=4
-#SBATCH --ntasks-per-node=40
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=192
 #SBATCH --array=1-$narray%5
 #SBATCH --time=$walltime
 #SBATCH --job-name=FWD.$stype
 #SBATCH --output=LOG/FWD.$stype-%j_set%a.txt
 #SBATCH --account=rrg-liuqy
 #SBATCH --partition=compute
-#SBATCH --mem=12G
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=nanqiao.du@mail.utoronto.ca
 EOF

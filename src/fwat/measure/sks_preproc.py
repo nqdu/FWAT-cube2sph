@@ -3,6 +3,22 @@ import numpy as np
 from mpi4py import MPI
     
 def _splitting_intensity(Rsyn:np.ndarray,Tsyn:np.ndarray,dt_syn:float):
+    """
+    compute splitting intensity from R and T components
+    
+    Parameters
+    ---------------
+    Rsyn,Tsyn: np.ndarray
+        R and T components of synthetics
+    dt_syn: float
+        time step of synthetics
+    
+    Returns
+    ---------------
+    si_syn: float
+        splitting intensity of synthetics
+    """
+
     from .utils import dif1
     dRsyn = dif1(Rsyn,dt_syn)
     norm_syn = np.sum(dRsyn**2)
@@ -12,6 +28,26 @@ def _splitting_intensity(Rsyn:np.ndarray,Tsyn:np.ndarray,dt_syn:float):
     return si_syn
 
 def _splitting_intensity_adjsrc(Rsyn,Tsyn,dt_syn,si_obs = 0.,weight = 1.):
+    """
+    compute splitting intensity from R and T components and its adjoint source
+    
+    Parameters
+    ---------------
+    Rsyn,Tsyn: np.ndarray
+        R and T components of synthetics
+    dt_syn: float
+        time step of synthetics
+    si_obs: float
+        splitting intensity of observations
+    weight: float
+        weight for this station
+    
+    Returns
+    ---------------
+    si_syn: float
+        splitting intensity of synthetics
+    adjsrc_R,adjsrc_T: np.ndarray
+        adjoint source for R and T components"""
     from .utils import dif1
     dRsyn = dif1(Rsyn,dt_syn)
     norm_syn = np.sum(dRsyn**2)
@@ -102,7 +138,6 @@ class SKS_PreOP(FwatPreOP):
 
         # init syn_data 
         syn_data = np.zeros((2,npt_syn))
-        si_syn = np.zeros((self.nsta_loc))
         
         # loop every station to save sac
         for ir in range(self.nsta_loc):
@@ -140,22 +175,6 @@ class SKS_PreOP(FwatPreOP):
                 # save to sac
                 filename = f"{outdir}/{code}.sac"
                 tr.write(filename)
-            
-            for ib in range(len(self.Tmax)):
-                freqmin = 1. / self.Tmax[ib]
-                freqmax = 1. / self.Tmin[ib]
-
-                # compute si
-                ic_r = self.components.index("R")
-                ic_t = self.components.index("T")
-
-                R = bandpass(syn_data[ic_r,:],dt_syn,freqmin,freqmax) * taper
-                T = bandpass(syn_data[ic_t,:],dt_syn,freqmin,freqmax) * taper 
-
-                si_syn[ir] += _splitting_intensity(R,T,dt_syn)
-        
-        # save si
-        self._write_si_obs(si_syn)
     
     def cal_adj_source(self,ib:int):
         from obspy.io.sac import SACTrace
@@ -233,13 +252,13 @@ class SKS_PreOP(FwatPreOP):
                     t0_obs = obs_tr.b 
                     dt_obs = obs_tr.delta 
                     npt_obs = obs_tr.npts 
+
+                    # filter 
+                    obs_tr.data = bandpass(obs_tr.data,dt_obs,freqmin,freqmax)
                     
                     # interpoate obs data to same series of synthetics
                     odata = interpolate_syn(obs_tr.data,t0_obs + self.t_ref[i],dt_obs,npt_obs,t_inj,dt_syn,npt_syn)
 
-                    # filter
-                    odata = bandpass(odata,dt_syn,freqmin,freqmax)
-                    
                     # save to global array   
                     obs_data[ic,:] = odata * taper
                 

@@ -413,6 +413,9 @@ class NoiseMC_PreOP():
         # new dt/nt for interpolate
         dt_inp = 0.01
         t0_inp = -10.
+        if dt_inp > dt_syn:
+            dt_inp = dt_syn * 1.
+            t0_inp = t0_syn * 1.
         t1_inp = t0_syn + (npt_syn - 1) * dt_syn
         npt_cut = int((t1_inp - t0_inp) / dt_inp) + 1
 
@@ -531,6 +534,9 @@ class NoiseMC_PreOP():
                     else:
                         syn_tr = vt * 1.
 
+                # bandpass obs data
+                obs_tr.data = bandpass(obs_tr.data,dt_obs,freqmin,freqmax)
+
                 # interp obs/syn
                 dat_inp1 = interpolate_syn(obs_tr.data,t0_obs,dt_obs,npt_obs,
                                         t0_obs + dt_inp,dt_inp,npt1_inp)
@@ -542,13 +548,11 @@ class NoiseMC_PreOP():
                     dat_inp1 = -dif1(dat_inp1,dt_inp)
                     if self.myrank == 0: print("CCFs => EGFs ...")
                 
-                
                 # cut 
                 dat_inp = interpolate_syn(dat_inp1,t0_obs + dt_inp,dt_inp,npt1_inp,
                                          t0_inp,dt_inp,npt_cut)
 
-                # preprocess
-                dat_inp = bandpass(dat_inp,dt_inp,freqmin,freqmax)
+                # preprocess syn data
                 syn_inp = bandpass(syn_inp,dt_inp,freqmin,freqmax)
 
                 # find amplitude of the in the window to normalize

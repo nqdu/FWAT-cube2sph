@@ -169,7 +169,6 @@ class Tele_PreOP(FwatPreOP):
     def _cal_adj_source_l2(self,ib:int):
         from obspy.io.sac import SACTrace
         from .utils import interpolate_syn
-        from .utils import bandpass
         from fwat.adjoint.l2_misfit import measure_adj_l2
         from scipy.signal import convolve,correlate
         from .tele.tele import compute_stf,get_average_amplitude

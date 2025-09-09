@@ -50,11 +50,10 @@ class FwatSubmitor:
         with open(f"{PARAM_FILE}","r") as f:
             param = yaml.safe_load(f)
             self.pdict = param['simulation']
-            self.mdict = param['measure'][meatype]
 
         # sanity check 
         if self.pdict['DUMP_WAVEFIELDS'] and   \
-            self.pdict['optimize']['PRECOND_TYPE'] == 'default':
+            param['optimize']['PRECOND_TYPE'] == 'default':
             print("DUMP_WAVEFIELDS is true, PRECOND_TYPE cannot be default!")
             print("exit!")
             exit(1)
