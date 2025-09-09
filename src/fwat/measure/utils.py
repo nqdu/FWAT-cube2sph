@@ -117,7 +117,7 @@ def bandpass(u,dt,freqmin,freqmax,max_percentage=0.05,type_='hann'):
         1. Detrends and demeans the input signal to remove linear trends and DC offset.
         2. Applies a Hann taper to the signal to reduce edge effects.
         3. Applies a zero-phase Butterworth bandpass filter between `freqmin` and `freqmax`.
-        4. Detrends, demeans, and tapers the signal again after filtering.
+        4. taper again to reduce edge effects after filtering.
 
     Parameters
     ----------
@@ -161,10 +161,9 @@ def bandpass(u,dt,freqmin,freqmax,max_percentage=0.05,type_='hann'):
     sos = signal.butter(4, [freqmin,freqmax], btype='bandpass', fs=1.0/dt, output='sos')
     u1 = signal.sosfiltfilt(sos, u1)
 
-    # detrend/demean and taper 
-    u1 = u1 - np.mean(u1)
-    u1 = signal.detrend(u1,type='linear')
-    u1 = u1 * win 
+    # taper again
+    win = func(len(u1),max_percentage * 0.5)
+    u1 = u1 * win
 
     return u1
 
