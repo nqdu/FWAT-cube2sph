@@ -8,8 +8,8 @@ def main():
     nt = 1024
     t = np.linspace(0,10,nt)
     dt = t[1]-t[0]
-    syn = np.exp(-((t-3.5)/0.5)**2)
-    obs = np.exp(-((t-7.5)/0.5)**2) + 0.2 * np.exp(-((t-4)/0.3)**2) - 0.2 * np.exp(-((t-6)/0.3)**2)
+    syn = np.exp(-((t-4.5)/0.5)**2)
+    obs = np.exp(-((t-5.)/0.5)**2) + 0.2 * np.exp(-((t-4)/0.5)**2) - 0.2 * np.exp(-((t-6)/0.5)**2)
 
     Tmin = 1.
     Tmax = 50.
@@ -20,7 +20,7 @@ def main():
         obs,syn,t[0],dt,len(t),Tmin,Tmax,
         tstart,tend)
 
-    lpt,rpt,taper0 = taper_window(t[0],dt,len(t),tstart,tend,p=0.1)
+    lpt,rpt,taper0 = taper_window(t[0],dt,len(t),tstart,tend,p=0.05)
     taper = adj * 0 
     taper[lpt:rpt] = taper0 
 
