@@ -39,17 +39,23 @@ else
   for((i=0;i<$nsimtypes;i++)); 
   do 
     info=`fwat-main misfit $MSTART ${SIMU_TYPES[$i]}`
-    l0=`echo $info |awk '{print $1/$2}'`
+    l0=`echo $info |awk '{print $1}'`
     info=`fwat-main misfit $MODEL ${SIMU_TYPES[$i]}`
-    l1=`echo $info |awk '{print $1/$2}'`
+    l1=`echo $info |awk '{print $1}'`
     info=`fwat-main misfit $MODEL.ls ${SIMU_TYPES[$i]}`
-    l2=`echo $info |awk '{print $1/$2}'`
+    l2=`echo $info |awk '{print $1}'`
 
-    # weighted sum
-    # L'_i = L_i / L_0 * user_weight
+    # weighted sum for iteration n
+    # \sum_i L^(n)_i / L^(0)_i * L^(0)_0 * user_weight
     chi=`echo $chi $l1 $l0 ${SIMU_TYPES_USER_WEIGHT[$i]} |awk '{print $1+$2/$3*$4}'`
     chi1=`echo $chi1 $l2 $l0 ${SIMU_TYPES_USER_WEIGHT[$i]}|awk '{print $1+$2/$3*$4}'`
   done 
+
+  # misfit for first model of dataset 1
+  info=`fwat-main misfit $MSTART ${SIMU_TYPES[0]}`
+  l0=`echo $info |awk '{print $1}'`
+  chi=`echo $chi $l0 |awk '{print $1*$2}'`
+  chi1=`echo $chi1 $l0 |awk '{print $1*$2}'`
 fi 
 
 echo "misfit current/next = $chi $chi1"

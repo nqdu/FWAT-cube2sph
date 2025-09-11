@@ -12,15 +12,14 @@ EOF
   local walltime=$3
     cat << EOF
 #!/bin/bash
-#SBATCH --nodes=4
-#SBATCH --ntasks-per-node=40
-#SBATCH --array=1-$narray%5
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=192
+#SBATCH --array=1-$narray
 #SBATCH --time=$walltime
 #SBATCH --job-name=ADJ.$flag.$stype
 #SBATCH --output=LOG/ADJ.$flag.$stype-%j_set%a.txt
 #SBATCH --account=rrg-liuqy
 #SBATCH --partition=compute
-#SBATCH --mem=12G
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=nanqiao.du@mail.utoronto.ca
 EOF
@@ -47,14 +46,13 @@ EOF
   else
     cat << EOF
 #!/bin/bash
-#SBATCH --nodes=4
-#SBATCH --ntasks-per-node=40
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=192
 #SBATCH --time=00:15:59
 #SBATCH --job-name=POST
 #SBATCH --output=LOG/POST_%j.txt
 #SBATCH --account=rrg-liuqy
 #SBATCH --partition=compute
-#SBATCH --mem=12G
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=nanqiao.du@mail.utoronto.ca
 EOF
@@ -69,14 +67,13 @@ EOF
   else
     cat << EOF
 #!/bin/bash
-#SBATCH --nodes=4
-#SBATCH --ntasks-per-node=40
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=192
 #SBATCH --time=00:15:59
 #SBATCH --job-name WOLFE
 #SBATCH --output=LOG/WOLFE_%j.txt
 #SBATCH --account=rrg-liuqy
 #SBATCH --partition=compute
-#SBATCH --mem=12G
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=nanqiao.du@mail.utoronto.ca
 EOF

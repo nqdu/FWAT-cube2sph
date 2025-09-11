@@ -23,9 +23,12 @@
   },
 
   // Tame heavy features
-  "python.analysis.typeCheckingMode": "basic",        // or "off" for max speed
+  "python.analysis.typeCheckingMode": "standard",        // or "off" for max speed
   "python.analysis.autoImportCompletions": false,     // speeds up IntelliSense
   "python.analysis.useLibraryCodeForTypes": false,    // faster, less precise
   "python.analysis.indexing": false,                  // disable global indexing if startup is slow
-
+  "python.analysis.extraPaths": [
+    "/cvmfs/soft.computecanada.ca/easybuild/software/2023/x86-64-v4/Compiler/gcc12/hdf5/1.14.2/lib/python3.11/site-packages",
+    "/cvmfs/soft.computecanada.ca/easybuild/software/2023/x86-64-v4/MPI/gcc12/openmpi4/mpi4py/4.0.3/lib/python3.11/site-packages"
+    ],  // adjust to your source code folder
 }

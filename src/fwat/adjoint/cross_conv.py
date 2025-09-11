@@ -30,6 +30,10 @@ def measure_adj_cross_conv(
         no. of iter-decon iterations 
     taper_ratio: float
         taper of the window, default = 0.1
+    cc_vohs: np.ndarray
+        cross-correlation between observed vertical and synthetic horizontal data
+    cc_hovs: np.ndarray
+        cross-correlation between synthetic vertical and observed horizontal data
 
     Returns
     ----------------
@@ -48,12 +52,14 @@ def measure_adj_cross_conv(
 
     # get window info
     lpt, rpt, taper0 = taper_window(t0, dt, nt, tstart, tend, p=taper_ratio)
+    taper = obs_v * 0 
+    taper[lpt:rpt] = taper0 
 
     # get windowed data
-    vsyn = syn_v[lpt:rpt] * taper0 
-    hsyn = syn_h[lpt:rpt] * taper0 
-    vobs = obs_v[lpt:rpt] * taper0
-    hobs = obs_h[lpt:rpt] * taper0 
+    vsyn = syn_v * taper 
+    hsyn = syn_h * taper 
+    vobs = obs_v * taper
+    hobs = obs_h * taper 
 
     # compute convolution of h/v
     chi1 = convolve(vobs,hsyn,'same') * dt
@@ -64,26 +70,14 @@ def measure_adj_cross_conv(
     mis = 0.5 * trapezoid(dchi**2,dx=dt)
 
     # reverse several arrays
-    v_rev = vsyn[::-1]
-    h_rev = hsyn[::-1]
-    chi1_rev = chi1[::-1]
-    chi2_rev = chi2[::-1]
+    v_rev = vobs[::-1]
+    h_rev = hobs[::-1]
     
     # adjoint source
-    tmp_z = -convolve(dchi,chi2_rev,'same') * dt 
-    tmp_r = convolve(dchi,chi1_rev,'same') * dt 
-    adj_r_tp = time_decon(tmp_r,h_rev,dt)
-    adj_z_tp = time_decon(tmp_z,v_rev,dt)
-
-    # copy to global arrays
-    adj_r = obs_h * 0 
-    adj_z = obs_h * 0
-    adj_r[lpt:rpt] = adj_r_tp
-    adj_z[lpt:rpt] = adj_z_tp 
+    adj_z = -convolve(dchi,h_rev,'same') * dt
+    adj_r = convolve(dchi,v_rev,'same') * dt
 
     # filter
-    taper = adj_r * 0 
-    taper[lpt:rpt] = taper0 
     adj_r = bandpass(adj_r,dt,1./max_period,1./min_period) * taper
     adj_z = bandpass(adj_z,dt,1./max_period,1./min_period) * taper
 
@@ -96,4 +90,10 @@ def measure_adj_cross_conv(
     win_chi[15-1] = tr_chi 
     win_chi[20-1] = nt * dt
 
-    return tr_chi,am_chi,win_chi,adj_r,adj_z
+    # also return the cross-conv for visualization
+    cc1 = obs_v * 0.
+    cc1 = chi1 * taper 
+    cc2 = obs_v * 0. 
+    cc2 = chi2 * taper
+
+    return tr_chi,am_chi,win_chi,adj_r,adj_z,cc1,cc2

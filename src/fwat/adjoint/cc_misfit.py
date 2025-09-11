@@ -94,7 +94,7 @@ def _cal_cc_error(d,s,dt,ishift,dlna,dt_sigma_min,dlna_sigma_min):
 
     return sigma_dt, sigma_dlna
 
-def _cc_shift(d,s,dt,dt_sigma_min,dlna_sigma_min,weight_by_uncertainty=True):
+def cc_measure(d,s,dt,dt_sigma_min,dlna_sigma_min,weight_by_uncertainty=True):
     """
     Calculate the cross-correlation shift.
 
@@ -123,6 +123,8 @@ def _cc_shift(d,s,dt,dt_sigma_min,dlna_sigma_min,weight_by_uncertainty=True):
         Estimated uncertainty for time shift.
     sigma_dlna : float
         Estimated uncertainty for amplitude shift.
+    cc_coef : float
+        correlation coefficient.
     """
     from scipy.signal import correlate
     
@@ -130,6 +132,10 @@ def _cc_shift(d,s,dt,dt_sigma_min,dlna_sigma_min,weight_by_uncertainty=True):
     cc = correlate(d,s,'full')
     ishift = np.argmax(cc) - len(d) + 1
     tshift = ishift * dt 
+
+    # compute pearson correlation coefficient
+    norm = np.sqrt(np.sum(d**2) * np.sum(s**2))
+    cc_coef = cc[len(d) + ishift] / norm
 
     # compute dlna
     dlna = 0.5 * np.log(np.sum(d**2) / np.sum(s**2))
@@ -141,7 +147,7 @@ def _cc_shift(d,s,dt,dt_sigma_min,dlna_sigma_min,weight_by_uncertainty=True):
         sigma_dt = 1. 
         sigma_dlna = 1.
 
-    return tshift,dlna,sigma_dt,sigma_dlna
+    return tshift,dlna,sigma_dt,sigma_dlna,cc_coef
 
 def _cc_shift_dd(d1,s1,d2,s2,dt,dt_sigma_min,dlna_sigma_min):
     from scipy.signal import correlate
@@ -173,6 +179,11 @@ def measure_adj_cc(obs,syn,t0,dt,nt,
                tstart,tend,
                return_type = 'dt',
                taper_ratio = 0.05,
+               tshift_min = -4.5,
+               tshift_max = 4.5,
+               dlna_min = -1.5,
+               dlna_max=1.5,
+               cc_min = 0.8,
                weight_by_uncertainty = True,
                dt_sigma_min = 1.,
                dlna_sigma_min = 0.5):
@@ -193,6 +204,16 @@ def measure_adj_cc(obs,syn,t0,dt,nt,
         type of return value, either 'dt' or 'am'
     taper_ratio: float
         taper of the window, default = 0.05
+    tshift_min: float
+        minimum time shift
+    tshift_max: float
+        maximum time shift
+    dlna_min: float
+        minimum log amplitude shift
+    dlna_max: float
+        maximum log amplitude shift
+    cc_min: float
+        minimum cross-correlation coefficient to do measurement
     weight_by_uncertainty: bool
         whether to weight the shift by uncertainty
     dt_sigma_min: float
@@ -228,11 +249,20 @@ def measure_adj_cc(obs,syn,t0,dt,nt,
     d = obs[lpt:rpt] * taper0 
 
     # calculate time shift
-    tshift,dlna,sigma_dt,sigma_dlna = _cc_shift(d,s,dt,dt_sigma_min,dlna_sigma_min,weight_by_uncertainty)
+    tshift,dlna,sigma_dt,sigma_dlna,cc_coef = cc_measure(d,s,dt,dt_sigma_min,dlna_sigma_min,weight_by_uncertainty)
+
+    # data selection
+    if tshift < tshift_min or tshift > tshift_max or  \
+        cc_coef < cc_min or dlna < dlna_min or dlna > dlna_max:
+        tshift = 0.
+        dlna = 0. 
+        sigma_dt = 1.
+        sigma_dlna = 1.
+        misfit_keep = 0.
 
     # misfit
-    misfit_p = 0.5 * (tshift / sigma_dt) **2 
-    misfit_q = 0.5 * (dlna / sigma_dlna) ** 2  
+    misfit_p = 0.5 * (tshift / sigma_dt) **2
+    misfit_q = 0.5 * (dlna / sigma_dlna) **2
 
     # calculate adjoint source for time
     dsdt = dif1(s,dt)

@@ -106,7 +106,7 @@ def run(argv):
         f.close()
 
     # convert model if required
-    vec = np.asarray(M.convert_md(vec0,False),dtype='f4')
+    vec = np.asarray(M.convert_model(vec0,False),dtype='f4')
 
     # read search direction
     direc = np.zeros((nker,size),'f4')
@@ -120,7 +120,7 @@ def run(argv):
     vec = M.model_update(vec,step_fac * direc)
 
     # convert back if required
-    vec0 = np.asarray(M.convert_md(vec,True),dtype='f4')
+    vec0 = np.asarray(M.convert_model(vec,True),dtype='f4')
 
     # write base model
     for i in range(nmod):

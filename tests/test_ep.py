@@ -115,8 +115,8 @@ def main():
 
     # plot 
     plt.figure(1)
-    plt.plot(t,adj,label='adj')
-    plt.plot(t,adj_fd / dt,label='adj-fd')
+    plt.plot(t,adj * dt,label='adj')
+    plt.plot(t,adj_fd,label='adj-fd')
     # print(np.max(abs(adj)) / np.max(abs(adj_fd)))
     # plt.plot(t,adj/np.max(abs(adj)))
     # plt.plot(t,adj_fd/np.max(abs(adj_fd)))

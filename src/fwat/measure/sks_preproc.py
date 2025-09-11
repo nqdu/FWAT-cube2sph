@@ -3,15 +3,51 @@ import numpy as np
 from mpi4py import MPI
     
 def _splitting_intensity(Rsyn:np.ndarray,Tsyn:np.ndarray,dt_syn:float):
+    """
+    compute splitting intensity from R and T components
+    
+    Parameters
+    ---------------
+    Rsyn,Tsyn: np.ndarray
+        R and T components of synthetics
+    dt_syn: float
+        time step of synthetics
+    
+    Returns
+    ---------------
+    si_syn: float
+        splitting intensity of synthetics
+    """
+
     from .utils import dif1
     dRsyn = dif1(Rsyn,dt_syn)
     norm_syn = np.sum(dRsyn**2)
     norm_syn = 1. / (norm_syn + 1.0e-30)
     si_syn = -2. * np.sum(dRsyn * Tsyn) * norm_syn 
 
-    return si_syn
+    return float(si_syn)
 
 def _splitting_intensity_adjsrc(Rsyn,Tsyn,dt_syn,si_obs = 0.,weight = 1.):
+    """
+    compute splitting intensity from R and T components and its adjoint source
+    
+    Parameters
+    ---------------
+    Rsyn,Tsyn: np.ndarray
+        R and T components of synthetics
+    dt_syn: float
+        time step of synthetics
+    si_obs: float
+        splitting intensity of observations
+    weight: float
+        weight for this station
+    
+    Returns
+    ---------------
+    si_syn: float
+        splitting intensity of synthetics
+    adjsrc_R,adjsrc_T: np.ndarray
+        adjoint source for R and T components"""
     from .utils import dif1
     dRsyn = dif1(Rsyn,dt_syn)
     norm_syn = np.sum(dRsyn**2)
@@ -102,7 +138,6 @@ class SKS_PreOP(FwatPreOP):
 
         # init syn_data 
         syn_data = np.zeros((2,npt_syn))
-        si_syn = np.zeros((self.nsta_loc))
         
         # loop every station to save sac
         for ir in range(self.nsta_loc):
@@ -128,7 +163,7 @@ class SKS_PreOP(FwatPreOP):
                 tr.data = data[:,1] * 1.
 
                 # syn data
-                syn_data[ic,:] = data[:,1] * 1.
+                syn_data[ic,:] = data[:,1] * taper
 
                 # channel and others
                 tr.kcmpnm = f"{self.chcode}{ch}"
@@ -140,23 +175,6 @@ class SKS_PreOP(FwatPreOP):
                 # save to sac
                 filename = f"{outdir}/{code}.sac"
                 tr.write(filename)
-            
-            for ib in range(len(self.Tmax)):
-                freqmin = 1. / self.Tmax[ib]
-                freqmax = 1. / self.Tmin[ib]
-                syn_data[ic,:] = bandpass(data[:,1],dt_syn,freqmin,freqmax)
-
-                # compute si
-                ic_r = self.components.index("R")
-                ic_t = self.components.index("T")
-
-                R = bandpass(syn_data[ic_r],dt_syn,freqmin,freqmax)
-                T = bandpass(syn_data[ic_t],dt_syn,freqmin,freqmax)
-
-                si_syn[ir] += _splitting_intensity(R,T,dt_syn)
-        
-        # save si
-        self._write_si_obs(si_syn)
     
     def cal_adj_source(self,ib:int):
         from obspy.io.sac import SACTrace
@@ -201,11 +219,10 @@ class SKS_PreOP(FwatPreOP):
             tmp = np.loadtxt(filename,dtype=str,ndmin=2)
             si_obs_evt = {}
             for i in range(tmp.shape[0]):
-                si_obs_evt[tmp[0]] = np.float64(tmp[1:])
+                si_obs_evt[tmp[i,0]] = tmp[i,1:].astype(float)
         else:
             si_obs_evt = {}
             cal_obs_si = True
-            
 
         # loop each station
         for ir in range(nsta_loc):
@@ -235,13 +252,13 @@ class SKS_PreOP(FwatPreOP):
                     t0_obs = obs_tr.b 
                     dt_obs = obs_tr.delta 
                     npt_obs = obs_tr.npts 
+
+                    # filter 
+                    obs_tr.data = bandpass(obs_tr.data,dt_obs,freqmin,freqmax)
                     
                     # interpoate obs data to same series of synthetics
                     odata = interpolate_syn(obs_tr.data,t0_obs + self.t_ref[i],dt_obs,npt_obs,t_inj,dt_syn,npt_syn)
 
-                    # filter
-                    odata = bandpass(odata,dt_syn,freqmin,freqmax)
-                    
                     # save to global array   
                     obs_data[ic,:] = odata * taper
                 
@@ -282,13 +299,13 @@ class SKS_PreOP(FwatPreOP):
                 # save to it
                 si_obs_data[ir] = SI_obs
             else:
-                name = f"{self.netwk[ir]}.{self.stnm[ir]}"
+                name = f"{self.netwk[i]}.{self.stnm[i]}"
                 if name not in si_obs_evt:
-                    print(f"cannot locate {self.netwk[ir]}.{self.stnm[ir]} in  {self.DATA_DIR}/{self.evtid}!")
+                    print(f"cannot locate {name} in  {self.DATA_DIR}/{self.evtid}!")
                     exit(1)
-                tmp = si_obs_evt[name][0]
-                SI_obs = tmp[0]
-                if len(tmp) > 2:
+                tmp = si_obs_evt[name]
+                SI_obs = float(tmp[0])
+                if len(tmp) > 1:
                     weight = 1. / float(tmp[1])
 
             # compute si for syn data and adjoint source

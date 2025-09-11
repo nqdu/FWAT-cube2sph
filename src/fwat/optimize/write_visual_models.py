@@ -57,7 +57,7 @@ def run(argv):
             md[im,:] = x * 1.
         
         # convert to user model
-        md_new,all_names = M.convert_md_visual(md)
+        md_new,all_names = M.convert_to_visual(md)
         md_new = np.asarray(md_new,dtype='f4')
 
         # write user model

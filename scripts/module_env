@@ -1,4 +1,5 @@
-
 # environments
-module load mpi cuda
+module add fwi/gcc
+source /scinet/vast/etc/vastpreload-openmpi.bash
+export UCX_VFS_ENABLE=n
 export OMP_NUM_THREADS=1

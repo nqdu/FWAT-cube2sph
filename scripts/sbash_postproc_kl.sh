@@ -19,16 +19,18 @@ nsimtypes="${#SIMU_TYPES[@]}"
 if [ "$nsimtypes" == "1" ]; then 
   SOURCE_FILE=./src_rec/sources.dat.${SIMU_TYPES[0]}
 else
+  SOURCE_FILE=./src_rec/sources.dat.joint
+
   # generate files if requireds
   iter_start=`fwat-utils getparam iter_start $FWATPARAM/lbfgs.yaml`
   if [ "$iter" == "0" ]; then
     # init source file
-    SOURCE_FILE=./src_rec/sources.dat.joint
+    
     cat ./src_rec/sources.dat.${SIMU_TYPES[0]} > $SOURCE_FILE
 
     # compute misfit 
     info=`fwat-main misfit $MODEL ${SIMU_TYPES[0]}`
-    chi0=`echo $info |awk '{print $1/$2}'`
+    chi0=`echo $info |awk '{print $1}'`
     chi1=`echo $chi0 $chi0 ${SIMU_TYPES_USER_WEIGHT[0]} |awk '{print $1/$2*$3}'`
 
     # init weight_kl.txt 
@@ -39,9 +41,9 @@ else
     # misfit = L0 + L1 * s0/s1 + L2 * s0/s2 + L_i s0/s_i
     for((i=1;i<$nsimtypes;i++)); 
     do 
-      cat ./src/sources.dat.${SIMU_TYPES[$i]} >> $SOURCE_FILE
+      cat ./src_rec/sources.dat.${SIMU_TYPES[$i]} >> $SOURCE_FILE
       info=`fwat-main misfit $MODEL ${SIMU_TYPES[$i]}`
-      chi1=`echo $info |awk '{print $1/$2}'`
+      chi1=`echo $info |awk '{print $1}'`
       chi1=`echo $chi0 $chi1 ${SIMU_TYPES_USER_WEIGHT[$i]} |awk '{print $1/$2*$3}'`
       awk -v a=$chi1 '{print $2*0+a}' ./src_rec/sources.dat.${SIMU_TYPES[$i]} >> ./optimize/weight_kl.txt
     done 

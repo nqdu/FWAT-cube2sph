@@ -6,7 +6,7 @@ def help_function():
 
     print("fwat-main measure measure_type iter evtid run_opt")
     print("\trun measurements to generate adjoint source")
-    print("\topt =1 forward, = 3 adjoint")
+    print("\topt =1 forward, = 2 for ls = 3 adjoint")
     print("\tmpi should be enabled")
     print("\texample: mpirun -np 31 fwat measure tele 0 XZ.FAF 3")
 

@@ -91,7 +91,7 @@ class RF_PreOP(FwatPreOP):
         import os 
         from obspy.io.sac import SACTrace
         from .tele.deconit import deconit
-        from .utils import interpolate_syn,bandpass
+        from .utils import bandpass
 
         # get some vars
         evtid = self.evtid 
@@ -176,8 +176,8 @@ class RF_PreOP(FwatPreOP):
     def cal_adj_source(self,ib:int):
         from obspy.io.sac import SACTrace
         from fwat.measure.utils import interpolate_syn,bandpass,taper_window
-        from fwat.measure.measure import measure_adj
         from fwat.measure.tele.deconit import deconit
+        from scipy.integrate import trapezoid
         import os 
         bandname = self._get_bandname(ib)
         if self.myrank == 0:
@@ -266,7 +266,7 @@ class RF_PreOP(FwatPreOP):
             rf_syn *= taper / amp 
 
             # misfit 
-            chi = 0.5 * np.sum((rf_obs - rf_syn)**2)
+            chi = 0.5 * trapezoid((rf_obs - rf_syn)**2, dx=dt_syn)
             tr_chi[ir] = chi 
             am_chi[ir] = chi
             win_chi[ir,0,13-1] = 0.5 * sum( rf_obs**2 )

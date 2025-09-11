@@ -19,6 +19,9 @@ mkdir -p grdfiles
 
 echo "$param_set txt to grd ..."
 
+# make mask grd
+gmt xyz2grd profiles/mask.dat -Ggrdfiles/mask.grd -I256+n/256+n -R$LON0_H/$LON1_H/$LAT0_H/$LAT1_H
+
 for param in $param_set ;do 
 for iter in $run_indx;do 
   ii=`printf %02d $iter`
@@ -52,6 +55,12 @@ for iter in $run_indx;do
       fi
 
       gmt surface tmp.3 -Ggrdfiles/$param.iter$idx.$name.$ip.grd -I$dx/$dz $bounds -Vq
+
+      if [ "$name" == "horiz" ]; then 
+        gmt grdmath grdfiles/$param.iter$idx.$name.$ip.grd grdfiles/mask.grd MUL =  tmp.grd 
+        \mv tmp.grd grdfiles/$param.iter$idx.$name.$ip.grd
+      fi 
+      
       \rm tmp.3
       gmt grdinfo -C grdfiles/$param.iter$idx.$name.$ip.grd
     done 

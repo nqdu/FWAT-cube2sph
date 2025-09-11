@@ -29,6 +29,13 @@ class Tele_PreOP(FwatPreOP):
                 print("only L2 norm (imeas = 2) and cross-conv adjoint source are supported!")
                 print(f"adjsrc_type = {self.adjsrc_type}")
             exit(1)
+        
+        # make sure Z/R components are used
+        if self.components != ['R','Z']:
+            if self.myrank == 0:
+                print("R/Z components must be used!")
+                print(f"components = {self.components}")
+            exit(1)
 
     def save_forward(self):
         import os 
@@ -77,7 +84,7 @@ class Tele_PreOP(FwatPreOP):
                 filename = f"{self.syndir}/OUTPUT_FILES/{code}.sem.npy"
                 data =  np.load(filename)
 
-                tr.data = convolve(data[:,1],stf[ic,:],'same') * dt_syn    
+                tr.data = convolve(data[:,1],stf[ic,:],'same') * dt_syn   
                 tr.b =  self.t_inj - self.t_ref[i]
 
                 # channel and others
@@ -91,10 +98,77 @@ class Tele_PreOP(FwatPreOP):
                 filename = f"{outdir}/{code}.sac"
                 tr.write(filename)
 
+    def _process_all_seismograms(self,ib:int):
+        """
+        do preprocessing for all seismigrams at a given frequency band, save in big arrays
+
+        Parameters
+        ------------
+        ib: int
+            frequency band index
+        """
+        from obspy.io.sac import SACTrace
+        from .utils import interpolate_syn,bandpass
+
+        # frequency band
+        freqmin = 1. / self.Tmax[ib]
+        freqmax = 1. / self.Tmin[ib]
+
+        # get frequency band
+        out_dir = f"{self.syndir}/OUTPUT_FILES/"
+
+        # get time window 
+        dt_syn = self.dt_syn
+        win_tb,win_te = self.pdict['TIME_WINDOW']
+        npt2 = int((win_te + win_tb) / dt_syn)
+        if npt2 // 2 * 2 != npt2:
+            npt2 += 1
+        
+        # glob arrays
+        ncomp = self.ncomp
+        nsta = self.nsta 
+        npt_syn = self.npt_syn
+        glob_obs = np.zeros((nsta,ncomp,npt_syn))
+        glob_syn = np.zeros((nsta,ncomp,npt_syn))
+
+        # loop each station
+        for ir in range(self.nsta_loc):
+            i = ir + self._istart
+            for ic in range(ncomp):
+                name = self._get_station_code(i,ic)
+
+                # read data
+                syn_data = np.load(f"{out_dir}/{name}.sem.npy")[:,1]
+                obs_tr = SACTrace.read(f"{self.DATA_DIR}/{self.evtid}/{name}.sac")
+                t0_obs = obs_tr.b 
+                dt_obs = obs_tr.delta 
+                npt_obs = obs_tr.npts 
+                obs_data = obs_tr.data
+
+                # filter 
+                obs_data = bandpass(obs_data,dt_obs,freqmin,freqmax)
+                syn_data = bandpass(syn_data,dt_syn,freqmin,freqmax)
+
+                # interpolate the obs/syn data to the same sampling of syn data
+                t0_inp = self.t_ref[i] - win_tb
+                u1 = interpolate_syn(obs_data,t0_obs + self.t_ref[i],dt_obs,npt_obs,t0_inp,dt_syn,npt2)
+                w1 = interpolate_syn(syn_data,self.t_inj,dt_syn,npt_syn,t0_inp,dt_syn,npt2)
+                u = interpolate_syn(u1,t0_inp,dt_syn,npt2,self.t_inj,dt_syn,npt_syn)
+                w = interpolate_syn(w1,t0_inp,dt_syn,npt2,self.t_inj,dt_syn,npt_syn)     
+
+                # save to  global array   
+                glob_obs[i,ic,:] = u
+                glob_syn[i,ic,:] = w
+
+        # save everything in big arrays
+        tmp = MPI.COMM_WORLD.allreduce(glob_obs); glob_obs = tmp * 1.
+        tmp = MPI.COMM_WORLD.allreduce(glob_syn); glob_syn = tmp * 1.
+
+        return glob_obs,glob_syn
+
     def _cal_adj_source_l2(self,ib:int):
         from obspy.io.sac import SACTrace
         from .utils import interpolate_syn
-        from .utils import bandpass
         from fwat.adjoint.l2_misfit import measure_adj_l2
         from scipy.signal import convolve,correlate
         from .tele.tele import compute_stf,get_average_amplitude
@@ -132,42 +206,7 @@ class Tele_PreOP(FwatPreOP):
 
         # glob arrays
         ncomp = self.ncomp
-        glob_obs = np.zeros((nsta,ncomp,npt_syn))
-        glob_syn = np.zeros((nsta,ncomp,npt_syn))
-
-        # loop each station
-        for ir in range(nsta_loc):
-            i = ir + self._istart
-            for ic in range(ncomp):
-                name = self._get_station_code(i,ic)
-
-                # read data
-                syn_data = np.load(f"{out_dir}/{name}.sem.npy")[:,1]
-                obs_tr = SACTrace.read(f"{self.DATA_DIR}/{self.evtid}/{name}.sac")
-                t0_obs = obs_tr.b 
-                dt_obs = obs_tr.delta 
-                npt_obs = obs_tr.npts 
-                obs_data = obs_tr.data
-
-                # data processing
-                obs_data = bandpass(obs_data,dt_obs,freqmin,freqmax)
-                syn_data = bandpass(syn_data,dt_syn,freqmin,freqmax)
-
-                # interpolate the obs/syn data to the same sampling of syn data
-                t0_inp = self.t_ref[i] - win_tb
-                u1 = interpolate_syn(obs_data,t0_obs + self.t_ref[i],dt_obs,npt_obs,t0_inp,dt_syn,npt2)
-                w1 = interpolate_syn(syn_data,t_inj,dt_syn,npt_syn,t0_inp,dt_syn,npt2)
-                u = interpolate_syn(u1,t0_inp,dt_syn,npt2,t_inj,dt_syn,npt_syn)
-                w = interpolate_syn(w1,t0_inp,dt_syn,npt2,t_inj,dt_syn,npt_syn)     
-
-                # save to  global array   
-                glob_obs[i,ic,:] = u
-                glob_syn[i,ic,:] = w 
-        
-        # all reduce
-        comm = MPI.COMM_WORLD
-        tmp = comm.allreduce(glob_obs); glob_obs = tmp * 1.
-        tmp = comm.allreduce(glob_syn); glob_syn = tmp * 1.
+        glob_obs,glob_syn = self._process_all_seismograms(ib)
 
         # get source time function 
         stf_names = [f'{self.SRC_REC}/stf_{ch}.sac.' + f"{bandname}" + f"_{self.evtid}" for ch in self.components]
@@ -255,15 +294,23 @@ class Tele_PreOP(FwatPreOP):
                 tr.write(f"{out_dir}/{bandname}/{name}.sac.syn")
         
         # normalize misfit function 
-        tr_chi *= dt_syn / avgamp**2 
-        am_chi *= dt_syn / avgamp**2
-        win_chi[:,:,14] *= dt_syn / avgamp**2
+        tr_chi *= 1. / avgamp**2 
+        am_chi *= 1. / avgamp**2
+        win_chi[:,:,14] *= 1. / avgamp**2
 
         self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,win_chi)
-    
+
     def _cal_adj_source_user(self,ib:int):
+        """
+        compute adjoint source by using cross-convolution for a given frequency band
+
+        Parameters
+        ------------
+        ib: int
+            frequency band index
+        """
         from obspy.io.sac import SACTrace
-        from .utils import interpolate_syn
+        from .tele.tele import get_average_amplitude
         from fwat.adjoint.cross_conv import measure_adj_cross_conv
 
         # get frequency band
@@ -283,11 +330,9 @@ class Tele_PreOP(FwatPreOP):
             npt2 += 1
         
         # allocate global arrays 
-        nsta = self.nsta 
         nsta_loc = self.nsta_loc
 
         # misfits
-        ncomp = self.ncomp
         tstart = np.zeros((nsta_loc))
         tend = np.zeros((nsta_loc))
         win_chi = np.zeros((nsta_loc,1,20))
@@ -295,49 +340,36 @@ class Tele_PreOP(FwatPreOP):
         am_chi = np.zeros((nsta_loc,1))
 
         # glob arrays
-        ncomp = self.ncomp
-        glob_obs = np.zeros((nsta_loc,ncomp,npt_syn))
-        glob_syn = np.zeros((nsta_loc,ncomp,npt_syn))
+        glob_obs,glob_syn = self._process_all_seismograms(ib)
 
-        # loop each station
+        # get average amplitude of obs data
+        ic = self.components.index('Z')
+        avgamp = get_average_amplitude(glob_obs,ic)
+        if self.myrank == 0: 
+            print("average amplitude for data gather: %g\n" %(avgamp))
+
+        # normalize 
+        glob_obs /= avgamp
+        glob_syn /= avgamp
+
+        # measure
         for ir in range(nsta_loc):
             i = ir + self._istart
-            for ic in range(ncomp):
-                name = self._get_station_code(i,ic)
 
-                # read data
-                syn_data = np.load(f"{out_dir}/{name}.sem.npy")[:,1]
-                obs_tr = SACTrace.read(f"{self.DATA_DIR}/{self.evtid}/{name}.sac")
-                t0_obs = obs_tr.b 
-                dt_obs = obs_tr.delta 
-                npt_obs = obs_tr.npts 
-                obs_data = obs_tr.data
-
-                # interpolate the obs/syn data to the same sampling of syn data
-                t0_inp = self.t_ref[i] - win_tb
-                u1 = interpolate_syn(obs_data,t0_obs + self.t_ref[i],dt_obs,npt_obs,t0_inp,dt_syn,npt2)
-                w1 = interpolate_syn(syn_data,t_inj,dt_syn,npt_syn,t0_inp,dt_syn,npt2)
-                u = interpolate_syn(u1,t0_inp,dt_syn,npt2,t_inj,dt_syn,npt_syn)
-                w = interpolate_syn(w1,t0_inp,dt_syn,npt2,t_inj,dt_syn,npt_syn)     
-
-                # save to  global array   
-                glob_obs[ir,ic,:] = u
-                glob_syn[ir,ic,:] = w 
-
-            # get info
+            # get  window info
             tstart[ir] = self.t_ref[i] - self.t_inj - win_tb
             tend[ir] = self.t_ref[i] - self.t_inj + win_te
-            
+    
             # call exponentiated phase function
             ic_z = self.components.index('Z')
             ic_r = self.components.index('R')
             tr_chi[ir, 0],am_chi[ir, 0],  \
-            win_chi[ir, 0, :],adj_r,adj_z  = \
+            win_chi[ir, 0, :],adj_r,adj_z,cc1,cc2 = \
                 measure_adj_cross_conv(
-                    glob_obs[ir, ic_z, :],
-                    glob_syn[ir, ic_z, :],
-                    glob_obs[ir, ic_r, :],
-                    glob_syn[ir, ic_r, :],
+                    glob_obs[i, ic_z, :],
+                    glob_syn[i, ic_z, :],
+                    glob_obs[i, ic_r, :],
+                    glob_syn[i, ic_r, :],
                     t0_syn,
                     dt_syn,
                     self.Tmin[ib],
@@ -345,7 +377,7 @@ class Tele_PreOP(FwatPreOP):
                     tstart[ir],
                     tend[ir],
                 )
-
+        
             # save adjoint source
             data = np.zeros((npt_syn,2))
             data[:,0] = t0_syn + np.arange(npt_syn) * dt_syn
@@ -357,7 +389,7 @@ class Tele_PreOP(FwatPreOP):
             np.save(f"{out_dir}/{bandname}/{name}",data)
 
             # save obs and synthetic data
-            for ic in range(self.ncomp):
+            for ic in range(1): # only one component
                 # init a sac header
                 tr = SACTrace(
                     evla=self.evla,evlo=self.evlo,
@@ -370,9 +402,9 @@ class Tele_PreOP(FwatPreOP):
                     kcmpnm = self.chcode + self.components[ic]
                 )
                 name = self._get_station_code(i,ic)
-                tr.data = glob_obs[i,ic,:]
+                tr.data = cc1
                 tr.write(f"{out_dir}/{bandname}/{name}.sac.obs")
-                tr.data = glob_syn[i,ic,:]
+                tr.data = cc2
                 tr.write(f"{out_dir}/{bandname}/{name}.sac.syn")
 
         self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,win_chi)
