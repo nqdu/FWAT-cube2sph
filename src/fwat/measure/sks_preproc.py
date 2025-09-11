@@ -25,7 +25,7 @@ def _splitting_intensity(Rsyn:np.ndarray,Tsyn:np.ndarray,dt_syn:float):
     norm_syn = 1. / (norm_syn + 1.0e-30)
     si_syn = -2. * np.sum(dRsyn * Tsyn) * norm_syn 
 
-    return si_syn
+    return float(si_syn)
 
 def _splitting_intensity_adjsrc(Rsyn,Tsyn,dt_syn,si_obs = 0.,weight = 1.):
     """
@@ -219,7 +219,7 @@ class SKS_PreOP(FwatPreOP):
             tmp = np.loadtxt(filename,dtype=str,ndmin=2)
             si_obs_evt = {}
             for i in range(tmp.shape[0]):
-                si_obs_evt[tmp[0]] = np.float64(tmp[1:])
+                si_obs_evt[tmp[i,0]] = tmp[i,1:].astype(float)
         else:
             si_obs_evt = {}
             cal_obs_si = True
@@ -299,13 +299,13 @@ class SKS_PreOP(FwatPreOP):
                 # save to it
                 si_obs_data[ir] = SI_obs
             else:
-                name = f"{self.netwk[ir]}.{self.stnm[ir]}"
+                name = f"{self.netwk[i]}.{self.stnm[i]}"
                 if name not in si_obs_evt:
-                    print(f"cannot locate {self.netwk[ir]}.{self.stnm[ir]} in  {self.DATA_DIR}/{self.evtid}!")
+                    print(f"cannot locate {name} in  {self.DATA_DIR}/{self.evtid}!")
                     exit(1)
-                tmp = si_obs_evt[name][0]
-                SI_obs = tmp[0]
-                if len(tmp) > 2:
+                tmp = si_obs_evt[name]
+                SI_obs = float(tmp[0])
+                if len(tmp) > 1:
                     weight = 1. / float(tmp[1])
 
             # compute si for syn data and adjoint source

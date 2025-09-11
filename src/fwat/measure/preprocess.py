@@ -3,8 +3,10 @@ from mpi4py import MPI
 def run(argv):
 
     if len(argv) != 4:
-        print("Usage: fwat-main measure measure_type iter evtid run_opt")
-        print("mpi should be enabled")
+        print("Usage: fwat-main measure measure_type iter evtid run_opt[1,2,3]")
+        print("\topt =1 forward, = 2 for ls = 3 adjoint")
+        print("\texample: mpirun -np 31 fwat measure tele 0 XZ.FAF 3")
+
         exit(1)
 
     # get input parameter

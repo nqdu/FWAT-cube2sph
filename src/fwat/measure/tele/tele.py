@@ -3,6 +3,7 @@ import numpy as np
 def get_injection_time(evtid:str):
     temp = np.loadtxt('src_rec/injection_time',dtype=str,ndmin=2)
     find_src = False
+    t_inj = 0.
     for i in range(temp.shape[0]):
         if temp[i,0] == evtid:
             t_inj = float(temp[i,1])
@@ -14,8 +15,15 @@ def get_injection_time(evtid:str):
     
     return t_inj 
 
-def compute_ak135_time(evla:float,evlo:float,evdp:float,stla,stlo,phase='P'):
+def compute_ak135_time(evla:float,evlo:float,evdp:float,
+                       stla:np.ndarray,stlo:np.ndarray,phase='P'):
     from obspy.taup import TauPyModel
+    from mpi4py import MPI
+
+    # get mpi info 
+    comm = MPI.COMM_WORLD
+    myrank = comm.Get_rank()
+    nprocs = comm.Get_size()
     
     nsta = len(stla)
     t_ref = np.zeros((nsta))
@@ -23,9 +31,11 @@ def compute_ak135_time(evla:float,evlo:float,evdp:float,stla,stlo,phase='P'):
     # create taup model
     model = TauPyModel("ak135")
     
-    for i in range(nsta):
+    for i in range(myrank,nsta,nprocs):
         t_ref[i] = model.get_travel_times_geo(evdp,evla,evlo,stla[i],stlo[i],[phase])[0].time
     
+    # gather all
+    tmp = comm.allreduce(t_ref); t_ref = tmp * 1.
 
     return t_ref
 

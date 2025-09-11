@@ -74,7 +74,7 @@ class FwatPreOP:
 
         # read simulation info dt,t0,npts
         fio = h5py.File(f"{self.syndir}/OUTPUT_FILES/seismograms.h5","r")
-        t = fio[list(fio.keys())[0]][:,0]
+        t = np.asarray(fio[list(fio.keys())[0]][:,0])
         fio.close()
         self.t0_syn = t[0]
         self.dt_syn = t[1] - t[0]
@@ -158,6 +158,7 @@ class FwatPreOP:
             window chi and adjoint source info  (20 values)
         """
         import os 
+        import sys 
         ncomp = tr_chi.shape[1]
         nsta_loc = self.nsta_loc
 
@@ -166,7 +167,8 @@ class FwatPreOP:
             os.makedirs(f"{self.MISFIT}/{self.mod}",exist_ok=True)
 
         # sync
-        MPI.COMM_WORLD.Barrier()
+        comm = MPI.COMM_WORLD
+        comm.Barrier()
 
         # loop each proc to print info on the screen
         # and save files
@@ -203,7 +205,7 @@ class FwatPreOP:
                 fio.close()
 
             # barrier
-            MPI.COMM_WORLD.Barrier()
+            comm.Barrier()
 
     def _get_bandname(self,ib:int):
         return 'T%03g_T%03g' %(self.Tmin[ib],self.Tmax[ib])
