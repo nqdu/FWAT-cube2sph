@@ -85,6 +85,10 @@ class FwatPreOP:
         self.nsta_loc = iend - istart + 1
         self._istart = istart 
 
+        # seismograms here, only save seismograms for local stations
+        self.seismogram = {}
+        self.seismogram_adj = {}
+
         # sanity check 
         self._sanity_check()
     

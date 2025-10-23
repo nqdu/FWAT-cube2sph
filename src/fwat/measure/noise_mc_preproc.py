@@ -777,7 +777,7 @@ class NoiseMC_PreOP():
             nsta = len(adj_files)
 
             # loop each station
-            for ir in range(nsta):
+            for ir in range(self.myrank,nsta,self.nprocs):
                 name = adj_files[ir].split('/')[-1].split(f'.{self.chcode}Z.adj.sem.npy')[0]
                 adj = np.zeros((3,self.npt_syn)) 
 
