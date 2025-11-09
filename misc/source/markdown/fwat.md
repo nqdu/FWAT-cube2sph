@@ -353,8 +353,8 @@ For multi-channel noise simulation, provide the following files:
 - `FORCESOLUTION_${NAME}_Z`
 - `FORCESOLUTION_${NAME}_N`
 - `FORCESOLUTION_${NAME}_E`
-- `STATIONS_${NAME}_R` / `STATIONS_${NAME}_T`
-- `STATIONS_${NAME}_Z`
+- `STATIONS_${NAME}_R/T/Z` (stations used for `RR,TT,ZZ`)
+
 The stations in each `STATION_${NAME}_[RTZ]` can be different. You should merge all `rot_${NAME}_{RTZ}` together by 
 ```bash
 cat rot_${NAME}_{RTZ} |sort -n |uniq > rot_${NAME}

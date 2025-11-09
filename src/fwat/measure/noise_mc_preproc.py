@@ -66,7 +66,7 @@ def _get_rotate_matrix(azd,bazd,rotate_src=True,rotate_sta = True):
 class NoiseMC_PreOP():
     def __init__(self, measure_type:str, iter:int, evtid:str, run_opt:int):
         # import packages
-        from .utils import read_params,cal_dist_az_baz
+        from .utils import read_params
         from .utils import get_source_loc
         import h5py 
         comm = MPI.COMM_WORLD
@@ -127,6 +127,11 @@ class NoiseMC_PreOP():
         self.t0_syn = t[0]
         self.dt_syn = t[1] - t[0]
         self.npt_syn = len(t)
+
+        # seismograms 
+        self.seismogram = {}
+        self.seismogram_adj = {}
+        self.seismogram_sac = {}
     
     def _get_mc_channel(self):
         import os 
@@ -138,7 +143,7 @@ class NoiseMC_PreOP():
         # sanity check
         self._sanity_check()
 
-        # init
+        # init source comps 
         comps_temp = set()
         scomps = [cc[0] for cc in self.cc_comps]
 
@@ -217,7 +222,7 @@ class NoiseMC_PreOP():
                     _,az,baz = cal_dist_az_baz(self.evla,self.evlo,stla[ir],stlo[ir])
                     self.stainfo[name] = [stlo[ir],stla[ir],az,baz]
         
-        # get all names
+        # get all names used for all multi-channels 
         self.sta_names: list[str] = sorted(self.stainfo.keys())
 
     def _rotate_XYZ_to_ZNE(self):
@@ -232,7 +237,8 @@ class NoiseMC_PreOP():
             to_template='${nt}.${sta}.BX${comp}.sem.npy'
 
             # rotate seismograms from XYZ to ZNE
-            rotate_seismo_fwd(fn_matrix,from_dir,to_dir,from_template,to_template)
+            out = rotate_seismo_fwd(fn_matrix,from_dir,to_dir,from_template,to_template)
+            self.seismogram.update(out)
 
     def _rotate_ZNE_to_XYZ(self):
         from .cube2sph_rotate import rotate_seismo_adj
@@ -259,7 +265,7 @@ class NoiseMC_PreOP():
         rcomp = [self.cc_comps[i][1] for i in range(self.ncomp)]
 
         # allocate jobs
-        keys = sorted(self.stainfo.keys())
+        keys = self.sta_names
         nsta = len(keys) 
         istart,iend = alloc_mpi_jobs(nsta,self.nprocs,self.myrank)
 
@@ -279,7 +285,7 @@ class NoiseMC_PreOP():
                 for ic,ch in enumerate(['E','N']):
                     name = f"{keys[i]}.{self.chcode}{ch}.sem.npy"
                     filename = f"{self.syndirs[ie]}/OUTPUT_FILES/{name}"
-                    data[:,:] = np.load(filename)
+                    data[:,:] = self.seismogram[filename]
                     temp_syn[ic,:] = data[:,1]
 
                 # rotate to R/T
@@ -296,7 +302,8 @@ class NoiseMC_PreOP():
                     filename = f"{self.syndirs[ie]}/OUTPUT_FILES/{name}"
                     data[:,1] = temp_syn[ic,:] 
                     #data.tofile(filename)
-                    np.save(filename,data)
+                    self.seismogram[filename] = data.copy()
+                    #np.save(filename,data)
 
         # sync
         MPI.COMM_WORLD.Barrier()
@@ -338,21 +345,22 @@ class NoiseMC_PreOP():
             statxt = np.loadtxt(f"{self.SRC_REC}/STATIONS_{self.evtid}_{chs}_globe",dtype=str,ndmin=2)
             sta_names = [statxt[i,1] + "." + statxt[i,0] for i in range(statxt.shape[0])]
 
-            # allocate jobs
-            istart,iend = alloc_mpi_jobs(len(sta_names),self.nprocs,self.myrank)
-
             # now loop to read stations
-            for i in range(istart,iend+1):
+            print_EGF = False
+            for i in range(len(sta_names)):
                 # get station code
                 code = f"{sta_names[i]}.{self.chcode}{chr}"
 
                 # load [NEZ]? components if required
+                exist_in_this_rank = True
                 if chs in ['N','E','Z']:
                     syndir = f"{self.SOLVER}/{self.mod}/{self.evtid}_{chs}/"
                     filename = f"{syndir}/OUTPUT_FILES/{code}.sem.npy"
-                    data = np.load(filename)
-                    tr.data = data[:,1] * 1.
-
+                    if filename not in self.seismogram:
+                        exist_in_this_rank = False
+                    else:
+                        data = self.seismogram[filename]
+                        tr.data = data[:,1] * 1.
                 else: # chs is in ['R','T']
                     
                     # load E/N data
@@ -360,8 +368,16 @@ class NoiseMC_PreOP():
                     for ic0,ch0 in enumerate(['N','E']):
                         syndir = f"{self.SOLVER}/{self.mod}/{self.evtid}_{ch0}/"
                         filename = f"{syndir}/OUTPUT_FILES/{code}.sem.npy"
-                        data[ic0,:] = np.load(filename)[:,1]
-                    
+                        if filename not in self.seismogram:
+                            exist_in_this_rank = False
+                            break 
+                        else:
+                            data[ic0,:] = self.seismogram[filename][:,1]
+
+                    # check exist
+                    if not exist_in_this_rank:
+                        continue
+
                     # rotation
                     az = self.stainfo[sta_names[i]][2]
                     ve = data[0,:]
@@ -378,8 +394,9 @@ class NoiseMC_PreOP():
 
                 # save sac
                 if self.pdict['USE_EGF'] == False:
-                    if i == istart and myrank == 0:
+                    if print_EGF and myrank == 0:
                         print("EGF => CCF ...")
+                        print_EGF = False 
                     tr.data = -cumtrapz1(tr.data,dt_syn)
                 tr.b = t0_syn
 
@@ -511,14 +528,16 @@ class NoiseMC_PreOP():
                 if chs in ['N','E','Z']:
                     syndir = f"{self.SOLVER}/{self.mod}/{self.evtid}_{chs}/"
                     filename = f"{syndir}/OUTPUT_FILES/{code}.sem.npy"
-                    syn_tr = np.load(filename)[:,1]
+                    syn_tr = self.seismogram[filename][:,1]
+                    #syn_tr = np.load(filename)[:,1]
                 else: # chs is in ['R','T']
                     # load E/N data
                     data = np.zeros((2,npt_syn))
                     for ic0,ch0 in enumerate(['N','E']):
                         syndir = f"{self.SOLVER}/{self.mod}/{self.evtid}_{ch0}/"
                         filename = f"{syndir}/OUTPUT_FILES/{code}.sem.npy"
-                        data[ic0,:] = np.load(filename)[:,1]
+                        #data[ic0,:] = np.load(filename)[:,1]
+                        data[ic0,:] = self.seismogram[filename][:,1]
                     
                     # rotation
                     az = self.stainfo[self.sta_names[i]][2]
@@ -630,9 +649,11 @@ class NoiseMC_PreOP():
                 obs_tr.delta = dt_inp 
                 obs_tr.b = t0_inp 
                 obs_tr.data = dat_inp 
-                obs_tr.write(f"{outdir}/{code}.sac.obs")
+                self.seismogram_sac[f"{outdir}/{code}.sac.obs"] = obs_tr.data.copy()
+                #obs_tr.write(f"{outdir}/{code}.sac.obs")
                 obs_tr.data = syn_inp
-                obs_tr.write(f"{outdir}/{code}.sac.syn")
+                self.seismogram_sac[f"{outdir}/{code}.sac.syn"] = obs_tr.data.copy()
+                #obs_tr.write(f"{outdir}/{code}.sac.syn")
             # end for loop cc_comps
 
             # rotate adjoint source to ENZ-ENZ
@@ -652,7 +673,8 @@ class NoiseMC_PreOP():
                     code = f"{self.sta_names[i]}.{self.chcode}{rcomp[i_r]}"
                     filename = f"{self.syndirs[ic]}/OUTPUT_FILES/{bandname}/{code}.adj.sem.npy"
                     data[:,1] = adj_src_all[i_s,i_r,:]
-                    np.save(filename,data)
+                    self.seismogram_adj[filename] = data.copy()
+                    #np.save(filename,data)
 
         # end for each station
 
@@ -757,6 +779,7 @@ class NoiseMC_PreOP():
     def sum_adj_source(self):
         import os 
         import glob 
+        from fwat.measure.utils import alloc_mpi_jobs
 
         nb = len(self.Tmax)
         if self.myrank == 0:
@@ -765,26 +788,28 @@ class NoiseMC_PreOP():
                 os.makedirs(f"{self.syndirs[ic]}/SEM",exist_ok=True)
         MPI.COMM_WORLD.Barrier()
 
+        # all stations
+        nsta = len(self.sta_names)
+        istart,iend = alloc_mpi_jobs(nsta,self.nprocs,self.myrank)
+        nsta_loc = iend - istart + 1
+
         # loop each syndir
         for ic in range(len(self.scomp_syn)):
             syndir = self.syndirs[ic]
 
             comps_read = ['E','N','Z']
 
-            # find stations
-            bandname = self._get_bandname(0)
-            adj_files = glob.glob(f"{syndir}/OUTPUT_FILES/{bandname}/*.{self.chcode}Z.adj.sem.npy")
-            nsta = len(adj_files)
-
             # loop each station
-            for ir in range(self.myrank,nsta,self.nprocs):
-                name = adj_files[ir].split('/')[-1].split(f'.{self.chcode}Z.adj.sem.npy')[0]
+            for ir in range(nsta_loc):
+                i = ir + istart
+                name = self.sta_names[i]
                 adj = np.zeros((3,self.npt_syn)) 
 
                 for ib in range(nb):
                     bandname = self._get_bandname(ib) 
                     for ic in range(3):
-                        data = np.load(f"{syndir}/OUTPUT_FILES/{bandname}/{name}.{self.chcode}{comps_read[ic]}.adj.sem.npy")
+                        #data = np.load(f"{syndir}/OUTPUT_FILES/{bandname}/{name}.{self.chcode}{comps_read[ic]}.adj.sem.npy")
+                        data = self.seismogram_adj[f"{syndir}/OUTPUT_FILES/{bandname}/{name}.{self.chcode}{comps_read[ic]}.adj.sem.npy"]
                         adj[ic,:] += data[:,1]
                 
                 # save to SEM/
@@ -808,9 +833,17 @@ class NoiseMC_PreOP():
         import os 
         import h5py 
         import shutil 
-        from obspy.io.sac import SACTrace
+        import re 
         if self.myrank == 0:
             print("cleaning up ...")
+
+        # for irank in range(self.nprocs):
+        #     if irank == self.myrank:
+        #         print("irank")
+        #         print(self.seismogram.keys())
+        #         print(self.seismogram_sac.keys())
+        #         print(self.seismogram_adj.keys())
+        #     MPI.COMM_WORLD.Barrier()
 
         # loop each syn dir
         for ic in range(len(self.scomp_syn)): 
@@ -821,42 +854,55 @@ class NoiseMC_PreOP():
                 bandname = self._get_bandname(ib)
                 for tag in ['obs','syn']:
 
-                    # all sac files
-                    sacfiles = glob(f"{syndir}/OUTPUT_FILES/{bandname}/*.sac.{tag}")
+                    # all sac file
+                    pattern = re.compile(rf"^{syndir}/OUTPUT_FILES/{bandname}/.*\.sac\.{tag}")
+                    sacfiles = [s for s in self.seismogram_sac.keys() if pattern.match(s)]
 
+                    sacfiles = glob(f"{syndir}/OUTPUT_FILES/{bandname}/*.sac.{tag}")
+                    
                     # check if we need to save data
-                    if len(sacfiles) == 0:
+                    nfiles = len(sacfiles)
+                    nfiles_tot = MPI.COMM_WORLD.allreduce(nfiles,op=MPI.SUM)
+                    if nfiles_tot == 0:
                         continue
 
-                    # open h5file 
-                    fio = h5py.File(f"{syndir}/OUTPUT_FILES/seismogram.{tag}.{bandname}.h5","w")
-                    for i in range(len(sacfiles)):
-                        tr = SACTrace.read(sacfiles[i])
-                        if i == 0:
-                            fio.attrs['dt'] = tr.delta  
-                            fio.attrs['t0'] = tr.b 
-                            fio.attrs['npts'] = tr.npts
+                    # loop each proc
+                    for irank in range(self.nprocs):
+                        # open h5file 
+                        if irank == 0:
+                            fio = h5py.File(f"{syndir}/OUTPUT_FILES/seismogram.{tag}.{bandname}.h5","w")
+                        else:
+                            fio = h5py.File(f"{syndir}/OUTPUT_FILES/seismogram.{tag}.{bandname}.h5","a")
+                        for i in range(len(sacfiles)):
+                            tr = self.seismogram_sac[sacfiles[i]]
+                            if i == 0 and irank == 0:
+                                fio.attrs['dt'] = tr.delta  
+                                fio.attrs['t0'] = tr.b 
+                                fio.attrs['npts'] = tr.npts
+                            
+                            dsetname = tr.knetwk + "." + tr.kstnm + "." + tr.kcmpnm
+                            fio.create_dataset(dsetname,shape=tr.data.shape,dtype='f4')
+                            fio[dsetname][:] = tr.data 
                         
-                        dsetname = tr.knetwk + "." + tr.kstnm + "." + tr.kcmpnm
-                        fio.create_dataset(dsetname,shape=tr.data.shape,dtype='f4')
-                        fio[dsetname][:] = tr.data 
+                        # close 
+                        fio.close()
+                        MPI.COMM_WORLD.Barrier()
                     
-                    # close 
-                    fio.close()
-            
+                ################################################################################
                 # clean bandname
                 shutil.rmtree(f"{syndir}/OUTPUT_FILES/{bandname}",ignore_errors=True)
 
-            # clean semd and sem.ascii
-            filenames = glob(f"{syndir}/OUTPUT_FILES/*.semd")
-            for f in filenames:
-                os.remove(f)
-            filenames = glob(f"{syndir}/OUTPUT_FILES/*.sem.npy")
-            for f in filenames:
-                os.remove(f)
-            filenames = glob(f"{syndir}/SEM/*.sem.npy")
-            for f in filenames:
-                os.remove(f)
+            if self.myrank == 0:
+                # clean semd and sem.ascii
+                filenames = glob(f"{syndir}/OUTPUT_FILES/*.semd")
+                for f in filenames:
+                    os.remove(f)
+                filenames = glob(f"{syndir}/OUTPUT_FILES/*.sem.npy")
+                for f in filenames:
+                    os.remove(f)
+                filenames = glob(f"{syndir}/SEM/*.sem.npy")
+                for f in filenames:
+                    os.remove(f)
 
     def execute(self):
         # rotate seismograms from XYZ to ZNE
@@ -879,7 +925,7 @@ class NoiseMC_PreOP():
         self.sum_adj_source()
 
         # pack SACs to h5
-        if self.myrank ==0: self.cleanup()
+        self.cleanup()
 
         # sync
         MPI.COMM_WORLD.Barrier()

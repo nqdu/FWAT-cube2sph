@@ -3,6 +3,7 @@ import os
 from string import Template
 from mpi4py import MPI
 import h5py
+from .utils import alloc_mpi_jobs
 
 def _get_first_dim_npy(filename):
     """Read the first dimension of a numpy binary file (.npy).
@@ -144,10 +145,14 @@ def rotate_seismo_fwd(fn_matrix:str,from_dir:str,to_dir:str,
     # get station names
     keys = sorted(rot_dict.keys())
     nrec = len(keys)
-    nrec_local = nrec // nproc
-    if (myrank < (nrec % nproc)): nrec_local = nrec_local + 1
+
+    # allocate jobs
+    istart, iend = alloc_mpi_jobs(nrec, nproc, myrank)
+    nrec_local = iend - istart + 1 
+    seismo_dict = {}
+
     for i_sta_local in range(0, nrec_local):
-        i_sta = i_sta_local * nproc + myrank
+        i_sta = istart + i_sta_local
 
         nt,sta = keys[i_sta].split('.')
         nu = rot_dict[keys[i_sta]]
@@ -168,12 +173,13 @@ def rotate_seismo_fwd(fn_matrix:str,from_dir:str,to_dir:str,
         if (missing_file):
             continue
         seis = np.zeros(shape=(nstep, 3), dtype=float)
+        arr = np.zeros(shape=(nstep, 2), dtype=float)
         for i_comp in range(0, 3):
             if (from_comp[i_comp] == '0'):
                 continue
 
             dname = from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp])
-            arr =  fio[dname][:] * 1.
+            arr[:] =  np.asarray(fio[dname][:])
             seis[:,i_comp] = arr[:,1]
 
 
@@ -187,10 +193,12 @@ def rotate_seismo_fwd(fn_matrix:str,from_dir:str,to_dir:str,
             #print(fn)
             arr[:,1] = seis[:,i_comp]
             #print(f"writing to ${fn}")
-            np.save(fn,arr)
+            seismo_dict[fn] = arr * 1.
 
     comm.barrier()
     fio.close()
+
+    return seismo_dict
 
 def rotate_seismo_adj(fn_matrix:str,from_dir:str,to_dir:str,
                       from_template_str:str,to_template_str:str):
@@ -230,10 +238,12 @@ def rotate_seismo_adj(fn_matrix:str,from_dir:str,to_dir:str,
     rot_dict = _read_rotation_file(fn_matrix)
     keys = sorted(rot_dict.keys())
     nrec = len(keys)
-    nrec_local = nrec // nproc
-    if (myrank < (nrec % nproc)): nrec_local = nrec_local + 1
+    # allocate jobs
+    istart, iend = alloc_mpi_jobs(nrec, nproc, myrank)
+    nrec_local = iend - istart + 1 
+
     for i_sta_local in range(0, nrec_local):
-        i_sta = i_sta_local * nproc + myrank
+        i_sta = istart + i_sta_local
         nt,sta = keys[i_sta].split('.')
         nu = rot_dict[keys[i_sta]]
         missing_file = False
@@ -256,6 +266,7 @@ def rotate_seismo_adj(fn_matrix:str,from_dir:str,to_dir:str,
         if (missing_file):
             continue
         seis = np.zeros(shape=(nstep, 3), dtype=float)
+        arr = np.zeros(shape=(nstep, 2), dtype=float)
         for i_comp in range(0, 3):
             if (from_comp[i_comp] == '0'):
                 continue
