@@ -4,34 +4,56 @@ from mpi4py import MPI
 
 def _rf_adj_src(rf_obs,rf_syn,synr,synz,
                 dt,tshift,f0,maxit):
-    from .tele.deconit import deconit,myconvolve
+    from .tele.deconit import deconit,myconvolve,nextpow2
+    from .tele.deconit import gauss_filter,apply_gaussian
 
     def shift_data(a,dt,t0):
-        a1 = np.fft.rfft(a)
-        om = 2 * np.pi * np.fft.rfftfreq(len(a),dt)
+        a1 = np.fft.fft(a)
+        om = 2 * np.pi * np.fft.fftfreq(len(a),dt)
         a1 = a1 * np.exp(-1j * om * t0)
 
-        return np.fft.irfft(a1).real
+        return np.fft.ifft(a1).real
+    
+    # get a filte
+    nft = nextpow2(len(rf_obs)* 2)
+    synr_filt = np.pad(synr,(0,nft - len(synr)),'constant')
+    synz_filt = np.pad(synz,(0,nft - len(synz)),'constant')
+    rf_o_filt = np.pad(rf_obs,(0,nft - len(rf_obs)),'constant')
+    rf_s_filt = np.pad(rf_syn,(0,nft - len(rf_syn)),'constant')
+
+    # gaussian filter
+    gauss = gauss_filter(nft,dt,f0)
+    synr_filt = apply_gaussian(synr_filt,gauss,dt)
+    synz_filt = apply_gaussian(synz_filt,gauss,dt)
 
     # normalize
     zrf = deconit(
-        synz,synr,dt,0.,
+        synz_filt,synz_filt,dt,0.,
         f0,0,maxit
     )
     amp = np.max(abs(zrf))
-    dobs_norm = rf_obs / amp
-    dsyn_norm = rf_syn / amp
+    dobs_norm = rf_o_filt / amp
+    dsyn_norm = rf_s_filt / amp
 
     # get negative shifted data, then reverse
-    r_rev = shift_data(synr,dt,-tshift)[::-1]
-    z_rev = shift_data(synz,dt,-tshift)[::-1]
+    r_rev = shift_data(synr_filt,dt,-tshift)[::-1]
+    z_rev = shift_data(synz_filt,dt,-tshift)[::-1]
     
     # adjoint source
     dR = dsyn_norm - dobs_norm
-    adj_r = deconit(dR,z_rev,dt,0,f0,1,maxit)
+    adj_r_filt = deconit(dR,z_rev,dt,0,f0,1,maxit)
     tmp = myconvolve(-dR,r_rev)
     tmp1 = myconvolve(z_rev,z_rev)
-    adj_z = deconit(tmp,tmp1,dt,0,f0,1,maxit)
+    adj_z_filt = deconit(tmp,tmp1,dt,0,f0,1,maxit)
+
+    # filter
+    adj_r_filt = apply_gaussian(adj_r_filt,gauss,dt)
+    adj_z_filt = apply_gaussian(adj_z_filt,gauss,dt)
+
+    # copy to original length
+    nt = len(rf_obs)
+    adj_r = adj_r_filt[:nt]
+    adj_z = adj_z_filt[:nt]
 
     return adj_r,adj_z,amp
 
@@ -91,7 +113,7 @@ class RF_PreOP(FwatPreOP):
         import os 
         from obspy.io.sac import SACTrace
         from .tele.deconit import deconit
-        from .utils import bandpass
+        from .utils import bandpass,taper_window
 
         # get some vars
         evtid = self.evtid 
@@ -110,6 +132,9 @@ class RF_PreOP(FwatPreOP):
             delta = dt_syn,
             b=-self._tshift
         )
+
+        # time window 
+        win_tb,win_te = self.pdict['TIME_WINDOW']
 
         outdir = f"{self.DATA_DIR}/{evtid}"
         if self.myrank == 0:
@@ -158,9 +183,18 @@ class RF_PreOP(FwatPreOP):
                     freqmin,freqmax
                 )
 
+                # time window 
+                lpt,rpt,taper = taper_window(
+                    0,dt_syn,npt_syn,
+                    self.t_ref[i] - self.t_inj - win_tb,
+                    self.t_ref[i] - self.t_inj + win_te
+                )
+                r_win = R[lpt:rpt] * taper
+                z_win = Z[lpt:rpt] * taper
+
                 # compute rf
                 rf = deconit(
-                    R,Z,
+                    r_win,z_win,
                     dt_syn,
                     self._tshift,
                     f0,0,self._maxit
@@ -213,7 +247,36 @@ class RF_PreOP(FwatPreOP):
         # loop each station
         for ir in range(nsta_loc):
             i = ir + self._istart
+        
+            # read synthetic data
             syn_data = np.zeros((2,npt_syn))
+            for ic in range(self.ncomp):
+                name = self._get_station_code(i,ic)
+                syn_data[ic,:] = self.seismogram[f"{out_dir}/{name}.sem.npy"][:,1]
+                #syn_data[ic,:] = np.load(f"{out_dir}/{name}.sem.npy")[:,1]
+
+                # filter
+                syn_data[ic,:] = bandpass(syn_data[ic,:],dt_syn,freqmin,freqmax)
+            
+            # get time window 
+            taper = np.zeros((npt_syn))
+            t1 = self.t_ref[i] - self.t_inj - win_tb 
+            t2 = self.t_ref[i] - self.t_inj + win_te
+            lpt,rpt,taper0 = taper_window(0,dt_syn,npt_syn,t1,t2)
+            taper[lpt:rpt] = taper0 * 1.
+
+            # fetch windowed data and compute receiver function
+            idx_r = self.components.index('R')
+            idx_z = self.components.index('Z')
+            r_win = syn_data[idx_r,lpt:rpt] * taper[lpt:rpt]
+            z_win = syn_data[idx_z,lpt:rpt] * taper[lpt:rpt]
+            rf_syn = deconit(
+                r_win,
+                z_win,
+                dt_syn,self._tshift,
+                self._f0[ib],0,
+                self._maxit
+            )
 
             # read obs data
             rfname = self._get_rf_code(i,ib)
@@ -222,46 +285,23 @@ class RF_PreOP(FwatPreOP):
             dt_obs = obs_tr.delta 
             npt_obs = obs_tr.npts 
 
-            # compute rf 
+            # interpolate rf_obs to time window
             rf_obs = interpolate_syn(
                 obs_tr.data,
                 t0_obs,dt_obs,npt_obs,
-                -self._tshift,dt_syn,npt_syn
-            )
-
-            # read synthetic data
-            for ic in range(self.ncomp):
-                name = self._get_station_code(i,ic)
-                syn_data[ic,:] = np.load(f"{out_dir}/{name}.sem.npy")[:,1]
-
-                # filter
-                syn_data[ic,:] = bandpass(syn_data[ic,:],dt_syn,freqmin,freqmax)
-
-            # compute receiver function
-            idx_r = self.components.index('R')
-            idx_z = self.components.index('Z')
-            rf_syn = deconit(
-                syn_data[idx_r,:],
-                syn_data[idx_z,:],
-                dt_syn,self._tshift,
-                self._f0[ib],0,
-                self._maxit
+                -self._tshift,dt_syn,len(rf_syn)
             )
 
             # compute adjoint source
             tp = self.t_ref[i] - self.t_inj
-            adj_r,adj_z,amp  = \
-                _rf_adj_src(
-                    rf_syn,rf_obs,syn_data[idx_z,:],
-                    syn_data[idx_r,:],dt_syn,
-                    self._tshift,self._f0[ib],
-                    self._maxit
-                )
+            adj_r_win,adj_z_win,amp  = _rf_adj_src(
+                rf_obs,rf_syn,
+                r_win,z_win,
+                dt_syn,self._tshift,self._f0[ib],
+                self._maxit
+            )
 
             # taper  RF
-            taper = np.zeros((npt_syn))
-            lpt,rpt,taper0 = taper_window(0,dt_syn,npt_syn,tstart[ir],tend[ir])
-            taper[lpt:rpt] = taper0 * 1.
             rf_obs *= taper / amp 
             rf_syn *= taper / amp 
 
@@ -275,23 +315,22 @@ class RF_PreOP(FwatPreOP):
             win_chi[ir,0,20-1] = npt_syn * dt_syn
 
             # filter and taper adj source
-            adj_z = bandpass(adj_z,dt_syn,freqmin,freqmax)
-            adj_r = bandpass(adj_r,dt_syn,freqmin,freqmax)
-            taper[:] = 0.
-            lpt,rpt,taper0 = taper_window(0,dt_syn,npt_syn,tp - win_tb,tp + win_te,)
-            taper[lpt:rpt] = taper0 * 1.
-            adj_r *= taper
-            adj_z *= taper
+            adj_z = np.zeros_like(npt_syn)
+            adj_r = np.zeros_like(npt_syn)
+            adj_z[lpt:rpt] = bandpass(adj_z_win,dt_syn,freqmin,freqmax) * taper0
+            adj_r[lpt:rpt] = bandpass(adj_r_win,dt_syn,freqmin,freqmax) * taper0
 
             # save adjoint source
             data = np.zeros((npt_syn,2))
             data[:,0] = t0_syn + np.arange(npt_syn) * dt_syn
             data[:,1] = adj_r
             outname = f"{out_dir}/{bandname}/{self.netwk[i]}.{self.stnm[i]}.{self.chcode}T.adj.sem.npy"
-            np.save(outname,data)
+            self.seismogram_adj[outname] = data.copy()
+            #np.save(outname,data)
             data[:,1] = adj_r
             outname = f"{out_dir}/{bandname}/{self.netwk[i]}.{self.stnm[i]}.{self.chcode}R.adj.sem.npy"
-            np.save(outname,data)
+            self.seismogram_adj[outname] = data.copy()
+            #np.save(outname,data)
 
             # save obs and syn
             name = f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}R.rf.sac"
@@ -302,12 +341,14 @@ class RF_PreOP(FwatPreOP):
                 delta = dt_syn,b=-self._tshift,
                 knetwk = self.netwk[i],
                 kstnm = self.stnm[i],
-                kcmpnm = self.chcode + self.components[ic]
+                kcmpnm = self.chcode + 'R'
             )
             tr.data = rf_obs
-            tr.write(f"{out_dir}/{bandname}/{name}.obs")
+            #tr.write()
+            self.seismo_sac[f"{out_dir}/{bandname}/{name}.obs"] = tr.copy()
             tr.data = rf_syn
-            tr.write(f"{out_dir}/{bandname}/{name}.syn")
+            #tr.write(f"{out_dir}/{bandname}/{name}.syn")
+            self.seismo_sac[f"{out_dir}/{bandname}/{name}.syn"] = tr.copy()
         
         # save measurement files
         self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,win_chi)
