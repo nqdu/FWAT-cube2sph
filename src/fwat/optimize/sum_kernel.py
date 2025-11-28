@@ -1,5 +1,5 @@
-import os 
-from scipy.io import FortranFile 
+import os
+from typing import List 
 import numpy as np 
 from mpi4py import MPI
 import h5py
@@ -8,6 +8,7 @@ import glob
 
 from fwat.optimize.model import FwatModel
 from fwat.const import OPT_DIR,SOLVER,PARAM_FILE
+from fwat.FortranIO import FortranIO
 
 def compute_zpred_hess(iter_cur):
 
@@ -17,14 +18,14 @@ def compute_zpred_hess(iter_cur):
 
     # read external_mesh.bin for zstore/ibool
     filename = f'{OPT_DIR}/MODEL_M%02d'%(iter_cur) + '/proc%06d'%(myrank) + '_external_mesh.bin'
-    f = FortranFile(filename)
-    _ = f.read_ints('i4')[0] # nspec
-    _ = f.read_ints('i4')[0] #gnlob
-    _ = f.read_ints('i4')
-    ibool = f.read_ints('i4') - 1
-    xstore = f.read_reals('f4')
-    ystore = f.read_reals('f4')
-    zstore = f.read_reals('f4')
+    f = FortranIO(filename,"r")
+    _ = f.read_record('i4')[0] # nspec
+    _ = f.read_record('i4')[0] #gnlob
+    _ = f.read_record('i4')
+    ibool = f.read_record('i4') - 1
+    xstore = f.read_record('f4')
+    ystore = f.read_record('f4')
+    zstore = f.read_record('f4')
     f.close()
 
     # compute depth in spherical coordinates
@@ -51,6 +52,42 @@ def compute_zpred_hess(iter_cur):
         print(f"hess maximum = {maxh}")
 
     return hess
+
+def _check_noise_source(MODEL:str,evtname:str):
+    """ check if it's a noise source based on evtname pattern """
+    import glob 
+    import yaml
+    from fwat.const import PARAM_FILE
+
+    filenames = glob.glob(f'./{SOLVER}/{MODEL}/{evtname}_[NEZ]')
+
+    if len(filenames) > 0:
+        # now check components used
+        with open(f'{PARAM_FILE}','r') as fio:
+            param = yaml.safe_load(fio)
+        
+        comp_used = param['measure']['noise']['CC_COMPS']
+        comp_required = set()
+
+        for i in range(len(comp_used)):
+            ch_s = comp_used[i][0]
+            if ch_s == 'Z':
+                comp_required.add('Z')
+            else:
+                comp_required.add('N')
+                comp_required.add('E')
+
+        # remove filename that is not in comp_required
+        new_filenames = []
+        for f in filenames:
+            direc = f.split('_')[-1]
+            if direc in comp_required:
+                new_filenames.append(f)
+                comp_required.remove(direc)
+
+        filenames = new_filenames
+
+    return filenames
 
 def run(argv):
     if len(argv) !=3 :
@@ -136,7 +173,7 @@ def run(argv):
         
         # write out
         outname = KERNEL_DIR + "/proc%06d"%myrank + '_' + grad_list_base[i] + '.bin'
-        f = FortranFile(outname,"w")
+        f = FortranIO(outname,"w")
         kl = np.asarray(kl,dtype='f4')
         f.write_record(kl)
         f.close()
@@ -145,14 +182,14 @@ def run(argv):
             kl = kl * 0 + 1
             outname = KERNEL_DIR + "/proc%06d"%myrank + "_hess_kernel" + '.bin'
             kl = np.asarray(kl,dtype='f4')
-            f = FortranFile(outname,"w")
+            f = FortranIO(outname,"w")
             f.write_record(kl)
             f.close()
     
     if PRECOND == 'z_precond':
         outname = KERNEL_DIR + "/proc%06d"%myrank + "_hess_kernel" + '.bin'
         kl = compute_zpred_hess(iter_cur)
-        f = FortranFile(outname,"w")
+        f = FortranIO(outname,"w")
         kl = np.asarray(kl,dtype='f4')
         f.write_record(kl)
         f.close()
@@ -162,7 +199,7 @@ def run(argv):
         kl = compute_zpred_hess(iter_cur)
         idx = np.logical_not(kl == 1.0e-8)
         kl[idx] = kl[idx]**2
-        f = FortranFile(outname,"w")
+        f = FortranIO(outname,"w")
         kl = np.asarray(kl,dtype='f4')
         f.write_record(kl)
         f.close()
@@ -173,7 +210,9 @@ def run(argv):
         for ievt in range(nevts):
 
             # check if it's noise source
-            filenames = glob.glob(f'./{SOLVER}/{MODEL}/{srctxt[ievt,0]}_[NEZRT]')
+            filenames = _check_noise_source(MODEL,srctxt[ievt,0])
+
+            # add regular source file
             filenames.append(f'./{SOLVER}/{MODEL}/{srctxt[ievt,0]}')
 
             for f in filenames:
@@ -187,12 +226,6 @@ def run(argv):
 
                 # sum kernel
                 kl = kl + arr * weight[ievt]
-
-                # filename = f'./{SOLVER}/{MODEL}' + setname + '/GRADIENT/' + 'hess_kernel.h5'
-
-                # fio = h5py.File(filename,'r')
-                # arr = fio[str(myrank)][:]
-                # fio.close()
                 
                 # get hessian norm
                 s = np.sum(arr * arr)
@@ -220,7 +253,7 @@ def run(argv):
         kl[idx] = 1. / kl[idx]
         kl[idx1] = 1. / THRESHOLD_HESS
 
-        f = FortranFile(outname,"w")
+        f = FortranIO(outname,"w")
         kl = np.asarray(kl,dtype='f4')
         f.write_record(kl)
         f.close()

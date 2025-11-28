@@ -1,9 +1,10 @@
 import numpy as np  
-from fwat.optimize.model import FwatModel
 import h5py 
 from mpi4py import MPI
-from scipy.io import FortranFile
 import glob
+
+from fwat.optimize.model import FwatModel
+from fwat.FortranIO import FortranIO
 
 def run(argv):
     # mpi nprocs
@@ -50,8 +51,8 @@ def run(argv):
         # read base model
         for im in range(nmod):
             filename = MODEL_DIR + "/proc%06d_" %(irank) + mname_list[im] + ".bin"
-            fio = FortranFile(filename,"r")
-            md[im,:] = fio.read_reals('f4')
+            fio = FortranIO(filename,"r")
+            md[im,:] = fio.read_record('f4')
             fio.close()
 
         # read base kernels
@@ -72,7 +73,7 @@ def run(argv):
         # write user model
         for i in range(nker):
             filename = KERNEL_DIR + "/proc%06d_" %(irank) + dname_list[i] + ".bin"
-            fio = FortranFile(filename,"w")
+            fio = FortranIO(filename,"w")
             fio.write_record(direc[i,...])
             fio.close()
 

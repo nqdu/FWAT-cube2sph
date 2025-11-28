@@ -1,12 +1,12 @@
 import numpy as np 
-from scipy.io import FortranFile 
 from mpi4py import MPI 
 import os 
-from fwat.optimize.model import FwatModel
 import h5py
 import yaml
 
 from fwat.const import OPT_DIR,NGLL
+from fwat.FortranIO import FortranIO
+from fwat.optimize.model import FwatModel
 
 NGLL3 = NGLL**3
 
@@ -36,8 +36,8 @@ def get_model_grad(iter:int,nspec:int,M:FwatModel):
 
         # read model
         filename = MODEL_DIR + "/proc%06d"%myrank + '_' + mod_list[i] + ".bin"
-        f = FortranFile(filename)
-        mod_vec[i,:,:] = f.read_reals('f4').reshape(nspec,NGLL3)
+        f = FortranIO(filename,"r")
+        mod_vec[i,:,:] = f.read_record('f4').reshape(nspec,NGLL3)
         f.close()
 
     # convert kernel and model to required type
@@ -88,19 +88,19 @@ def get_lbfgs_direc(iter:int,paramfile:str,M:FwatModel):
     # read jacobian
     # read nspec/nglob/ibool
     filename = f'{OPT_DIR}/MODEL_M%02d'%(iter) + '/proc%06d'%(myrank) + '_external_mesh.bin'
-    f = FortranFile(filename)
-    nspec = f.read_ints('i4')[0]
-    _ = f.read_ints('i4')[0]
-    f.read_ints('i4')
-    _= f.read_ints('i4')
+    f = FortranIO(filename,"r")
+    nspec = f.read_record('i4')[0]
+    _ = f.read_record('i4')[0]
+    f.read_record('i4')
+    _= f.read_record('i4')
     for _ in range(3):
-        f.read_reals('f4')
-    f.read_ints('i4') # irregular_element_number
-    f.read_reals('f4')
-    f.read_reals('f4')
+        f.read_record('f4')
+    f.read_record('i4') # irregular_element_number
+    f.read_record('f4')
+    f.read_record('f4')
     for _ in range(9):
-        f.read_reals('f4')
-    jaco = f.read_reals('f4').reshape(nspec,NGLL3)
+        f.read_record('f4')
+    jaco = f.read_record('f4').reshape(nspec,NGLL3)
     f.close()
 
     # alloc space for temporary vars 
@@ -224,8 +224,8 @@ def get_sd_direction(iter:int,paramfile:str,M:FwatModel):
 
     # read nspec/nglob/ibool
     filename = f'{OPT_DIR}/MODEL_M%02d'%(iter) + '/proc%06d'%(myrank) + '_external_mesh.bin'
-    f = FortranFile(filename)
-    nspec = f.read_ints('i4')[0]
+    f = FortranIO(filename,"r")
+    nspec = f.read_record('i4')[0]
     f.close()
 
     # read hess from hdf5
@@ -285,7 +285,7 @@ def get_search_direction(iter:int,paramfile:str):
     ndirec = direc.shape[0]
     for i in range(ndirec):
         outname =  f'{OPT_DIR}/SUM_KERNELS_M%02d'%(iter) + '/proc%06d'%(myrank) + '_' + direc_list[i] + ".bin"
-        f = FortranFile(outname,'w')
+        f = FortranIO(outname,"w")
         f.write_record(direc[i,:,:])
         f.close()
     

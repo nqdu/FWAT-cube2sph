@@ -77,7 +77,9 @@ class FwatModel:
                 direc_list = ["dalpha","dbeta","drho","dGcp","dGsp"]
             elif self._kltype == 2:
                 direc_list = ["dalphah","dalphav","dbetah","dbetav","drho","deta","dGcp","dGsp"]
-
+        else:
+            print(f"not implemented for modeltype = {self._mdtype}")
+            exit(1)
             
         return direc_list
     
@@ -200,6 +202,9 @@ class FwatModel:
                 model_new[_Index(5,5),...] = N 
                 model_new[_Index(3,4),...] = -gs
                 model_new[-1,...] = rho
+        else:
+            print(f"not implemented for kltype = {self._kltype}")
+            exit(1)
 
         return model_new
     
@@ -232,6 +237,9 @@ class FwatModel:
                     model_new[0,...] = vpvs * vs 
         elif self._mdtype == "dtti":
             model_new = self._cijkl2dtti(model,backward)
+        else:
+            print(f"not implemented for modeltype = {self._mdtype}")
+            exit(1)
         
         return model_new
     
@@ -263,8 +271,8 @@ class FwatModel:
                 phi = 0.5 * np.arctan2(gsp,gcp)
                 g0p = np.hypot(gsp,gcp)
                 
-                # zero out phi when g0p < 1.0e-4
-                idx = g0p < 1.0e-4
+                # zero out phi when g0p < 1.0e-2
+                idx = g0p < 1.0e-2
                 phi[idx] = 0.
 
                 # copy back to model_new
@@ -284,6 +292,9 @@ class FwatModel:
                 model_user[6,...] = g0p * 1.
                 plot_names[5] = "phi"
                 plot_names[6] = "G0"
+            else:
+                print(f"not implemented for kltype = {self._kltype}")
+                exit(1)
 
         return model_user,plot_names
 
@@ -414,6 +425,9 @@ class FwatModel:
 
             # get relative change if required
             md_newkl[0:5,...] *= md_new[0:5,...]
+        else:
+            print(f"not implemented for kltype = {self._kltype}")
+            exit(1)
 
         return md_newkl
     
@@ -447,9 +461,12 @@ class FwatModel:
 
         elif self._mdtype == "dtti":
             kl_usr = self._cijkl_kl2dtti(md_usr,md_kl)
-
+        else:
+            print(f"not implemented for modeltype = {self._mdtype}")
+            exit(1)
 
         # mask part of the kernels
         kl_usr[self._mask_vars,...] = 0.
+
 
         return md_usr,kl_usr

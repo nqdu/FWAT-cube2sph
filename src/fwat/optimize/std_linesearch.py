@@ -1,5 +1,4 @@
 import numpy as np 
-from scipy.io import FortranFile 
 from mpi4py import MPI 
 import yaml
 import h5py
@@ -10,6 +9,7 @@ from fwat.optimize.libgll import get_gll_weights
 from fwat.optimize.model import FwatModel
 from fwat.optimize.search_direction import compute_inner_dot
 from fwat.const import PARAM_FILE,LBFGS_FILE,OPT_DIR,NGLL
+from fwat.FortranIO import FortranIO
 
 NGLL3 = NGLL**3
 
@@ -49,19 +49,19 @@ def run(argv):
     # read jaco 
     # read nspec/nglob/ibool
     filename = MODEL_DIR + '/proc%06d'%(myrank) + '_external_mesh.bin'
-    f = FortranFile(filename)
-    nspec = f.read_ints('i4')[0]
-    _ = f.read_ints('i4')[0]
-    f.read_ints('i4')
-    _ = f.read_ints('i4')
+    f = FortranIO(filename,"r")
+    nspec = f.read_record('i4')[0]
+    _ = f.read_record('i4')[0]
+    f.read_record('i4')
+    _ = f.read_record('i4')
     for _ in range(3):
-        f.read_reals('f4')
-        f.read_ints('i4') # irregular_element_number
-        f.read_reals('f4')
-        f.read_reals('f4')
+        f.read_record('f4')
+        f.read_record('i4') # irregular_element_number
+        f.read_record('f4')
+        f.read_record('f4')
     for _ in range(9):
-        f.read_reals('f4')
-    jaco = f.read_reals('f4').reshape(nspec,NGLL3)
+        f.read_record('f4')
+    jaco = f.read_record('f4').reshape(nspec,NGLL3)
     f.close()
 
     # read search direction, grad, grad for linesearch
@@ -86,8 +86,8 @@ def run(argv):
 
         # read model
         filename = f"{MODEL_DIR}/proc%06d_{mod_list[i]}.bin" %(myrank)
-        fio = FortranFile(filename,"r")
-        mod_sub_base[i,:] = fio.read_reals('f4').reshape(nspec,NGLL3)
+        fio = FortranIO(filename,"r")
+        mod_sub_base[i,:] = fio.read_record('f4').reshape(nspec,NGLL3)
         fio.close()
 
         # kernel for line search
@@ -98,8 +98,8 @@ def run(argv):
 
         # read model for line search
         filename = f"{MODEL_DIR}.ls/proc%06d_{mod_list[i]}.bin" %(myrank)
-        fio = FortranFile(filename,"r")
-        mod_sub1_base[i,:] = fio.read_reals('f4').reshape(nspec,NGLL3)
+        fio = FortranIO(filename,"r")
+        mod_sub1_base[i,:] = fio.read_record('f4').reshape(nspec,NGLL3)
         fio.close()
     
     # convert to user defined model
