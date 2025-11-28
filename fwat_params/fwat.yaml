@@ -15,7 +15,7 @@ measure:
     ADJSRC_TYPE: 2 # 2,cross-conv
 
   noise: # multichannel noise 
-    CC_COMPS: ['ZZ']  # {SOURCE-COMP}{RECEIVER-COMP}
+    CC_COMPS: ['ZZ','TT']  # {SOURCE-COMP}{RECEIVER-COMP}
     CH_CODE: BX   # CH_CODE
     FILTER_BANDS:  # filter bands used, in s, [T_min,Tmax]
       - [20.,40.]

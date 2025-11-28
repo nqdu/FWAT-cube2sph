@@ -1,6 +1,10 @@
 import numpy as np 
 from mpi4py import MPI 
+import os 
 from fwat.const import PARAM_FILE
+from obspy.io.sac import SACTrace
+from fwat.measure.utils import cumtrapz1,dif1
+from fwat.measure.utils import alloc_mpi_jobs
 
 def _get_snr(data:np.ndarray,win_b:int,win_e:int):
     """
@@ -122,9 +126,9 @@ class NoiseMC_PreOP():
 
         # read simulation info dt,t0,npts
         fio = h5py.File(f"{self.syndirs[0]}/OUTPUT_FILES/seismograms.h5","r")
-        t = fio[list(fio.keys())[0]][:,0]
+        t = np.asarray(fio[list(fio.keys())[0]][:,0])
         fio.close()
-        self.t0_syn = t[0]
+        self.t0_syn = t[0] * 1
         self.dt_syn = t[1] - t[0]
         self.npt_syn = len(t)
 
@@ -145,42 +149,29 @@ class NoiseMC_PreOP():
 
         # init source comps 
         comps_temp = set()
-        scomps = [cc[0] for cc in self.cc_comps]
 
-        for ch in ['E','N','Z']:
-            name = f"{self.SRC_REC}/STATIONS_{self.evtid}_{ch}"
-            if ch in scomps and os.path.exists(name):
-                comps_temp.add(ch)
-
-        for ch in ['R','T']:
-            name1 = f"{self.SRC_REC}/STATIONS_{self.evtid}_{ch}"
-            if ch in scomps and os.path.exists(name1):
-                comps_temp.add("E")
-                comps_temp.add("N")
-
-        # recheck all cc_comps
-        cc_comps = []
-        for ic in range(self.ncomp):
-            flag = scomps[ic] in comps_temp
-            flag1 = scomps[ic] in ['Z','E','N']
-            flag2 = scomps[ic] in ['R','T']
-            if flag1 and  flag:
-                cc_comps.append(self.cc_comps[ic])
-
-            if flag2 and 'E' in comps_temp and 'N' in comps_temp :
-                cc_comps.append(self.cc_comps[ic])
+        # check available source components
+        for comp in self.cc_comps:
+            filename = f"{self.SRC_REC}/STATIONS_{self.evtid}_{comp}_globe"
+            exist_flag = os.path.exists(filename)
+            if comp[0] == 'Z' and exist_flag:
+                comps_temp.add('Z')
+            elif comp[0] in ['R','T'] and exist_flag:
+                comps_temp.add('E')
+                comps_temp.add('N')
+            else:
+                print(f"Source component {comp} file {filename} does not exist!")
+                exit(1)
+        scomp_syn = sorted(list(comps_temp))
         
-        # reset cc_comps and ncomps
-        self.cc_comps = sorted(cc_comps)
-        self.ncomp = len(cc_comps)
-        if self.myrank == 0: print(f"{self.evtid}: used cc_comps =  {cc_comps}\n")
-
-        comps = sorted(list(comps_temp))
-        self.scomp_syn = comps # only ZNE
+        # add syndirs
         self.syndirs:list[str] = []
-        for ic in range(len(comps)):
-            syndir = f"{self.SOLVER}/{self.mod}/{self.evtid}_{comps[ic]}/"
+        for ic in range(len(scomp_syn)):
+            syndir = f"{self.SOLVER}/{self.mod}/{self.evtid}_{scomp_syn[ic]}/"
             self.syndirs.append(syndir)
+
+        # add source component 
+        self.scomp_syn = scomp_syn
 
     def _sanity_check(self):
         # make sure [RT][NE] donnot co-exist
@@ -206,9 +197,10 @@ class NoiseMC_PreOP():
     def _get_station_info(self):
         from .utils  import cal_dist_az_baz
         self.stainfo = {}
+        self.sta_names_comp:list[set[str]] = []
         for ic in range(self.ncomp):
-            chs = self.cc_comps[ic][0]
-            stationfile = f'{self.SRC_REC}/STATIONS_{self.evtid}_{chs}_globe'
+            comp = self.cc_comps[ic]
+            stationfile = f'{self.SRC_REC}/STATIONS_{self.evtid}_{comp}_globe'
             statxt = np.loadtxt(stationfile,dtype=str,ndmin=2)
             nsta = statxt.shape[0]
             netwk = statxt[:,1]
@@ -216,11 +208,17 @@ class NoiseMC_PreOP():
             stla = statxt[:,2].astype(float)
             stlo = statxt[:,3].astype(float)
 
+            # save station name in each component
+            names = set()
             for ir in range(nsta):
                 name = netwk[ir] + '.' + stnm[ir]
                 if name not in self.stainfo:
                     _,az,baz = cal_dist_az_baz(self.evla,self.evlo,stla[ir],stlo[ir])
                     self.stainfo[name] = [stlo[ir],stla[ir],az,baz]
+                
+                # save names for this component
+                names.add(name)
+            self.sta_names_comp.append(names)
         
         # get all names used for all multi-channels 
         self.sta_names: list[str] = sorted(self.stainfo.keys())
@@ -308,13 +306,65 @@ class NoiseMC_PreOP():
         # sync
         MPI.COMM_WORLD.Barrier()
 
+    def _get_RTZRTZ_seismogram(self,i:int):
+        data = np.zeros((3,3,self.npt_syn))
 
+        # loop each component to load in data 
+        for i_s,chs in enumerate(['E','N','Z']):
+            syndir = f"{self.SOLVER}/{self.mod}/{self.evtid}_{chs}/"
+            for i_r,chr in enumerate(['E','N','Z']):
+                filename = f"{syndir}/OUTPUT_FILES/{self.sta_names[i]}.{self.chcode}{chr}.sem.npy"
+                if filename not in self.seismogram:
+                    continue
+                data[i_s,i_r,:] = self.seismogram[filename][:,1] * 1.
+        
+        # rotate to RTZ-RTZ if needed
+        azd,bazd = self.stainfo[self.sta_names[i]][2:4]
+        R_s,R_r = _get_rotate_matrix(azd,bazd)
+        data = np.einsum("ip,jq,pqk-> ijk",R_s,R_r,data)
+
+        return data
+    
+    def _rotate_mc_adj(self,i:int,adj_src_all:np.ndarray):
+        # rotate adjoint source to ENZ-ENZ
+        azd,bazd = self.stainfo[self.sta_names[i]][2:]
+        R_s,R_r = _get_rotate_matrix(azd,bazd)
+        adj_src_all = np.einsum("ip,jq,pqk-> ijk",R_s.T,R_r.T,adj_src_all)
+
+        return adj_src_all
+    
+    def _cal_adj_by_name(self,name,dat_inp,syn_inp,
+                         t0_inp,dt_inp,npt_cut,
+                         ib:int,tstart:float,tend:float):
+        
+        if self.adjsrc_type == 'exp_phase':
+            from fwat.adjoint.exp_phase_misfit import measure_adj_exphase
+            return measure_adj_exphase(
+                        dat_inp,syn_inp,
+                        t0_inp,dt_inp,npt_cut,
+                        self.Tmin[ib],self.Tmax[ib],
+                        tstart,tend)
+        elif self.adjsrc_type == 'cc_time':
+            from fwat.adjoint.cc_misfit import measure_adj_cc
+            return measure_adj_cc(
+                        dat_inp,syn_inp,
+                        t0_inp,dt_inp,npt_cut,
+                        self.Tmin[ib],self.Tmax[ib],
+                        tstart,tend)
+        else:
+            from .measure import measure_adj
+            imeas = int(self.adjsrc_type)
+            verbose = (self.myrank == 0) and (name == self.sta_names[0])
+            return measure_adj(
+                        t0_inp,dt_inp,npt_cut,
+                        t0_inp,dt_inp,npt_cut,
+                        tstart,tend,imeas,
+                        self.Tmax[ib]*1.01,
+                        self.Tmin[ib]*0.99,
+                        verbose,dat_inp,
+                        syn_inp)
+        
     def save_forward(self):
-        import os 
-        from obspy.io.sac import SACTrace
-        from fwat.measure.utils import cumtrapz1,alloc_mpi_jobs
-        from fwat.measure.utils import rotate_EN_to_RT
-
         # get some vars
         dt_syn = self.dt_syn
         npt_syn = self.npt_syn
@@ -332,95 +382,77 @@ class NoiseMC_PreOP():
         if self.myrank == 0:
             print("Synthetic Observations ...")
 
-        # loop every source component
-        for ic in range(self.ncomp):
-            chs = self.cc_comps[ic][0]
-            chr = self.cc_comps[ic][1]
-            
-            # make dir
-            outdir = f"{self.DATA_DIR}/{self.evtid}_{chs}"
-            os.makedirs(outdir,exist_ok=True)
+        # make directories
+        if myrank == 0:
+            for ic in range(self.ncomp):
+                comp = self.cc_comps[ic]
+                outdir = f"{self.DATA_DIR}/{self.evtid}_{comp[0]}"
+                os.makedirs(outdir,exist_ok=True)
+        MPI.COMM_WORLD.Barrier()
+        
+        # note, all data in seismograms are in ENZ-ENZ coordinates
+        # we should rotate them to RTZ-RTZ if needed
 
-            # load stations
-            statxt = np.loadtxt(f"{self.SRC_REC}/STATIONS_{self.evtid}_{chs}_globe",dtype=str,ndmin=2)
-            sta_names = [statxt[i,1] + "." + statxt[i,0] for i in range(statxt.shape[0])]
+        # allocate jobs 
+        nsta = len(self.sta_names)
+        istart,iend = alloc_mpi_jobs(nsta,self.nprocs,self.myrank)
+        nsta_loc = iend - istart + 1
 
-            # now loop to read stations
-            print_EGF = False
-            for i in range(len(sta_names)):
-                # get station code
-                code = f"{sta_names[i]}.{self.chcode}{chr}"
+        # loop each stations 
+        print_EGF = True
+        for ir in range(nsta_loc):
+            i = ir + istart 
 
-                # load [NEZ]? components if required
-                exist_in_this_rank = True
-                if chs in ['N','E','Z']:
-                    syndir = f"{self.SOLVER}/{self.mod}/{self.evtid}_{chs}/"
-                    filename = f"{syndir}/OUTPUT_FILES/{code}.sem.npy"
-                    if filename not in self.seismogram:
-                        exist_in_this_rank = False
-                    else:
-                        data = self.seismogram[filename]
-                        tr.data = data[:,1] * 1.
-                else: # chs is in ['R','T']
-                    
-                    # load E/N data
-                    data = np.zeros((2,npt_syn))
-                    for ic0,ch0 in enumerate(['N','E']):
-                        syndir = f"{self.SOLVER}/{self.mod}/{self.evtid}_{ch0}/"
-                        filename = f"{syndir}/OUTPUT_FILES/{code}.sem.npy"
-                        if filename not in self.seismogram:
-                            exist_in_this_rank = False
-                            break 
-                        else:
-                            data[ic0,:] = self.seismogram[filename][:,1]
+            # fetch seismogram in RTZ-RTZ
+            data = self._get_RTZRTZ_seismogram(i)
 
-                    # check exist
-                    if not exist_in_this_rank:
-                        continue
+            # now loop each component to save sac files
+            for ic in range(self.ncomp):
+                # check if this component exists
+                if self.sta_names[i] not in self.sta_names_comp[ic]:
+                    continue
 
-                    # rotation
-                    az = self.stainfo[sta_names[i]][2]
-                    ve = data[0,:]
-                    vn = data[1,:]
-                    vr,vt = rotate_EN_to_RT(ve,vn,az)
-                    vr = -vr 
-                    vt = -vt 
+                # out dir
+                outdir = f"{self.DATA_DIR}/{self.evtid}_{self.cc_comps[ic][0]}"
 
-                    # choose components
-                    if chs == 'R':
-                        tr.data = vr * 1. 
-                    else:
-                        tr.data = vt * 1.
+                # get chs/chr
+                chs = self.cc_comps[ic][0]
+                chr = self.cc_comps[ic][1]
+                i_r = ['R','T','Z'].index(chr)
+                i_s = ['R','T','Z'].index(chs)
+                tr.data = data[i_s,i_r,:] * 1.
 
-                # save sac
+                # convert to EGF if required
                 if self.pdict['USE_EGF'] == False:
                     if print_EGF and myrank == 0:
                         print("EGF => CCF ...")
-                        print_EGF = False 
+                        print_EGF = False
                     tr.data = -cumtrapz1(tr.data,dt_syn)
-                tr.b = t0_syn
 
-                # channel and others
+                # save sac 
+                code = f"{self.sta_names[i]}.{self.chcode}{chr}"
                 tr.kcmpnm = f"{self.chcode}{chr}"
-                tr.knetwk = sta_names[i].split('.')[0]
-                tr.kstnm = sta_names[i].split('.')[1]
-                info = self.stainfo[sta_names[i]]
+                tr.knetwk = self.sta_names[i].split('.')[0]
+                tr.kstnm = self.sta_names[i].split('.')[1]
+                info = self.stainfo[self.sta_names[i]]
                 tr.stla = info[1]
                 tr.stlo = info[0]
-
-                # save to sac
                 filename = f"{outdir}/{code}.sac"
                 tr.write(filename)
-            
-            # sync
-            MPI.COMM_WORLD.Barrier()
-    
+
+        # sync
+        MPI.COMM_WORLD.Barrier()
+
     def cal_adj_source(self,ib:int):
-        from obspy.io.sac import SACTrace
-        from .utils import interpolate_syn,dif1
-        from .utils import bandpass,alloc_mpi_jobs
-        from .utils import rotate_EN_to_RT
-        import os 
+        """ 
+        Calculate adjoint source for noise cross-correlation measurement. 
+
+        Parameters
+        -----------
+        ib: int
+            Index of frequency band.
+        """
+        from fwat.measure.utils import interpolate_syn,bandpass
 
         # get vars
         npt_syn = self.npt_syn
@@ -471,49 +503,30 @@ class NoiseMC_PreOP():
         tr_chi = np.zeros((nsta_loc,ncomp))
         am_chi = np.zeros((nsta_loc,ncomp))
 
-        # components to read
-        rcomp = [self.cc_comps[i][1] for i in range(self.ncomp)]
-        if 'R' in rcomp or 'T' in rcomp:
-            rcomp = ['R','T','Z']
-        else:
-            rcomp = ['E','N','Z']
-        scomp = [self.cc_comps[i][0] for i in range(self.ncomp)]
-        if 'R' in scomp or 'T' in scomp:
-            scomp = ['R','T','Z']
-        else:
-            scomp = ['E','N','Z']
+        # temp 
+        RTZ = ['R','T','Z']
 
-        # names for each cc comps
-        if ib == 0:
-            sta_names_comps:list[set] = []
-            for ic in range(3):
-                filename = f"{self.SRC_REC}/STATIONS_{self.evtid}_{scomp[ic]}_globe"
-                if os.path.exists(filename):
-                    # load stations
-                    statxt = np.loadtxt(filename,dtype=str,ndmin=2)
-                    sta_names = set([statxt[i,1] + "." + statxt[i,0] for i in range(statxt.shape[0])])
-                else:
-                    sta_names = set()
-                sta_names_comps.append(sta_names)
-            self.sta_names_comps = sta_names_comps
-        
         # loop each station
         for ir in range(nsta_loc):
             i = ir + istart 
+
+            # fetch RTZRTZ seismogram
+            data = self._get_RTZRTZ_seismogram(i)
 
             # allocate space for adjoint source
             adj_src_all = np.zeros((3,3,npt_syn))
 
             # loop each CC-component
             for ic in range(self.ncomp):
+                # check if this component exists
+                if self.sta_names[i] not in self.sta_names_comp[ic]:
+                    continue
+                
+                # get chs/chr
                 chs = self.cc_comps[ic][0]
                 chr = self.cc_comps[ic][1]
-                i_s = scomp.index(chs)
-                i_r = rcomp.index(chr)
-
-                # check if this station exists in this source component
-                if self.sta_names[i] not in self.sta_names_comps[i_s]:
-                    continue
+                i_s = RTZ.index(chs)
+                i_r = RTZ.index(chr)
 
                 # load obs_data
                 code = f"{self.sta_names[i]}.{self.chcode}{chr}"
@@ -524,42 +537,14 @@ class NoiseMC_PreOP():
                 npt1_inp = int((npt_obs - 1) * dt_obs / dt_inp)
                 dist = obs_tr.dist 
 
-                # load synthetic data
-                if chs in ['N','E','Z']:
-                    syndir = f"{self.SOLVER}/{self.mod}/{self.evtid}_{chs}/"
-                    filename = f"{syndir}/OUTPUT_FILES/{code}.sem.npy"
-                    syn_tr = self.seismogram[filename][:,1]
-                    #syn_tr = np.load(filename)[:,1]
-                else: # chs is in ['R','T']
-                    # load E/N data
-                    data = np.zeros((2,npt_syn))
-                    for ic0,ch0 in enumerate(['N','E']):
-                        syndir = f"{self.SOLVER}/{self.mod}/{self.evtid}_{ch0}/"
-                        filename = f"{syndir}/OUTPUT_FILES/{code}.sem.npy"
-                        #data[ic0,:] = np.load(filename)[:,1]
-                        data[ic0,:] = self.seismogram[filename][:,1]
-                    
-                    # rotation
-                    az = self.stainfo[self.sta_names[i]][2]
-                    ve = data[0,:]
-                    vn = data[1,:]
-                    vr,vt = rotate_EN_to_RT(ve,vn,az)
-                    vr = -vr 
-                    vt = -vt 
-
-                    # choose components
-                    if chs == 'R':
-                        syn_tr = vr * 1. 
-                    else:
-                        syn_tr = vt * 1.
-
                 # bandpass obs data
                 obs_tr.data = bandpass(obs_tr.data,dt_obs,freqmin,freqmax)
+                syn_inp = bandpass(data[i_s,i_r,:],dt_syn,freqmin,freqmax)
 
                 # interp obs/syn
                 dat_inp1 = interpolate_syn(obs_tr.data,t0_obs,dt_obs,npt_obs,
                                         t0_obs + dt_inp,dt_inp,npt1_inp)
-                syn_inp = interpolate_syn(syn_tr,t0_syn,dt_syn,npt_syn,
+                syn_inp = interpolate_syn(syn_inp,t0_syn,dt_syn,npt_syn,
                                          t0_inp,dt_inp,npt_cut)
 
                 # compute time derivative 
@@ -570,9 +555,6 @@ class NoiseMC_PreOP():
                 # cut 
                 dat_inp = interpolate_syn(dat_inp1,t0_obs + dt_inp,dt_inp,npt1_inp,
                                          t0_inp,dt_inp,npt_cut)
-
-                # preprocess syn data
-                syn_inp = bandpass(syn_inp,dt_inp,freqmin,freqmax)
 
                 # find amplitude of the in the window to normalize
                 dist = obs_tr.dist
@@ -595,41 +577,18 @@ class NoiseMC_PreOP():
                 tend[ir] = min(tend[ir],t0_obs+(npt_obs-1)*dt_obs)
 
                 # compute misfits and adjoint source
-                if self.adjsrc_type == 'exp_phase':
-                    from fwat.adjoint.exp_phase_misfit import measure_adj_exphase
-                    tr_chi[ir,ic],am_chi[ir,ic],win_chi[ir,ic,:],adjsrc =  \
-                        measure_adj_exphase(dat_inp,syn_inp,
-                                            t0_inp,dt_inp,npt_cut,
-                                            self.Tmin[ib],self.Tmax[ib],
-                                            tstart[ir],tend[ir]
-                        )
-                    # reinterpolate adjoint source
-                    adjsrc = interpolate_syn(adjsrc,t0_inp,dt_inp,npt_cut,
-                                             t0_syn,dt_syn,npt_syn)
-                elif self.adjsrc_type == 'cc_time':
-                    from fwat.adjoint.cc_misfit import measure_adj_cc
-                    tr_chi[ir,ic],am_chi[ir,ic],win_chi[ir,ic,:],adjsrc =  \
-                        measure_adj_cc(dat_inp,syn_inp,
-                                       t0_inp,dt_inp,npt_cut,
-                                       self.Tmin[ib],self.Tmax[ib],
-                                       tstart[ir],tend[ir]
-                        )
-                    # reinterpolate adjoint source
-                    adjsrc = interpolate_syn(adjsrc,t0_inp,dt_inp,npt_cut,
-                                             t0_syn,dt_syn,npt_syn)
-                else:
-                    from .measure import measure_adj
-                    verbose = (self.myrank == 0) and (ir == 0)
-                    imeas = int(self.adjsrc_type)
-                    tr_chi[ir,ic],am_chi[ir,ic],win_chi[ir,ic,:],adjsrc =   \
-                        measure_adj(t0_inp,dt_inp,npt_cut,t0_syn,dt_syn,npt_syn,
-                                    tstart[ir],tend[ir],imeas,self.Tmax[ib]*1.01,
-                                    self.Tmin[ib]*0.99,verbose,dat_inp,
-                                    syn_inp)
+                tr_chi[ir,ic],am_chi[ir,ic],win_chi[ir,ic,:],adjsrc =  \
+                    self._cal_adj_by_name(
+                        self.sta_names[i],dat_inp,syn_inp,
+                        t0_inp,dt_inp,npt_cut,
+                        ib,tstart[ir],tend[ir]
+                    )
+                adjsrc = interpolate_syn(adjsrc,t0_inp,dt_inp,npt_cut,
+                                            t0_syn,dt_syn,npt_syn)
 
                 # make sure the snr > snr_threshold
                 if snr < snr_threshold:
-                    adjsrc *= 0.
+                    adjsrc[:] = 0.
                     tr_chi[ir,ic] = 0.
                     am_chi[ir,ic] = 0.
                     win_chi[ir,ic,6] *= 0.
@@ -638,30 +597,19 @@ class NoiseMC_PreOP():
                 adj_src_all[i_s,i_r,:] = adjsrc.copy()
 
                 # save obs and syn data as sac
-                if chs in ['N','E','Z']:
-                    syndir = f"{self.SOLVER}/{self.mod}/{self.evtid}_{chs}/"
-                else:
-                    if chs == 'R':
-                        syndir = f"{self.SOLVER}/{self.mod}/{self.evtid}_E/"
-                    else:
-                        syndir = f"{self.SOLVER}/{self.mod}/{self.evtid}_N/"
-                outdir = f"{syndir}/OUTPUT_FILES/{bandname}"
+                outdir = f"{self.SOLVER}/{self.mod}/{self.evtid}_{chs}/OUTPUT_FILES/{bandname}"
                 obs_tr.delta = dt_inp 
                 obs_tr.b = t0_inp 
                 obs_tr.data = dat_inp 
-                self.seismogram_sac[f"{outdir}/{code}.sac.obs"] = obs_tr.data.copy()
+                self.seismogram_sac[f"{outdir}/{code}.sac.obs"] = obs_tr.copy()
                 #obs_tr.write(f"{outdir}/{code}.sac.obs")
                 obs_tr.data = syn_inp
-                self.seismogram_sac[f"{outdir}/{code}.sac.syn"] = obs_tr.data.copy()
+                self.seismogram_sac[f"{outdir}/{code}.sac.syn"] = obs_tr.copy()
                 #obs_tr.write(f"{outdir}/{code}.sac.syn")
             # end for loop cc_comps
 
             # rotate adjoint source to ENZ-ENZ
-            azd,bazd = self.stainfo[self.sta_names[i]][2:]
-            rotate_src = (scomp == ['R','T','Z'])
-            rotate_sta = (rcomp == ['R','T','Z'])
-            R_s,R_r = _get_rotate_matrix(azd,bazd,rotate_src=rotate_src,rotate_sta=rotate_sta)
-            adj_src_all = np.einsum("ip,jq,pqk-> ijk",R_s,R_r,adj_src_all)
+            adj_src_all = self._rotate_mc_adj(i,adj_src_all)
 
             # save adjoint source
             rcomp = ['E','N','Z']
@@ -680,7 +628,6 @@ class NoiseMC_PreOP():
 
         # print measure_adj information
         self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,win_chi)
-
 
     def _print_measure_info(self,bandname:str,tstart:np.ndarray,tend:np.ndarray,
                             tr_chi:np.ndarray,am_chi:np.ndarray,
@@ -716,16 +663,8 @@ class NoiseMC_PreOP():
         # sync
         MPI.COMM_WORLD.Barrier()
 
-        rcomp = [self.cc_comps[i][1] for i in range(self.ncomp)]
-        if 'R' in rcomp or 'T' in rcomp:
-            rcomp = ['R','T','Z']
-        else:
-            rcomp = ['E','N','Z']
-        scomp = [self.cc_comps[i][0] for i in range(self.ncomp)]
-        if 'R' in scomp or 'T' in scomp:
-            scomp = ['R','T','Z']
-        else:
-            scomp = ['E','N','Z']
+        # temp comps
+        RTZ = ['R','T','Z']
 
         # job id
         istart,_ = alloc_mpi_jobs(len(self.sta_names),self.nprocs,self.myrank)
@@ -747,11 +686,9 @@ class NoiseMC_PreOP():
                     for ic in range(ncomp):
                         chs = self.cc_comps[ic][0]
                         chr = self.cc_comps[ic][1]
-                        i_s = scomp.index(chs)
-                        i_r = rcomp.index(chr)
 
                         # check if this station exists in this source component
-                        if self.sta_names[i] not in self.sta_names_comps[i_s]:
+                        if self.sta_names[i] not in self.sta_names_comp[ic]:
                             continue
 
                         name = self.sta_names[i]
@@ -837,29 +774,30 @@ class NoiseMC_PreOP():
         if self.myrank == 0:
             print("cleaning up ...")
 
-        # for irank in range(self.nprocs):
-        #     if irank == self.myrank:
-        #         print("irank")
-        #         print(self.seismogram.keys())
-        #         print(self.seismogram_sac.keys())
-        #         print(self.seismogram_adj.keys())
-        #     MPI.COMM_WORLD.Barrier()
+        # save obs/syn
+        for ic in range(self.ncomp):
+            comp = self.cc_comps[ic]
+            chs = comp[0]
+            chs_enz = ''
+            syndir = f"{self.SOLVER}/{self.mod}/{self.evtid}_{chs}"
+            syndir1 = f"{self.SOLVER}/{self.mod}/{self.evtid}"
 
-        # loop each syn dir
-        for ic in range(len(self.scomp_syn)): 
-            syndir = self.syndirs[ic]
-        
-            # first pack all obs/syn sacs to hdf5 
+            if chs == 'Z':
+                chs_enz = 'Z'
+            elif chs == 'R':
+                chs_enz = 'E'
+            else: # chs == 'T'
+                chs_enz = 'N'   
+            syndir1 = syndir1 + f"_{chs_enz}"
+
+            # pack all obs/syn sacs to hdf5
             for ib in range(len(self.Tmax)):
                 bandname = self._get_bandname(ib)
                 for tag in ['obs','syn']:
-
                     # all sac file
                     pattern = re.compile(rf"^{syndir}/OUTPUT_FILES/{bandname}/.*\.sac\.{tag}")
                     sacfiles = [s for s in self.seismogram_sac.keys() if pattern.match(s)]
 
-                    sacfiles = glob(f"{syndir}/OUTPUT_FILES/{bandname}/*.sac.{tag}")
-                    
                     # check if we need to save data
                     nfiles = len(sacfiles)
                     nfiles_tot = MPI.COMM_WORLD.allreduce(nfiles,op=MPI.SUM)
@@ -869,28 +807,33 @@ class NoiseMC_PreOP():
                     # loop each proc
                     for irank in range(self.nprocs):
                         # open h5file 
-                        if irank == 0:
-                            fio = h5py.File(f"{syndir}/OUTPUT_FILES/seismogram.{tag}.{bandname}.h5","w")
-                        else:
-                            fio = h5py.File(f"{syndir}/OUTPUT_FILES/seismogram.{tag}.{bandname}.h5","a")
-                        for i in range(len(sacfiles)):
-                            tr = self.seismogram_sac[sacfiles[i]]
-                            if i == 0 and irank == 0:
-                                fio.attrs['dt'] = tr.delta  
-                                fio.attrs['t0'] = tr.b 
-                                fio.attrs['npts'] = tr.npts
+                        if irank == self.myrank:
+                            # open file 
+                            if self.myrank == 0:
+                                fio = h5py.File(f"{syndir1}/OUTPUT_FILES/seismogram_{chs}.{tag}.{bandname}.h5","w")
+                            else:
+                                fio = h5py.File(f"{syndir1}/OUTPUT_FILES/seismogram_{chs}.{tag}.{bandname}.h5","a")
                             
-                            dsetname = tr.knetwk + "." + tr.kstnm + "." + tr.kcmpnm
-                            fio.create_dataset(dsetname,shape=tr.data.shape,dtype='f4')
-                            fio[dsetname][:] = tr.data 
+                            # loop each sac file
+                            for i in range(len(sacfiles)):
+                                tr = self.seismogram_sac[sacfiles[i]]
+                                if i == 0 and irank == 0:
+                                    fio.attrs['dt'] = tr.delta  
+                                    fio.attrs['t0'] = tr.b 
+                                    fio.attrs['npts'] = tr.npts
+                                
+                                dsetname = tr.knetwk + "." + tr.kstnm + "." + tr.kcmpnm
+                                fio.create_dataset(dsetname,shape=tr.data.shape,dtype='f4')
+                                fio[dsetname][:] = tr.data 
                         
-                        # close 
-                        fio.close()
+                            # close 
+                            fio.close()
                         MPI.COMM_WORLD.Barrier()
-                    
-                ################################################################################
-                # clean bandname
-                shutil.rmtree(f"{syndir}/OUTPUT_FILES/{bandname}",ignore_errors=True)
+
+
+        # loop each syn dir
+        for ic in range(len(self.scomp_syn)): 
+            syndir = self.syndirs[ic]
 
             if self.myrank == 0:
                 # clean semd and sem.ascii
