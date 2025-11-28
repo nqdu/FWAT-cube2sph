@@ -2,7 +2,7 @@
 
 set -e
 source parameters.sh 
-source module_env
+source module_env_gmt
 
 bounds=-R$LON0_H/$LON1_H/$LAT0_H/$LAT1_H
 proj=-JM12C
@@ -30,7 +30,7 @@ EOF
 # selection
 if [ $do_mask -ne 0 ]; then 
   echo "Select points inside the region ..."
-  gmt select points.xyz $bounds -Dh -Nk/s > subset > out.txt 
+  gmt select points.xyz $bounds -Dh -Nk/s  > out.txt 
 else 
   cat points.xyz > out.txt
 fi

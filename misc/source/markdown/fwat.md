@@ -353,11 +353,11 @@ For multi-channel noise simulation, provide the following files:
 - `FORCESOLUTION_${NAME}_Z`
 - `FORCESOLUTION_${NAME}_N`
 - `FORCESOLUTION_${NAME}_E`
-- `STATIONS_${NAME}_R/T/Z` (stations used for `RR,TT,ZZ`)
+- `STATIONS_${NAME}_RR/TT/ZZ/RZ` (stations used for `RR,TT,ZZ,RZ`)
 
-The stations in each `STATION_${NAME}_[RTZ]` can be different. You should merge all `rot_${NAME}_{RTZ}` together by 
+The stations in each `STATION_${NAME}_[RR/TT/ZZ/RT]` can be different. You should merge all `rot_${NAME}_{RTZ}` together by 
 ```bash
-cat rot_${NAME}_{RTZ} |sort -n |uniq > rot_${NAME}
+cat rot_${NAME}_* |sort -n |uniq > rot_${NAME}
 ```
 
 ### Create the CMT Solution File
@@ -426,15 +426,33 @@ Contains the environment module commands required to load dependencies on the cl
   ```
 
 ### `run_fwi.sh` and `run_forward.sh`
-These scripts implement several functions that add SLURM job headers, making them executable on a cluster.  
-The functions include:
-- `SHELL_HEADER_SEM`
-- `SHELL_HEADER_POST`
-- `SHELL_HEADER_WOLFE`
-- `WAIT_FINISH`
+
+These scripts implement several functions to add SLURM job headers, enabling execution on a cluster. Both scripts leverage the job array capabilities of SLURM.  
+
+The functions included are:
+- **`SHELL_HEADER_SEM`**
+- **`SHELL_HEADER_POST`**
+- **`SHELL_HEADER_WOLFE`**
+- **`WAIT_FINISH`**
 
 **Note:**  
-Edit these functions to match your working environment, for example, by adding GPU-specific flags, account information, or other SLURM parameters.
+Be sure to modify these functions according to your working environment. This may involve adding GPU-specific flags, account details, or other SLURM parameters.
+
+### `slurm_or_local_fwi.sh`
+
+This script facilitates an FWI workflow and serves as an alternative to `run_fwi.sh`. It launches a large job that may span multiple nodes and run for several hours. The input parameters specify the number of processes and the number of iterations. Events will be allocated across all processes utilized in this script, and the workflow will continue iterating until it completes the specified iterations or the allotted time expires.  
+
+To submit the job locally, use the following command:
+```bash
+bash slurm_or_local_fwi.sh 32 10
+```
+In this example, the job will launch 32 MPI processes and iterate 10 times.
+
+To run the job on SLURM, use:
+```bash
+sbatch slurm_or_local_fwi.sh 10
+```
+This command will launch the appropriate number of processes as defined by the SLURM batch headers within the script and will iterate 10 times.
 
 ## Data Preparation
 ### Teleseismic Waveform Data
@@ -455,10 +473,4 @@ Before running a forward or adjoint simulation, ensure the following items are p
 - **`fwat_data`** - Data directory. All files must be provided in SAC format with all required headers. Seismograms for each event should be saved in a {NAME} directory, or in {NAME}_{RTZ} for multi-channel noise. For teleseismic data, the time t = 0 must correspond to the direct arrival time.
 
 ## User-Defined Parameter Set
-under construction
-
-## Visualization 
-under construction
-
-## Workflow 
-under construction
+If you want to define your own anisotropic model 
