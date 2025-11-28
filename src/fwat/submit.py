@@ -6,36 +6,47 @@ from fwat.system.specfem import get_param,change_parfile
 from fwat.system.system import sys_remove
 
 def get_noise_mc_event_list(evtid:str,verbose = True):
-    # check  required CC_COMPS
-    import yaml 
+    """
+    Get the list of event ids for multi-channel noise simulation based on available station files.
+    
+    Parameters
+    ----------
+    evtid : str
+        Base event ID to check for station files.
+    verbose : bool, optional
+        If True, print warnings for missing station files. Default is True.
+    """
+    evtid_set = set() 
 
+    # load CC_COMPS
+    import yaml 
     with open(PARAM_FILE,"r") as fio:
         cc_comps = yaml.safe_load(fio)['measure']['noise']['CC_COMPS']
 
     if verbose: print("")
-    evtid_set = set()
-    scomps = sorted([cc[0] for cc in cc_comps])
-    for ch in ['E','N','Z']:
-        name = f"{SRC_REC}/STATIONS_{evtid}_{ch}"
-        if ch in scomps and os.path.exists(name):
-            evtid_set.add(f"{evtid}_{ch}")
+    for comp in cc_comps:
+        ch = comp[0]  # source component
+        sta_name  = f"{SRC_REC}/STATIONS_{evtid}_{comp}"  
 
-        # check if station_files is missing
-        if ch in scomps and (not os.path.exists(name)) and verbose:
-            print(f"multi-channel noise evtid = {evtid}:")
-            print(f"source channel {ch} is required but station file {name} is missing")
-            print(f"skip source channel {ch}")
+        # check if station file exists
+        exist_sta = os.path.exists(sta_name) 
 
-    for ch in ['R','T']:
-        name1 = f"{SRC_REC}/STATIONS_{evtid}_{ch}"
-        if ch in scomps and os.path.exists(name1):
-            evtid_set.add(f"{evtid}_E")
-            evtid_set.add(f"{evtid}_N")
-
-        if ch in scomps and (not os.path.exists(name1)) and verbose:
-            print(f"multi-channel noise evtid = {evtid}:")
-            print(f"source channel {ch} is required but station file {name1} is missing")
-            print(f"skip source channel {ch}")
+        # check ch is ENZ or RT
+        if ch in ['R','T']:
+            if not exist_sta and verbose:
+                print(f"multi-channel noise evtid = {evtid}:")
+                print(f"channel {comp} is required but station file {sta_name} is missing")
+                print(f"skip source channel {comp}")
+            else:
+                evtid_set.add(f"{evtid}_E")
+                evtid_set.add(f"{evtid}_N")
+        else:
+            if not exist_sta and verbose:
+                print(f"multi-channel noise evtid = {evtid}:")
+                print(f"channel {comp} is required but station file {sta_name} is missing")
+                print(f"skip source channel {comp}")
+            else:
+                evtid_set.add(f"{evtid}_{ch}")
 
     # get unique
     evtid_list = sorted(list(evtid_set))
@@ -168,7 +179,7 @@ class FwatSubmitor:
             
             # get stations_list
             import glob 
-            name = f"{self.SRC_REC}/STATIONS_{self.evtid}_[ENZRT]"
+            name = f"{self.SRC_REC}/STATIONS_{self.evtid}_[ZRT][ZRT]"
             names = glob.glob(name)
             strout = self._filter_station_files(names)
             for _ in range(len(evtid_list)):

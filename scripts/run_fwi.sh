@@ -91,7 +91,7 @@ RUN_SEM()
   do 
     local njobs=${NJOBS_PER_JOBARRAY[$isim]}
     local simu_type=${SIMU_TYPES[$isim]}
-    local nevts=`awk 'END { print NR }' src_rec/sources.dat.$simu_type`
+    local nevts=`awk 'END { print NR }' ${FWAT_SRC_REC}/sources.dat.$simu_type`
     local narray=`echo "($nevts + $njobs - 1) / $njobs"|bc`
     if [ "$PLATFORM"  == "local" ]; then 
       njobs=$nevts
@@ -183,16 +183,16 @@ job_post=0
 for ii in `seq 1 4`;do 
 
   # current model
-  iter=`fwat-utils getparam iter fwat_params/lbfgs.yaml`
-  flag=`fwat-utils getparam flag fwat_params/lbfgs.yaml`
+  iter=`fwat-utils getparam iter ${LBFGS_FILE}`
+  flag=`fwat-utils getparam flag ${LBFGS_FILE}`
   mod=M`printf %02d $iter`
   #mkdir -p LOG/${mod}
   echo "iteration $iter $mod $flag"
 
   # copy first model to MODEL_M00
-  if [[ "$iter" -eq 0 && ! -d "optimize/MODEL_M00" ]]; then
-    mkdir -p optimize/MODEL_M00
-    \cp initial_model/* optimize/MODEL_M00
+  if [[ "$iter" -eq 0 && ! -d "${FWAT_OPT_DIR}/MODEL_M00" ]]; then
+    mkdir -p ${FWAT_OPT_DIR}/MODEL_M00
+    \cp initial_model/* ${FWAT_OPT_DIR}/MODEL_M00
   fi
 
   # check flag type and run 

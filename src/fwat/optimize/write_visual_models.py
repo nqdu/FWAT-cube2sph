@@ -1,5 +1,5 @@
 import numpy as np 
-from scipy.io import FortranFile 
+from fwat.FortranIO import FortranIO
 from fwat.optimize.model import FwatModel
 import glob
 
@@ -38,8 +38,8 @@ def run(argv):
     array_size = np.zeros((nfiles),'i4')
     for myrank in range(nfiles):
         filename = MODEL_DIR + "/proc%06d_" %(myrank) + mname_list[0] + ".bin"
-        fio = FortranFile(filename,"r")
-        x = fio.read_reals('f4') 
+        fio = FortranIO(filename,"r")
+        x = fio.read_record('f4') 
         array_size[myrank] = x.size
         fio.close()
 
@@ -51,8 +51,8 @@ def run(argv):
         # read base model
         for im in range(nmod):
             filename = MODEL_DIR + "/proc%06d_" %(myrank) + mname_list[im] + ".bin"
-            fio = FortranFile(filename,"r")
-            x = fio.read_reals('f4') 
+            fio = FortranIO(filename,"r")
+            x = fio.read_record('f4') 
             fio.close()
             md[im,:] = x * 1.
         
@@ -65,7 +65,7 @@ def run(argv):
         for i in range(nker):
             filename = MODEL_DIR + "/proc%06d_" %(myrank) + all_names[i] + ".bin"
             print(f"working on {filename}")
-            fio = FortranFile(filename,"w")
+            fio = FortranIO(filename,"w")
             fio.write_record(md_new[i,...])
             fio.close()
 

@@ -9,6 +9,7 @@ MISFIT: Final =  "./misfits/"
 PARAM_FILE: Final = "./fwat_params/fwat.yaml"
 LBFGS_FILE: Final = "./fwat_params/lbfgs.yaml"
 OPT_DIR: Final = "./optimize/"
+PARAM_DIR: Final = "./fwat_params/"
 
 # GLL
 NGLL: Final = 5
