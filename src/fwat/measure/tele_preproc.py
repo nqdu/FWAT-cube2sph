@@ -82,7 +82,7 @@ class Tele_PreOP(FwatPreOP):
                 # load synthetics from npy
                 code = self._get_station_code(i,ic)
                 filename = f"{self.syndir}/OUTPUT_FILES/{code}.sem.npy"
-                data =  np.load(filename)
+                data =  self.seismogram[filename]
 
                 tr.data = convolve(data[:,1],stf[ic,:],'same') * dt_syn   
                 tr.b =  self.t_inj - self.t_ref[i]
@@ -138,7 +138,8 @@ class Tele_PreOP(FwatPreOP):
                 name = self._get_station_code(i,ic)
 
                 # read data
-                syn_data = np.load(f"{out_dir}/{name}.sem.npy")[:,1]
+                #syn_data = np.load(f"{out_dir}/{name}.sem.npy")[:,1]
+                syn_data = self.seismogram[f"{out_dir}/{name}.sem.npy"][:,1]
                 obs_tr = SACTrace.read(f"{self.DATA_DIR}/{self.evtid}/{name}.sac")
                 t0_obs = obs_tr.b 
                 dt_obs = obs_tr.delta 
@@ -273,7 +274,8 @@ class Tele_PreOP(FwatPreOP):
                 data[:,0] = t0_syn + np.arange(npt_syn) * dt_syn
                 data[:,1] = adjsrc
                 name = self._get_station_code(i,ic) + ".adj.sem.npy"
-                np.save(f"{out_dir}/{bandname}/{name}",data)
+                self.seismogram_adj[f"{out_dir}/{bandname}/{name}"] = data 
+                # np.save(f"{out_dir}/{bandname}/{name}",data)
 
                 # save SAC obs and syn
                 # init a sac header
@@ -289,9 +291,11 @@ class Tele_PreOP(FwatPreOP):
                 )
                 name = self._get_station_code(i,ic)
                 tr.data = glob_obs[i,ic,:]
-                tr.write(f"{out_dir}/{bandname}/{name}.sac.obs")
+                self.seismo_sac[f"{out_dir}/{bandname}/{name}.sac.obs"] = tr.copy()
+                #tr.write(f"{out_dir}/{bandname}/{name}.sac.obs")
                 tr.data = glob_syn[i,ic,:]
-                tr.write(f"{out_dir}/{bandname}/{name}.sac.syn")
+                self.seismo_sac[f"{out_dir}/{bandname}/{name}.sac.syn"] = tr.copy()
+                #tr.write(f"{out_dir}/{bandname}/{name}.sac.syn")   
         
         # normalize misfit function 
         tr_chi *= 1. / avgamp**2 
@@ -383,10 +387,12 @@ class Tele_PreOP(FwatPreOP):
             data[:,0] = t0_syn + np.arange(npt_syn) * dt_syn
             data[:,1] = adj_z
             name = self._get_station_code(i,ic_z) + ".adj.sem.npy"
-            np.save(f"{out_dir}/{bandname}/{name}",data)
+            #np.save(f"{out_dir}/{bandname}/{name}",data)
+            self.seismogram_adj[f"{out_dir}/{bandname}/{name}"] = data
             data[:,1] = adj_r
             name = self._get_station_code(i,ic_r) + ".adj.sem.npy"
-            np.save(f"{out_dir}/{bandname}/{name}",data)
+            #np.save(f"{out_dir}/{bandname}/{name}",data)
+            self.seismogram_adj[f"{out_dir}/{bandname}/{name}"] = data
 
             # save obs and synthetic data
             for ic in range(1): # only one component
@@ -403,9 +409,11 @@ class Tele_PreOP(FwatPreOP):
                 )
                 name = self._get_station_code(i,ic)
                 tr.data = cc1
-                tr.write(f"{out_dir}/{bandname}/{name}.sac.obs")
+                self.seismo_sac[f"{out_dir}/{bandname}/{name}.sac.obs"] = tr.copy()
+                #tr.write(f"{out_dir}/{bandname}/{name}.sac.obs")
                 tr.data = cc2
-                tr.write(f"{out_dir}/{bandname}/{name}.sac.syn")
+                self.seismo_sac[f"{out_dir}/{bandname}/{name}.sac.syn"] = tr.copy()
+                #tr.write(f"{out_dir}/{bandname}/{name}.sac.syn")
 
         self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,win_chi)
     

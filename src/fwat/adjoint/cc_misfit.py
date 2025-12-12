@@ -252,17 +252,18 @@ def measure_adj_cc(obs,syn,t0,dt,nt,
     tshift,dlna,sigma_dt,sigma_dlna,cc_coef = cc_measure(d,s,dt,dt_sigma_min,dlna_sigma_min,weight_by_uncertainty)
 
     # data selection
+    misfit_flag = 1.
     if tshift < tshift_min or tshift > tshift_max or  \
         cc_coef < cc_min or dlna < dlna_min or dlna > dlna_max:
         tshift = 0.
         dlna = 0. 
         sigma_dt = 1.
         sigma_dlna = 1.
-        misfit_keep = 0.
+        misfit_flag = 0.
 
     # misfit
-    misfit_p = 0.5 * (tshift / sigma_dt) **2
-    misfit_q = 0.5 * (dlna / sigma_dlna) **2
+    misfit_p = 0.5 * (tshift / sigma_dt) **2 * misfit_flag
+    misfit_q = 0.5 * (dlna / sigma_dlna) **2 * misfit_flag
 
     # calculate adjoint source for time
     dsdt = dif1(s,dt)

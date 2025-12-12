@@ -1,4 +1,11 @@
+try:
+    import cupy as cp
+except:
+    import numpy as cp
+
+# import numpy as cp
 import numpy as np 
+
 
 def nextpow2(n):
     i = 1
@@ -7,44 +14,56 @@ def nextpow2(n):
     
     return i
 
-def gauss_filter(nt,dt,f0):
-    freqs = np.fft.rfftfreq(nt,dt)
-    out = np.exp(-0.25 * (2 * np.pi * freqs / f0) **2)
+def gauss_filter(nt,dt,f0,device='cpu'):
+    if device == 'cpu':
+        freqs = np.fft.rfftfreq(nt,dt)
+        out = np.exp(-0.25 * (2 * np.pi * freqs / f0) **2)
+    else:
+        freqs = cp.fft.rfftfreq(nt,dt)
+        out = cp.exp(-0.25 * (2 * cp.pi * freqs / f0) **2)
 
     return out 
 
-def lowpass_filter(d,dt,freqmax):
-    from scipy.signal import sosfiltfilt,butter 
+def apply_gaussian(data,gauss,dt,device='cpu'):
 
-    # get sos coefs
-    sos = butter(4,freqmax * dt * 2,output='sos')
-    out = sosfiltfilt(sos,d)
+    if device == 'cpu':
+        data_freq = np.fft.rfft(data) * dt 
+        data_freq *= gauss 
 
-    return out
+        out = np.fft.irfft(data_freq)/ dt 
 
-def apply_gaussian(data,gauss,dt):
-    data_freq = np.fft.rfft(data) * dt 
-    data_freq *= gauss 
+    else:
+        data_freq = cp.fft.rfft(data) * dt 
+        data_freq *= gauss 
+        out = cp.fft.irfft(data_freq) / dt
+    return out 
 
-    out = np.fft.irfft(data_freq) / dt 
+def mycorrelate(a,b,device='cpu'):
+    if device == 'cpu':
+        aft = np.fft.rfft(a)
+        bft = np.fft.rfft(b)
+        out = np.fft.irfft(aft * np.conjugate(bft))
+        return out
+    else:
+        aft = cp.fft.rfft(a)
+        bft = cp.fft.rfft(b)
+        out = cp.fft.irfft(aft * cp.conjugate(bft))
 
     return out 
 
-def mycorrelate(a,b):
-    aft = np.fft.rfft(a)
-    bft = np.fft.rfft(b)
-    out = np.fft.irfft(aft * np.conjugate(bft))
-
+def myconvolve(a,b,device='cpu'):
+    if device == 'cpu':
+        aft = np.fft.rfft(a)
+        bft = np.fft.rfft(b)
+        out = np.fft.irfft(aft * bft)
+    else:
+        aft = cp.fft.rfft(a)
+        bft = cp.fft.rfft(b)
+        out = cp.fft.irfft(aft * bft)
     return out 
 
-def myconvolve(a,b):
-    aft = np.fft.rfft(a)
-    bft = np.fft.rfft(b)
-    out = np.fft.irfft(aft * bft)
 
-    return out 
-
-def deconit(u, w, dt, tshift, f0,ipart=1,maxiter=120,):
+def deconit(u, w, dt, tshift, f0,ipart=1,maxiter=2000):
     """
     Time iterative deconvolution from cps330
 
@@ -70,22 +89,26 @@ def deconit(u, w, dt, tshift, f0,ipart=1,maxiter=120,):
         deconvoluted array, shape(npts)
     """
     nt = len(u)
-    nft = nextpow2(nt * 2) # avoid aliasing
+    nft = nextpow2(nt*2) # avoid aliasing
+
+    # device is gpu if cupy is used
+    device = 'cpu'
+    if cp is not np:
+        device = 'gpu'
 
     # allocate space for new array 
-    uflt = np.zeros((nft)); uflt[:nt] = u.copy()
-    wflt = np.zeros((nft)); wflt[:nt] = w.copy()
-    wcopy = wflt.copy()
-    gauss = gauss_filter(nft,dt,f0)
+    uflt = cp.zeros((nft)); uflt[:nt] = cp.asarray(u.copy())
+    wflt = cp.zeros((nft)); wflt[:nt] = cp.asarray(w.copy())
+    wcopy = cp.asarray(wflt.copy())
+    gauss = gauss_filter(nft,dt,f0,device=device)
 
     # filter 
-    uflt = apply_gaussian(uflt,gauss,dt)
-    wflt = apply_gaussian(wflt,gauss,dt)
-
+    uflt = apply_gaussian(uflt,gauss,dt,device=device)
+    wflt = apply_gaussian(wflt,gauss,dt,device=device)
     # init
-    invpw = 1. / np.sum(wflt**2) / dt 
-    invpu = 1. / np.sum(uflt**2) / dt
-    P = np.zeros((nft))
+    invpw = 1. / cp.sum(wflt**2) / dt 
+    invpu = 1. / cp.sum(uflt**2) / dt
+    P = cp.zeros((nft))
     sumsq_i = 1.0
     minderr = 0.001
     d_error = 100 * invpw + minderr
@@ -99,78 +122,36 @@ def deconit(u, w, dt, tshift, f0,ipart=1,maxiter=120,):
     for i in range(maxiter):
         if abs(d_error) <= minderr : break; 
 
-        cuw = mycorrelate(rflt,wflt) * dt 
-        idx = np.argmax(abs(cuw[0:max_lag]))
+        cuw = mycorrelate(rflt,wflt,device=device) * dt 
+        idx = cp.argmax(abs(cuw[0:max_lag]))
         P[idx] += cuw[idx] * invpw / dt 
-        temp = apply_gaussian(P,gauss,dt)
-        rflt = uflt - myconvolve(temp,wcopy) * dt 
+        temp = apply_gaussian(P,gauss,dt,device=device)
+        rflt = uflt - myconvolve(temp,wcopy,device=device) * dt 
 
         # compute error 
-        sumsq = np.sum(rflt**2) * dt * invpu
+        sumsq = cp.sum(rflt**2) * dt * invpu
         d_error = 100 * (sumsq_i - sumsq)
         sumsq_i = sumsq
+
+    if d_error > minderr: print(d_error)
     
     # get rf and phase shift 
-    P = apply_gaussian(P,gauss,dt)
-    pft = np.fft.rfft(P) * dt 
-    pft *= np.exp(-1j * np.fft.rfftfreq(nft,dt) * np.pi * 2 * tshift)
-    rf = np.fft.irfft(pft)[:nt] / dt
+    P = apply_gaussian(P,gauss,dt,device=device)
+    pft = cp.fft.rfft(P) * dt
+    pft *= cp.exp(-1j * cp.fft.rfftfreq(nft,dt) * cp.pi * 2 * tshift)
+    rf = cp.fft.irfft(pft)[:nt]/ dt
+
+    # convert back to numpy array if using cupy
+    if cp is not np:
+        rf = cp.asnumpy(rf)
 
     return rf 
-
-def _time_decon_with_filt(u,w,dt,freqmax):
-    from scipy.signal import fftconvolve
-    nt = len(u)
-    nt2 = nextpow2(nt)
-
-    # allocate space for new array 
-    uflt = np.zeros((nt2))
-    wflt = np.zeros((nt2))
-    uflt[:nt] = u.copy()
-    wflt[:nt] = w.copy()
-    wcopy = wflt.copy()
-
-    # filter
-    # wflt = lowpass_filter(wflt,dt,freqmax)
-    # uflt = lowpass_filter(uflt,dt,freqmax)
-    P = np.zeros((nt2))
-
-    invpow = 1. / (dt * np.sum(wflt**2))
-    invpowu = 1. / (dt * np.sum(uflt**2))
-    sumsq_i = 1.
-    sumsq = 50.
-    minderr = 0.001 
-    d_error = 100 * invpow + minderr
-
-    rflt = uflt.copy()
-    for i in range(120):
-        if abs(d_error) < minderr or d_error < 0: break
-
-        # find max
-        cuw = fftconvolve(rflt,wflt[::-1],'full') * dt 
-        idx = np.argmax(abs(cuw[nt2:]))
-        amp = cuw[idx + nt2] * invpow  / dt
-        P[idx] += amp
-        temp = lowpass_filter(P,dt,freqmax)
-        rflt = uflt - fftconvolve(temp,wcopy,'full')[:nt2] * dt 
-        
-        sumsq = np.sum(rflt**2) * dt * invpowu 
-        d_error = 100 * (sumsq_i - sumsq)
-        sumsq_i = sumsq
-
-        print(i,d_error)
-
-    rf = lowpass_filter(P,dt,freqmax)
-    return rf[:nt] 
 
 
 def time_decon(u,w,dt,freqmax=None):
     # load modules
     from scipy.signal import correlate,convolve
     nt = len(u)
-
-    if freqmax != None:
-        return _time_decon_with_filt(u,w,dt,freqmax)
 
     # allocate space for new array 
     uflt = u.copy()
@@ -185,7 +166,7 @@ def time_decon(u,w,dt,freqmax=None):
 
     dobs = uflt * 1.
     src_one = np.zeros((nt))
-    for i in range(200):
+    for i in range(1500):
         if abs(d_error) < minderr: break
 
         #cuw = mycorrelate(dobs,wflt) * dt 

@@ -31,6 +31,11 @@ def help_function():
     print("\tget parameters in the file")
     print("\texample: fwat-param get measure/tele/CH_CODE ")
 
+    print()
+    print("fwat-utils install install-dir")
+    print("\tinstall FWAT to the specified directory")
+    print("\texample: fwat-utils install /path/to/install/dir")
+
 def set_param(argv):
     if len(argv) !=3 and len(argv) != 2:
         print("Usage: fwat-param set paramloc value [file=fwat_params/fwat.yaml]")
@@ -82,6 +87,51 @@ def get_param(argv):
     value = get_nested_value(pdict,paramloc)
     print(value)
 
+def install(argv):
+    if len(argv) !=1:
+        print("Usage: fwat-utils install install-dir")
+        exit(1)
+    
+    import shutil
+    import glob 
+    import os
+    import fwat.const as const 
+    
+    # get install dir
+    install_dir = argv[0]
+
+    # copy fwat_params
+    if os.path.exists(install_dir):
+        shutil.rmtree(install_dir)
+    os.makedirs(install_dir)
+    shutil.copytree("fwat_params",f"{install_dir}/fwat_params/")
+    shutil.copytree("plots",f"{install_dir}/plots/")
+    shutil.copy("scripts/module_env",f"{install_dir}/module_env")
+
+    # find all sh files in scripts
+    sh_files = glob.glob("scripts/*.sh")
+    for sh_file in sh_files:
+        shutil.copy(sh_file,f"{install_dir}/{sh_file.split('/')[-1]}")
+
+    # create a dictionary for const
+    const_dict = {
+        "PARAM_FILE": f"{const.PARAM_FILE}",
+        "LBFGS_FILE": f"{const.LBFGS_FILE}",
+        "FWAT_MISFIT": f"{const.MISFIT}",
+        "FWAT_SRC_REC": f"{const.SRC_REC}",
+        "FWAT_SOLVER": f"{const.SOLVER}",
+        "FWAT_OPT_DIR": f"{const.OPT_DIR}",
+        "FWAT_DATA_DIR": f"{const.DATA_DIR}",
+    }
+
+    # append something to parameters.sh 
+    with open(f"{install_dir}/parameters.sh","a") as f:
+        f.write("\n")
+        f.write("# FWAT constants\n")
+        for key in const_dict:
+            f.write(f"{key}={const_dict[key]}\n")
+
+
 def main():
     import sys
     if len(sys.argv) < 2:
@@ -100,6 +150,8 @@ def main():
     elif cmd == "clean":
         from fwat import clean
         clean.run(args)
+    elif cmd == "install":
+        install(args)
     else:
         print(f"module {cmd} not exist")
         help_function()

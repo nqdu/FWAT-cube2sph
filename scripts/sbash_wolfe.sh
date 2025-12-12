@@ -6,16 +6,15 @@ source module_env
 NPROC=`grep ^"NPROC" DATA/Par_file | cut -d'=' -f2`
 
 # get search direction
-FWATPARAM=./fwat_params
-iter=`fwat-utils getparam iter $FWATPARAM/lbfgs.yaml`
-FLAG=`fwat-utils getparam flag $FWATPARAM/lbfgs.yaml`
+iter=`fwat-utils getparam iter ${LBFGS_FILE}`
+FLAG=`fwat-utils getparam flag ${LBFGS_FILE}`
 MODEL=M`echo "$iter" |awk '{printf "%02d",$1}'`
 
 # compute misfit
 # check how many simu types required
 nsimtypes="${#SIMU_TYPES[@]}"
 if [ "$nsimtypes" == "1" ]; then 
-  SOURCE_FILE_LS=./src_rec/sources.dat.${SIMU_TYPES[0]}
+  SOURCE_FILE_LS=./${FWAT_SRC_REC}/sources.dat.${SIMU_TYPES[0]}
 
   # compute misfits
   info=`fwat-main misfit $MODEL ${SIMU_TYPES[0]}`
@@ -24,14 +23,13 @@ if [ "$nsimtypes" == "1" ]; then
   chi1=`echo $info |awk '{print $1}'`
 else
 
-  SOURCE_FILE_LS=./src_rec/sources.dat.joint
-
+  SOURCE_FILE_LS=./${FWAT_SRC_REC}/sources.dat.joint
   #init misifits
   chi=0.
   chi1=0.
 
   # get first model
-  iter_start=`fwat-utils getparam iter_start $FWATPARAM/lbfgs.yaml`
+  iter_start=`fwat-utils getparam iter_start ${LBFGS_FILE}`
   MSTART=M`echo "$iter_start" |awk '{printf "%02d",$1}'`
   MSTART=M00
 
@@ -68,8 +66,8 @@ kl_list=`fwat-model name grad`
 for param in $kl_list hess_kernel;
 do 
     echo "converting $param to hdf5 ..."
-    fwat-main bin2h5 optimize/SUM_KERNELS_${MODEL}.ls/ $param $NPROC 1
-    \rm optimize/SUM_KERNELS_${MODEL}.ls/*_${param}.bin
+    fwat-main bin2h5 ${FWAT_OPT_DIR}/SUM_KERNELS_${MODEL}.ls/ $param $NPROC 1
+    \rm ${FWAT_OPT_DIR}/SUM_KERNELS_${MODEL}.ls/*_${param}.bin
 done
 echo " " 
 
@@ -81,8 +79,8 @@ logfile=LOG/output_fwat4_log_$MODEL.txt
 echo "******************************************************" > $logfile
 
 # check if this line search is accepted
-LSDIR=./optimize/MODEL_${MODEL}.ls
-flag=`fwat-utils getparam flag $FWATPARAM/lbfgs.yaml`
+LSDIR=./${FWAT_OPT_DIR}/MODEL_${MODEL}.ls
+flag=`fwat-utils getparam flag ${LBFGS_FILE}`
 if [ "$flag" == "GRAD" ]; then 
   icur=$(echo $MODEL |awk -F'M' '{print $2}')
   inext=$(printf "%02d" `echo $MODEL |awk -F'M' '{print $2+1}'`)
@@ -92,20 +90,20 @@ if [ "$flag" == "GRAD" ]; then
   echo "rename  MODEL_${MODEL}.ls =>  MODEL_M$inext" >> $logfile
   
   # move new model to optimize/MODEL_M$inext
-  rm -rf ./optimize/MODEL_M$inext 
-  mv $LSDIR ./optimize/MODEL_M$inext 
+  rm -rf ./${FWAT_OPT_DIR}/MODEL_M$inext 
+  mv $LSDIR ./${FWAT_OPT_DIR}/MODEL_M$inext 
 
   # move kernels to optimize/SUM_KERNELS_M$inext
-  rm -rf ./optimize/SUM_KERNELS_M$inext
-  mv ./optimize/SUM_KERNELS_${MODEL}.ls ./optimize/SUM_KERNELS_M$inext
+  rm -rf ./${FWAT_OPT_DIR}/SUM_KERNELS_M$inext
+  mv ./${FWAT_OPT_DIR}/SUM_KERNELS_${MODEL}.ls ./${FWAT_OPT_DIR}/SUM_KERNELS_M$inext
   
   # solver 
-  rm -rf ./solver/M$inext
-  mv ./solver/${MODEL}.ls solver/M$inext
+  rm -rf ${FWAT_SOLVER}/M$inext
+  mv ${FWAT_SOLVER}/${MODEL}.ls ${FWAT_SOLVER}/M$inext
 
   # misfits
-  rm -rf ./misfits/M$inext 
-  mv ./misfits/${MODEL}.ls  ./misfits/M$inext 
+  rm -rf ${FWAT_MISFIT}/M$inext 
+  mv ${FWAT_MISFIT}/${MODEL}.ls ${FWAT_MISFIT}/M$inext 
 
   # save LOGS
   mkdir -p LOG/$MODEL LOG/M$inext
@@ -130,7 +128,7 @@ if [ "$flag" == "GRAD" ]; then
   for d in $MODEL M$inext;
   do 
     for CDIR in SEM GRADIENT;do 
-      for f in solver/$d/*/*$CDIR;
+      for f in ${FWAT_SOLVER}/$d/*/*$CDIR;
       do 
         echo "clean $f" >> $logfile 
         rm -rf $f 
@@ -149,7 +147,7 @@ else
   change_par SAVE_MESH_FILES .false. DATA/Par_file
 
   # copy info to new 
-  LOCAL_PATH=./optimize/MODEL_${MODEL}
+  LOCAL_PATH=./${FWAT_OPT_DIR}/MODEL_${MODEL}
   echo -e ".false.\n.true." > adepml_stage
   \cp  $LOCAL_PATH/*Database $LSDIR/
   \cp  $LOCAL_PATH/*adepml* $LSDIR/
@@ -158,7 +156,7 @@ else
 
   \rm adepml_*
 
-  step_fac=`fwat-utils getparam alpha $FWATPARAM/lbfgs.yaml`
+  step_fac=`fwat-utils getparam alpha ${LBFGS_FILE}`
   echo " Line search failed, try step_fac = $step_fac !!!" >> $logfile 
 fi 
 

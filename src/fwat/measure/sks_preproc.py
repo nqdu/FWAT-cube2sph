@@ -157,7 +157,8 @@ class SKS_PreOP(FwatPreOP):
                 # load synthetics from npy
                 code = self._get_station_code(i,ic)
                 filename = f"{self.syndir}/OUTPUT_FILES/{code}.sem.npy"
-                data =  np.load(filename)
+                data = self.seismogram[filename]
+                #data =  np.load(filename)
 
                 tr.b =  self.t_inj - self.t_ref[i]
                 tr.data = data[:,1] * 1.
@@ -241,7 +242,8 @@ class SKS_PreOP(FwatPreOP):
                 name = self._get_station_code(i,ic)
 
                 # read syn data and preprocessing
-                sdata = np.load(f"{out_dir}/{name}.sem.npy")[:,1]
+                #sdata = np.load(f"{out_dir}/{name}.sem.npy")[:,1]
+                sdata = self.seismogram[f"{out_dir}/{name}.sem.npy"][:,1]
                 sdata = bandpass(sdata,dt_syn,freqmin,freqmax)
                 syn_data[ic,:] = sdata * taper 
 
@@ -276,12 +278,14 @@ class SKS_PreOP(FwatPreOP):
                 
                 # save syn
                 tr.data = syn_data[ic,:]
-                tr.write(f"{out_dir}/{bandname}/{name}.sac.syn")
+                self.seismo_sac[f"{out_dir}/{bandname}/{name}.sac.syn"] = tr.copy()
+                #tr.write(f"{out_dir}/{bandname}/{name}.sac.syn")
 
                 # save obs
                 if cal_obs_si:
                     tr.data = obs_data[ic,:]
-                    tr.write(f"{out_dir}/{bandname}/{name}.sac.obs")
+                    self.seismo_sac[f"{out_dir}/{bandname}/{name}.sac.obs"] = tr.copy()
+                    #tr.write(f"{out_dir}/{bandname}/{name}.sac.obs")
 
             # components
             ic_r = self.components.index("R")
@@ -333,10 +337,13 @@ class SKS_PreOP(FwatPreOP):
             data[:,0] = t0_syn + np.arange(npt_syn) * dt_syn
             data[:,1] = adjsrc_T
             outname = f"{out_dir}/{bandname}/{self.netwk[i]}.{self.stnm[i]}.{self.chcode}T.adj.sem.npy"
-            np.save(outname,data)
+            #np.save(outname,data)
+            self.seismogram_adj[outname] = data
+
             data[:,1] = adjsrc_R
             outname = f"{out_dir}/{bandname}/{self.netwk[i]}.{self.stnm[i]}.{self.chcode}R.adj.sem.npy"
-            np.save(outname,data)
+            #np.save(outname,data)
+            self.seismogram_adj[outname] = data
 
         # save SI 
         if cal_obs_si: self._write_si_obs(si_obs_data)

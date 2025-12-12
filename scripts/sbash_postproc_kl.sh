@@ -8,25 +8,24 @@ source parameters.sh
 NPROC=`grep ^"NPROC" DATA/Par_file | cut -d'=' -f2`
 
 # get search direction
-FWATPARAM=./fwat_params
-iter=`fwat-utils getparam iter $FWATPARAM/lbfgs.yaml`
-FLAG=`fwat-utils getparam flag $FWATPARAM/lbfgs.yaml`
+iter=`fwat-utils getparam iter ${LBFGS_FILE}`
+FLAG=`fwat-utils getparam flag ${LBFGS_FILE}`
 MODEL=M`echo "$iter" |awk '{printf "%02d",$1}'`
-PRECOND=`fwat-utils getparam optimize/PRECOND_TYPE`
+PRECOND=`fwat-utils getparam ${FWAT_OPT_DIR}/PRECOND_TYPE`
 
 # check how many simu types required
 nsimtypes="${#SIMU_TYPES[@]}"
 if [ "$nsimtypes" == "1" ]; then 
-  SOURCE_FILE=./src_rec/sources.dat.${SIMU_TYPES[0]}
+  SOURCE_FILE=${FWAT_SRC_REC}/sources.dat.${SIMU_TYPES[0]}
 else
-  SOURCE_FILE=./src_rec/sources.dat.joint
+  SOURCE_FILE=${FWAT_SRC_REC}/sources.dat.joint
 
   # generate files if requireds
-  iter_start=`fwat-utils getparam iter_start $FWATPARAM/lbfgs.yaml`
+  iter_start=`fwat-utils getparam iter_start ${LBFGS_FILE}`
   if [ "$iter" == "0" ]; then
     # init source file
     
-    cat ./src_rec/sources.dat.${SIMU_TYPES[0]} > $SOURCE_FILE
+    cat ${FWAT_SRC_REC}/sources.dat.${SIMU_TYPES[0]} > $SOURCE_FILE
 
     # compute misfit 
     info=`fwat-main misfit $MODEL ${SIMU_TYPES[0]}`
@@ -34,18 +33,18 @@ else
     chi1=`echo $chi0 $chi0 ${SIMU_TYPES_USER_WEIGHT[0]} |awk '{print $1/$2*$3}'`
 
     # init weight_kl.txt 
-    :> ./optimize/weight_kl.txt
-    awk -v a=$chi1 '{print $2*0+a}' ./src_rec/sources.dat.${SIMU_TYPES[0]} >> ./optimize/weight_kl.txt
+    :> ${FWAT_OPT_DIR}/weight_kl.txt
+    awk -v a=$chi1 '{print $2*0+a}' ${FWAT_SRC_REC}/sources.dat.${SIMU_TYPES[0]} >> ./${FWAT_OPT_DIR}/weight_kl.txt
 
     # for other simulation types
     # misfit = L0 + L1 * s0/s1 + L2 * s0/s2 + L_i s0/s_i
     for((i=1;i<$nsimtypes;i++)); 
     do 
-      cat ./src_rec/sources.dat.${SIMU_TYPES[$i]} >> $SOURCE_FILE
+      cat ${FWAT_SRC_REC}/sources.dat.${SIMU_TYPES[$i]} >> $SOURCE_FILE
       info=`fwat-main misfit $MODEL ${SIMU_TYPES[$i]}`
       chi1=`echo $info |awk '{print $1}'`
       chi1=`echo $chi0 $chi1 ${SIMU_TYPES_USER_WEIGHT[$i]} |awk '{print $1/$2*$3}'`
-      awk -v a=$chi1 '{print $2*0+a}' ./src_rec/sources.dat.${SIMU_TYPES[$i]} >> ./optimize/weight_kl.txt
+      awk -v a=$chi1 '{print $2*0+a}' ${FWAT_SRC_REC}/sources.dat.${SIMU_TYPES[$i]} >> ${FWAT_OPT_DIR}/weight_kl.txt
     done 
   fi
 fi 
@@ -65,14 +64,14 @@ if [ $FLAG != "GRAD" ]; then
   for param in $kl_list 
   do 
     echo "converting $param to hdf5 ..."
-    fwat-main bin2h5 optimize/SUM_KERNELS_${MODEL}/ $param $NPROC 1
-    \rm optimize/SUM_KERNELS_${MODEL}/*_${param}.bin
+    fwat-main bin2h5 ${FWAT_OPT_DIR}/SUM_KERNELS_${MODEL}/ $param $NPROC 1
+    \rm ${FWAT_OPT_DIR}/SUM_KERNELS_${MODEL}/*_${param}.bin
   done
   echo " " 
 fi 
 
 # set smoothing parameters
-LOCAL_PATH=./optimize/MODEL_${MODEL}
+LOCAL_PATH=${FWAT_OPT_DIR}/MODEL_${MODEL}
 change_par LOCAL_PATH $LOCAL_PATH ./DATA/Par_file
 change_par LOCAL_PATH $LOCAL_PATH ./DATA/meshfem3D_files/Mesh_Par_file
 info=`fwat-utils getparam optimize/SMOOTHING  | sed 's/\[\|]//g' | sed 's/,/ /g'`
@@ -83,21 +82,21 @@ sigma_v=`echo $info | awk  '{print $2}'`
 GPU_MODE=`grep ^"GPU_MODE" DATA/Par_file | cut -d'=' -f2`
 if [ $PRECOND == "default" ] && [ $MODEL == "M00"  ];then 
   param=hess_kernel
-  mv optimize/SUM_KERNELS_${MODEL}/*_$param.bin $LOCAL_PATH
-  $MPIRUN -np $NPROC $SEM_PATH/bin/xsmooth_sem_sph_pde 50000 25000 $param $LOCAL_PATH optimize/SUM_KERNELS_$MODEL/ $GPU_MODE >> $logfile
+  mv ${FWAT_OPT_DIR}/SUM_KERNELS_${MODEL}/*_$param.bin $LOCAL_PATH
+  $MPIRUN -np $NPROC $SEM_PATH/bin/xsmooth_sem_sph_pde 50000 25000 $param $LOCAL_PATH ${FWAT_OPT_DIR}/SUM_KERNELS_$MODEL/ $GPU_MODE >> $logfile
   \rm $LOCAL_PATH/*_$param.bin
   for i in `seq 1 $NPROC`;
   do
     ii=`echo $i |awk '{printf "%06d", $1-1}'`
-    name=optimize/SUM_KERNELS_$MODEL/proc${ii}_$param
+    name=${FWAT_OPT_DIR}/SUM_KERNELS_$MODEL/proc${ii}_$param
     mv ${name}_smooth.bin $name.bin 
   done 
-  \rm optimize/SUM_KERNELS_${MODEL}/*_${param}.bin
+  \rm ${FWAT_OPT_DIR}/SUM_KERNELS_${MODEL}/*_${param}.bin
 fi 
 
 if [ $FLAG != "GRAD" ]; then 
-  fwat-main bin2h5 optimize/SUM_KERNELS_${MODEL}/ hess_kernel $NPROC 1
-  \rm optimize/SUM_KERNELS_${MODEL}/*hess_kernel.bin
+  fwat-main bin2h5 ${FWAT_OPT_DIR}/SUM_KERNELS_${MODEL}/ hess_kernel $NPROC 1
+  \rm ${FWAT_OPT_DIR}/SUM_KERNELS_${MODEL}/*hess_kernel.bin
 fi
 
 # get search direction
@@ -108,23 +107,23 @@ echo " "
 kl_list=`fwat-model name direc`
 for param in $kl_list; 
 do 
-  mv optimize/SUM_KERNELS_$MODEL/*_$param.bin $LOCAL_PATH
-  $MPIRUN -np $NPROC $SEM_PATH/bin/xsmooth_sem_sph_pde $sigma_h $sigma_v $param $LOCAL_PATH optimize/SUM_KERNELS_$MODEL/ $GPU_MODE >> $logfile
+  mv ${FWAT_OPT_DIR}/SUM_KERNELS_$MODEL/*_$param.bin $LOCAL_PATH
+  $MPIRUN -np $NPROC $SEM_PATH/bin/xsmooth_sem_sph_pde $sigma_h $sigma_v $param $LOCAL_PATH ${FWAT_OPT_DIR}/SUM_KERNELS_$MODEL/ $GPU_MODE >> $logfile
   \rm $LOCAL_PATH/*_$param.bin
   for i in `seq 1 $NPROC`;
   do
     ii=`echo $i |awk '{printf "%06d", $1-1}'`
-    name=optimize/SUM_KERNELS_${MODEL}/proc${ii}_$param
+    name=${FWAT_OPT_DIR}/SUM_KERNELS_${MODEL}/proc${ii}_$param
     mv ${name}_smooth.bin $name.bin 
   done
 
   echo "converting $param to hdf5 ..."
-  fwat-main bin2h5 optimize/SUM_KERNELS_${MODEL}/ $param $NPROC 1
-  \rm optimize/SUM_KERNELS_${MODEL}/*_${param}.bin
+  fwat-main bin2h5 ${FWAT_OPT_DIR}/SUM_KERNELS_${MODEL}/ $param $NPROC 1
+  \rm ${FWAT_OPT_DIR}/SUM_KERNELS_${MODEL}/*_${param}.bin
 done
 
 # generate new model
-LSDIR=./optimize/MODEL_${MODEL}.ls
+LSDIR=./${FWAT_OPT_DIR}/MODEL_${MODEL}.ls
 mkdir -p $LSDIR
 echo " "
 echo "$MPIRUN -np $NPROC fwat-main update $MODEL $LSDIR"
@@ -146,15 +145,15 @@ $MPIRUN -np $NPROC $SEM_PATH/bin/xgenerate_databases
 \rm adepml_*
 
 # check if search method is GD
-OPT_METHOD=`fwat-utils getparam optimize/OPT_METHOD`
+OPT_METHOD=`fwat-utils getparam ${FWAT_OPT_DIR}/OPT_METHOD`
 if [ "$OPT_METHOD" == "GD" ]; then 
   let iter1=iter+1
-	fwat-utils setparam flag INIT $FWATPARAM/lbfgs.yaml
-	fwat-utils setparam iter_start $iter1 $FWATPARAM/lbfgs.yaml
-	fwat-utils setparam iter $iter1 $FWATPARAM/lbfgs.yaml
-  fwat-utils setparam alpha -1. $FWATPARAM/lbfgs.yaml
+	fwat-utils setparam flag INIT ${LBFGS_FILE}
+	fwat-utils setparam iter_start $iter1 ${LBFGS_FILE}
+	fwat-utils setparam iter $iter1 ${LBFGS_FILE}
+  fwat-utils setparam alpha -1. ${LBFGS_FILE}
 	MODEL1=M`echo "$iter" |awk '{printf "%02d",$1+1}'`
-	mv $LSDIR ./optimize/MODEL_${MODEL1}
+	mv $LSDIR ./${FWAT_OPT_DIR}/MODEL_${MODEL1}
 
 	# save LOGS
 	cd LOG
@@ -173,7 +172,7 @@ if [ "$OPT_METHOD" == "GD" ]; then
   for d in $MODEL;
   do 
     for CDIR in SEM GRADIENT;do 
-      for f in solver/$d/*/*$CDIR;
+      for f in ${FWAT_SOLVER}/$d/*/*$CDIR;
       do 
         echo "clean $f" >> $logfile 
         rm -rf $f 

@@ -15,7 +15,7 @@ measure:
     ADJSRC_TYPE: 2 # 2,cross-conv
 
   noise: # multichannel noise 
-    CC_COMPS: ['ZZ']  # {SOURCE-COMP}{RECEIVER-COMP}
+    CC_COMPS: ['ZZ','TT']  # {SOURCE-COMP}{RECEIVER-COMP}
     CH_CODE: BX   # CH_CODE
     FILTER_BANDS:  # filter bands used, in s, [T_min,Tmax]
       - [20.,40.]
@@ -62,7 +62,7 @@ measure:
 optimize:
   SMOOTHING: [16000.,8000.]  # gaussian smoothing in horizontal/vertical direction, in m
   OPT_METHOD: LBFGS  # GD/ LBFGS
-  PRECOND_TYPE: z_precond # default / z_precond /z2_precond
+  PRECOND_TYPE: z_precond # default / z_precond /z2_precond/ z_sqrt_precond
   MAX_PER: 0.02 # maximum relative perturbation
 
   # model/kernel type
@@ -74,6 +74,7 @@ optimize:
   #     0: c11-c66,rho
   #     1: vp,vs,rho,gcp,gsp
   #     2. vph,vpv,vsh,vsv,rho,eta,gcp,gsp
+  #     3. vp,vs,rho,kappaa,kappab,eta,gcp,gsp  where kappaa = (vph/vph), vp = sqrt((2*vsh^2 + vsv^2)/3), kappab = (vsv/vpv)
   MODEL_TYPE: iso 
   KERNEL_SET: 2
   MASK_VARS: [] # set all the gradients related to index in it to 0

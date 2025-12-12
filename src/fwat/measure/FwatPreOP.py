@@ -85,6 +85,11 @@ class FwatPreOP:
         self.nsta_loc = iend - istart + 1
         self._istart = istart 
 
+        # seismograms here, only save seismograms for local stations
+        self.seismogram = {}
+        self.seismogram_adj = {}
+        self.seismo_sac = {}
+
         # sanity check 
         self._sanity_check()
     
@@ -123,7 +128,8 @@ class FwatPreOP:
         to_template='${nt}.${sta}.BX${comp}.sem.npy'
 
         # rotate seismograms from XYZ to ZNE
-        rotate_seismo_fwd(fn_matrix,from_dir,to_dir,from_template,to_template)
+        self.seismogram =  \
+            rotate_seismo_fwd(fn_matrix,from_dir,to_dir,from_template,to_template)
     
     def _rotate_ZNE_to_XYZ(self):
         from .cube2sph_rotate import rotate_seismo_adj
@@ -239,8 +245,8 @@ class FwatPreOP:
 
                 for ic,ch in enumerate(comps_read):
                     name = f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}{ch}.adj.sem.npy"
-                    if os.path.exists(f"{input_dir}/{name}"):
-                        data = np.load(f"{input_dir}/{name}")
+                    if f"{input_dir}/{name}" in self.seismogram_adj:
+                        data = self.seismogram_adj[f"{input_dir}/{name}"]
                         adj[ic,:] += data[:,1]
                 
             # rotation if required
@@ -263,10 +269,9 @@ class FwatPreOP:
 
     def cleanup(self):
         from glob import glob 
+        import re 
         import os 
         import h5py 
-        import shutil 
-        from obspy.io.sac import SACTrace
         if self.myrank == 0:
             print("cleaning up ...")
 
@@ -276,41 +281,53 @@ class FwatPreOP:
             for tag in ['obs','syn']:
 
                 # all sac files
-                sacfiles = glob(f"{self.syndir}/OUTPUT_FILES/{bandname}/*.sac.{tag}")
+                pattern = re.compile(rf"^{self.syndir}/OUTPUT_FILES/{bandname}/.*\.sac\.{tag}")
+                sacfiles = [s for s in self.seismo_sac.keys() if pattern.match(s)]
 
                 # check if we need to save data
-                if len(sacfiles) == 0:
+                nfiles = len(sacfiles)
+                nfiles_tot = MPI.COMM_WORLD.allreduce(nfiles,op=MPI.SUM)
+                if nfiles_tot == 0:
                     continue
 
-                # open h5file 
-                fio = h5py.File(f"{self.syndir}/OUTPUT_FILES/seismogram.{tag}.{bandname}.h5","w")
-                for i in range(len(sacfiles)):
-                    tr = SACTrace.read(sacfiles[i])
-                    if i == 0:
-                        fio.attrs['dt'] = tr.delta  
-                        fio.attrs['t0'] = tr.b 
-                        fio.attrs['npts'] = tr.npts
-                    
-                    dsetname = tr.knetwk + "." + tr.kstnm + "." + tr.kcmpnm
-                    fio.create_dataset(dsetname,shape=tr.data.shape,dtype='f4')
-                    fio[dsetname][:] = tr.data 
-                
-                # close 
-                fio.close()
-        
-            # clean bandname
-            shutil.rmtree(f"{self.syndir}/OUTPUT_FILES/{bandname}",ignore_errors=True)
+                # loop each proc
+                for irank in range(self.nprocs):
+                    if irank == self.myrank:
+
+                        # open h5file 
+                        if irank == 0:
+                            fio = h5py.File(f"{self.syndir}/OUTPUT_FILES/seismogram.{tag}.{bandname}.h5","w")
+                        else:
+                            fio = h5py.File(f"{self.syndir}/OUTPUT_FILES/seismogram.{tag}.{bandname}.h5","a")
+                        for i in range(len(sacfiles)):
+                            tr = self.seismo_sac[sacfiles[i]]
+                            if i == 0 and irank == 0:
+                                fio.attrs['dt'] = tr.delta  
+                                fio.attrs['t0'] = tr.b 
+                                fio.attrs['npts'] = tr.npts
+                            
+                            dsetname = tr.knetwk + "." + tr.kstnm + "." + tr.kcmpnm
+                            fio.create_dataset(dsetname,shape=tr.data.shape,dtype='f4')
+                            fio[dsetname][:] = tr.data 
+                        
+                        # close 
+                        fio.close()
+
+                    MPI.COMM_WORLD.Barrier()
+
+
 
         # clean semd and sem.ascii
-        filenames = glob(f"{self.syndir}/OUTPUT_FILES/*.semd")
-        for f in filenames:
-            os.remove(f)
-        filenames = glob(f"{self.syndir}/OUTPUT_FILES/*.sem.npy")
-        for f in filenames:
-            os.remove(f)
-        filenames = glob(f"{self.syndir}/SEM/*.sem.npy")
-        for f in filenames:
-            os.remove(f)
+        if self.myrank == 0:
+            filenames = glob(f"{self.syndir}/OUTPUT_FILES/*.semd")
+            for f in filenames:
+                os.remove(f)
+            filenames = glob(f"{self.syndir}/OUTPUT_FILES/*.sem.npy")
+            for f in filenames:
+                os.remove(f)
+            filenames = glob(f"{self.syndir}/SEM/*.sem.npy")
+            for f in filenames:
+                os.remove(f)
 
     def _rotate_seismogram_to_RT(self,):
         from .utils import cal_dist_baz,rotate_EN_to_RT
@@ -331,7 +348,7 @@ class FwatPreOP:
                 for ic,ch in enumerate(['E','N']):
                     name = f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}{ch}.sem.npy"
                     filename = f"{self.syndir}/OUTPUT_FILES/{name}"
-                    data[:,:] = np.load(filename)
+                    data[:,:] = self.seismogram[filename]
                     temp_syn[ic,:] = data[:,1]
 
                 # rotate to R/T
@@ -347,7 +364,7 @@ class FwatPreOP:
                     filename = f"{self.syndir}/OUTPUT_FILES/{name}"
                     data[:,1] = temp_syn[ic,:] 
                     #data.tofile(filename)
-                    np.save(filename,data)
+                    self.seismogram[filename] = data 
         MPI.COMM_WORLD.Barrier()
 
     def save_forward(self):
@@ -376,8 +393,8 @@ class FwatPreOP:
         # sum adjoint source
         self.sum_adj_source()
 
-        # pack SACs to h5
-        if self.myrank == 0: self.cleanup()
+        # cleanup temporary files 
+        self.cleanup()
 
         # sync
         MPI.COMM_WORLD.Barrier()

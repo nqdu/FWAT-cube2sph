@@ -30,8 +30,10 @@ rm -rf build
 # build python
 pip install -e .
 
-mkdir -p $INSTALL_DIR
-\cp -r scripts/module_env scripts/*.sh plots fwat_params $INSTALL_DIR/
+# install
+fwat-utils install $INSTALL_DIR
+# mkdir -p $INSTALL_DIR
+# \cp -r scripts/module_env scripts/*.sh plots fwat_params $INSTALL_DIR/
 CDIR=`pwd`
 
 chmod +x $INSTALL_DIR/*.sh 

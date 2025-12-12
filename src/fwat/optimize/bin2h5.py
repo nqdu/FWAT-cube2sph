@@ -1,6 +1,6 @@
-from scipy.io import FortranFile 
 import numpy as np 
 import h5py
+from fwat.FortranIO import FortranIO
 
 def run(argv):
     if len(argv) !=4 :
@@ -22,8 +22,8 @@ def run(argv):
             procname = str(i)
             dset_name = "proc%06d"%(i) + "_" + name
             filename = WORK_DIR +  dset_name + ".bin"
-            fio_f = FortranFile(filename,"r")
-            a = fio_f.read_reals('f4')
+            fio_f = FortranIO(filename,"r")
+            a = fio_f.read_record('f4')
             fio_f.close()
 
             # create a h5 database
@@ -42,7 +42,7 @@ def run(argv):
             a = fio[procname][:]
 
             filename = WORK_DIR +  dset_name + ".bin"
-            fio_f = FortranFile(filename,"w")
+            fio_f = FortranIO(filename,"w")
             fio_f.write_record(a)
             fio_f.close()
 

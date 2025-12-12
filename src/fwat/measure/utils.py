@@ -237,6 +237,7 @@ def taper_window(t0,dt,nt,tstart,tend,p=0.05,type_='hann'):
     right_pt = left_pt + nlen
     if right_pt > nt:
         right_pt = nt
+    nlen = right_pt - left_pt
 
     func = _TAPER_ENTRY_POINT[type_]
     win = func(nlen,p)

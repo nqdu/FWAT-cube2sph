@@ -1,5 +1,4 @@
 import numpy as np 
-from scipy.io import FortranFile 
 import yaml
 import h5py
 from mpi4py import MPI
@@ -8,6 +7,7 @@ from typing import Final
 
 from fwat.optimize.model import FwatModel
 from fwat.const import OPT_DIR,PARAM_FILE,LBFGS_FILE
+from fwat.FortranIO import FortranIO
 
 
 def run(argv):
@@ -73,10 +73,7 @@ def run(argv):
     step_fac = opt['alpha']
     step_fac_in_per = params['MAX_PER']
 
-    # first lbfgs step_fac = step_fac_in_per
-    if opt['iter'] == opt['iter_start'] and opt['iter_ls'] == 0:
-        step_fac = -1
-    
+    # first lbfgs step_fac = step_fac_in_per    
     if opt['iter'] == opt['iter_start'] + 1 and opt['iter_ls'] == 0:
         # init step_fac is 1
         step_fac = 1.
@@ -101,8 +98,8 @@ def run(argv):
         if myrank == 0:
             print(f'reading model from {filename}')
 
-        f = FortranFile(filename,"r")
-        vec0[i,...] = f.read_reals('f4')
+        f = FortranIO(filename,"r")
+        vec0[i,...] = f.read_record('f4')
         f.close()
 
     # convert model if required
@@ -129,7 +126,7 @@ def run(argv):
         if myrank == 0:
             print(f'wrting new model to {filename}')
         
-        f = FortranFile(filename,"w")
+        f = FortranIO(filename,"w")
         f.write_record(vec0[i,...])
         f.close()
 

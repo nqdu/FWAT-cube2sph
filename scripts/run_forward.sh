@@ -32,7 +32,7 @@ RUN_SEM()
   do 
     local njobs=${NJOBS_PER_JOBARRAY[$isim]}
     local simu_type=${SIMU_TYPES[$isim]}
-    local nevts=`awk 'END { print NR }' src_rec/sources.dat.$simu_type`
+    local nevts=`awk 'END { print NR }' ${FWAT_SRC_REC}/sources.dat.$simu_type`
     local narray=`echo "($nevts + $njobs - 1) / $njobs"|bc`
     if [ "$PLATFORM"  == "local" ]; then 
       njobs=$nevts

@@ -1,8 +1,9 @@
 from mpi4py import MPI
 import numpy as np
 from numba import jit  
-from scipy.io import FortranFile
 import glob 
+
+from fwat.FortranIO import FortranIO
 
 @jit(nopython=True)
 def coords2discon(xstore,ystore,zstore,ibool):
@@ -19,14 +20,14 @@ def coords2discon(xstore,ystore,zstore,ibool):
     return x,y,z
 
 def read_coordinates(filename):
-    f = FortranFile(filename)
-    _ = f.read_ints('i4')[0] # nspec
-    _ = f.read_ints('i4')[0] #gnlob
-    _ = f.read_ints('i4')
-    ibool = f.read_ints('i4') - 1
-    xstore = f.read_reals('f4')
-    ystore = f.read_reals('f4')
-    zstore = f.read_reals('f4')
+    f = FortranIO(filename)
+    _ = f.read_record('i4')[0] # nspec
+    _ = f.read_record('i4')[0] #gnlob
+    _ = f.read_record('i4')
+    ibool = f.read_record('i4') - 1
+    xstore = f.read_record('f4')
+    ystore = f.read_record('f4')
+    zstore = f.read_record('f4')
 
     x,y,z = coords2discon(xstore,ystore,zstore,ibool)
 
@@ -55,8 +56,8 @@ def run(argv):
 
     # read model file 
     filename = input_dir + '/proc%06d'%(myrank) + f'_{param}.bin'
-    f = FortranFile(filename)
-    model_in = f.read_reals('f4')
+    f = FortranIO(filename)
+    model_in = f.read_record('f4')
     f.close()
 
     # create dictionary for model_in 
@@ -115,7 +116,7 @@ def run(argv):
             print("=======================\n")
 
         model_out = np.asarray(model_out,dtype='f4')
-        f = FortranFile(filename,'w') 
+        f = FortranIO(filename,'w') 
         f.write_record(model_out)
         f.close()
 
