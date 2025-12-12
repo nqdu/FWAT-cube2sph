@@ -19,6 +19,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Visualization for Model" href="visual.html" />
     <link rel="prev" title="Cube2sph Tutorial" href="cube2sph.html" /> 
 </head>
 
@@ -81,6 +82,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#module-env"><code class="docutils literal notranslate"><span class="pre">module_env</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#parameters-sh"><code class="docutils literal notranslate"><span class="pre">parameters.sh</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#run-fwi-sh-and-run-forward-sh"><code class="docutils literal notranslate"><span class="pre">run_fwi.sh</span></code> and <code class="docutils literal notranslate"><span class="pre">run_forward.sh</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#run-fwi-big-job-sh"><code class="docutils literal notranslate"><span class="pre">run_fwi_big_job.sh</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#data-preparation">Data Preparation</a><ul>
@@ -89,10 +91,9 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#checklist">Checklist</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#user-defined-parameter-set">User-Defined Parameter Set</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#visualization">Visualization</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#workflow">Workflow</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="visual.html">Visualization for Model</a></li>
 </ul>
 
         </div>
@@ -206,6 +207,8 @@
 <span class="w">  </span><span class="c1">#     0: c11-c66,rho</span>
 <span class="w">  </span><span class="c1">#     1: vp,vs,rho,gcp,gsp</span>
 <span class="w">  </span><span class="c1">#     2. vph,vpv,vsh,vsv,rho,eta,gcp,gsp</span>
+<span class="w">  </span><span class="c1">#     3. vp,vs,rho,kappaa,kappab,eta,gcp,gsp  where kappaa = (vph/vpv) / vpv, vp = sqrt((2*vph**2+vpv**2)/3), kappab = (vsh - vsv) / vsv, vs = sqrt((2*vsh**2 + vsv**2) / 3)</span>
+
 <span class="w">  </span><span class="nt">MODEL_TYPE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">iso</span><span class="w"> </span>
 <span class="w">  </span><span class="nt">KERNEL_SET</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
 <span class="w">  </span><span class="nt">MASK_VARS</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span><span class="w"> </span><span class="c1"># set all the gradients related to index in it to 0</span>
@@ -354,6 +357,7 @@ Possible configurations:</p>
 <li><p><code class="docutils literal notranslate"><span class="pre">0</span></code>: <code class="docutils literal notranslate"><span class="pre">c11</span></code>–<code class="docutils literal notranslate"><span class="pre">c66</span></code>, <code class="docutils literal notranslate"><span class="pre">rho</span></code></p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">1</span></code>: <code class="docutils literal notranslate"><span class="pre">vp</span></code>, <code class="docutils literal notranslate"><span class="pre">vs</span></code>, <code class="docutils literal notranslate"><span class="pre">rho</span></code>, <code class="docutils literal notranslate"><span class="pre">gcp</span></code>, <code class="docutils literal notranslate"><span class="pre">gsp</span></code></p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">2</span></code>: <code class="docutils literal notranslate"><span class="pre">vph</span></code>, <code class="docutils literal notranslate"><span class="pre">vpv</span></code>, <code class="docutils literal notranslate"><span class="pre">vsh</span></code>, <code class="docutils literal notranslate"><span class="pre">vsv</span></code>, <code class="docutils literal notranslate"><span class="pre">rho</span></code>, <code class="docutils literal notranslate"><span class="pre">eta</span></code>, <code class="docutils literal notranslate"><span class="pre">gcp</span></code>, <code class="docutils literal notranslate"><span class="pre">gsp</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">3</span></code>: <code class="docutils literal notranslate"><span class="pre">vp</span></code>, <code class="docutils literal notranslate"><span class="pre">vs</span></code>, <code class="docutils literal notranslate"><span class="pre">rho</span></code>, <code class="docutils literal notranslate"><span class="pre">kappaa</span></code>,<code class="docutils literal notranslate"><span class="pre">kappab</span></code>, <code class="docutils literal notranslate"><span class="pre">eta</span></code>, <code class="docutils literal notranslate"><span class="pre">gcp</span></code>,<code class="docutils literal notranslate"><span class="pre">gsp</span></code></p></li>
 </ul>
 </li>
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">KERNEL_SET</span></code></strong> – Kernel set index.<br />
@@ -500,11 +504,84 @@ For multi-channel noise simulation, provide the following files:</p>
 <li><p><code class="docutils literal notranslate"><span class="pre">FORCESOLUTION_${NAME}_Z</span></code></p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">FORCESOLUTION_${NAME}_N</span></code></p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">FORCESOLUTION_${NAME}_E</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">STATIONS_${NAME}_R</span></code> / <code class="docutils literal notranslate"><span class="pre">STATIONS_${NAME}_T</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">STATIONS_${NAME}_Z</span></code>
-The stations in each <code class="docutils literal notranslate"><span class="pre">STATION_${NAME}_[RTZ]</span></code> can be different. You should merge all <code class="docutils literal notranslate"><span class="pre">rot_${NAME}_{RTZ}</span></code> together by</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">STATIONS_${NAME}_RR/TT/ZZ/RZ</span></code> (stations used for <code class="docutils literal notranslate"><span class="pre">RR,TT,ZZ,RZ</span></code>)</p></li>
 </ul>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>cat<span class="w"> </span>rot_<span class="si">${</span><span class="nv">NAME</span><span class="si">}</span>_<span class="o">{</span>RTZ<span class="o">}</span><span class="w"> </span><span class="p">|</span>sort<span class="w"> </span>-n<span class="w"> </span><span class="p">|</span>uniq<span class="w"> </span>&gt;<span class="w"> </span>rot_<span class="si">${</span><span class="nv">NAME</span><span class="si">}</span>
+<p>The stations in each <code class="docutils literal notranslate"><span class="pre">STATION_${NAME}_[RR/TT/ZZ/RT]</span></code> can be different. You should merge all <code class="docutils literal notranslate"><span class="pre">rot_${NAME}_{RTZ}</span></code> together by using this python file</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">glob</span> 
+<span class="kn">import</span> <span class="nn">sys</span> 
+<span class="kn">import</span> <span class="nn">os</span> 
+
+<span class="k">def</span> <span class="nf">read_rot_file</span><span class="p">(</span><span class="n">mydict</span><span class="p">:</span><span class="nb">dict</span><span class="p">,</span><span class="n">filename</span><span class="p">):</span>
+
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span><span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fio</span><span class="p">:</span>
+        <span class="n">lines</span> <span class="o">=</span> <span class="n">fio</span><span class="o">.</span><span class="n">readlines</span><span class="p">()</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">while</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">lines</span><span class="p">):</span>
+            <span class="n">line</span> <span class="o">=</span> <span class="n">lines</span><span class="p">[</span><span class="n">n</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            
+            <span class="c1"># get keys</span>
+            <span class="n">info</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+            <span class="n">key</span> <span class="o">=</span> <span class="n">info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;_&#39;</span> <span class="o">+</span> <span class="n">info</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+            <span class="c1"># get values, 3x3 matrix</span>
+            <span class="n">a</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">),</span><span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="n">n</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="n">line</span> <span class="o">=</span> <span class="n">lines</span><span class="p">[</span><span class="n">n</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+                <span class="n">info</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                    <span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">info</span><span class="p">[</span><span class="n">j</span><span class="p">])</span>
+            
+            <span class="n">n</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="c1"># check if key exists</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">mydict</span><span class="p">:</span>
+                <span class="n">mydict</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">a</span>
+    
+    <span class="k">return</span> <span class="n">mydict</span>
+
+<span class="k">def</span> <span class="nf">main</span><span class="p">():</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Usage: python merge_rot_file.py path ...&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;example: python merge_rot_file.py src_rec&quot;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    
+    <span class="n">path</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="c1"># get all rot files, start with rot_*_[ZZ/TT/RR]</span>
+    <span class="n">input_files</span> <span class="o">=</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">/rot_*_*&quot;</span><span class="p">)</span>
+
+    <span class="c1"># got all names</span>
+    <span class="n">all_names</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">input_files</span><span class="p">:</span>
+        <span class="n">parts</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">f</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">)</span>
+        <span class="n">all_names</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">parts</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+
+    <span class="c1"># loop each names</span>
+    <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">all_names</span><span class="p">:</span>
+        <span class="n">mydict</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">filenames</span> <span class="o">=</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">/rot_</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_*&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">filenames</span><span class="p">:</span>
+            <span class="k">if</span> <span class="sa">f</span><span class="s2">&quot;rot_</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_&quot;</span> <span class="ow">in</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">mydict</span> <span class="o">=</span> <span class="n">read_rot_file</span><span class="p">(</span><span class="n">mydict</span><span class="p">,</span><span class="n">f</span><span class="p">)</span>
+
+                <span class="c1"># remove the file after reading</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+        
+        <span class="c1"># write merged file</span>
+        <span class="n">output_file</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">/rot_</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">output_file</span><span class="p">,</span><span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fio</span><span class="p">:</span>
+            <span class="n">keys</span><span class="o">=</span>  <span class="nb">sorted</span><span class="p">(</span><span class="n">mydict</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">keys</span><span class="p">:</span>
+                <span class="n">a</span><span class="p">,</span><span class="n">b</span> <span class="o">=</span> <span class="n">key</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">)</span>
+                <span class="n">fio</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">a</span><span class="si">}</span><span class="se">\t</span><span class="s2"> </span><span class="si">{</span><span class="n">b</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">a</span> <span class="o">=</span> <span class="n">mydict</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                    <span class="n">fio</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="se">\t</span><span class="s2"> </span><span class="si">{</span><span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="se">\t</span><span class="s2"> </span><span class="si">{</span><span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="mi">2</span><span class="p">]</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+
 </pre></div>
 </div>
 </section>
@@ -582,16 +659,31 @@ Example:</p>
 </section>
 <section id="run-fwi-sh-and-run-forward-sh">
 <h3><code class="docutils literal notranslate"><span class="pre">run_fwi.sh</span></code> and <code class="docutils literal notranslate"><span class="pre">run_forward.sh</span></code><a class="headerlink" href="#run-fwi-sh-and-run-forward-sh" title="Link to this heading"></a></h3>
-<p>These scripts implement several functions that add SLURM job headers, making them executable on a cluster.<br />
-The functions include:</p>
+<p>These scripts implement several functions to add SLURM job headers, enabling execution on a cluster. Both scripts leverage the job array capabilities of SLURM.</p>
+<p>The functions included are:</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">SHELL_HEADER_SEM</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">SHELL_HEADER_POST</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">SHELL_HEADER_WOLFE</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">WAIT_FINISH</span></code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">SHELL_HEADER_SEM</span></code></strong></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">SHELL_HEADER_POST</span></code></strong></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">SHELL_HEADER_WOLFE</span></code></strong></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">WAIT_FINISH</span></code></strong></p></li>
 </ul>
 <p><strong>Note:</strong><br />
-Edit these functions to match your working environment, for example, by adding GPU-specific flags, account information, or other SLURM parameters.</p>
+Be sure to modify these functions according to your working environment. This may involve adding GPU-specific flags, account details, or other SLURM parameters.</p>
+</section>
+<section id="run-fwi-big-job-sh">
+<h3><code class="docutils literal notranslate"><span class="pre">run_fwi_big_job.sh</span></code><a class="headerlink" href="#run-fwi-big-job-sh" title="Link to this heading"></a></h3>
+<p>This script facilitates an FWI workflow and serves as an alternative to <code class="docutils literal notranslate"><span class="pre">run_fwi.sh</span></code>. It launches a large job that may span multiple nodes and run for several hours. The input parameters specify the number of processes and the number of iterations. Events will be allocated across all processes utilized in this script, and the workflow will continue iterating until it completes the specified iterations or the allotted time expires.</p>
+<p>To submit the job locally, use the following command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bash<span class="w"> </span>run_fwi_big_job.sh<span class="w"> </span><span class="m">32</span><span class="w"> </span><span class="m">10</span>
+</pre></div>
+</div>
+<p>In this example, the job will launch <code class="docutils literal notranslate"><span class="pre">32</span></code> MPI processes and iterate <code class="docutils literal notranslate"><span class="pre">10</span></code> times.</p>
+<p>To run the job on SLURM/PBS, use:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bash<span class="w"> </span>run_fwi_big_job.sh<span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="m">64</span><span class="w"> </span><span class="m">10</span>
+</pre></div>
+</div>
+<p>This command will launch a SLURM/PBS job with <code class="docutils literal notranslate"><span class="pre">4</span></code> nodes and <code class="docutils literal notranslate"><span class="pre">64</span></code> MPI processes per node (a total of 256 processes), and will iterate <code class="docutils literal notranslate"><span class="pre">10</span></code> times.</p>
+<p>In both cases, the script will launch <code class="docutils literal notranslate"><span class="pre">NPROCS_IN_TOTAL</span> <span class="pre">/</span> <span class="pre">NPROCS</span></code> simulations (where <code class="docutils literal notranslate"><span class="pre">NPROCS</span></code> is defined in the <code class="docutils literal notranslate"><span class="pre">Par_file</span></code>).</p>
 </section>
 </section>
 <section id="data-preparation">
@@ -617,15 +709,16 @@ Edit these functions to match your working environment, for example, by adding G
 </section>
 <section id="user-defined-parameter-set">
 <h2>User-Defined Parameter Set<a class="headerlink" href="#user-defined-parameter-set" title="Link to this heading"></a></h2>
-<p>under construction</p>
-</section>
-<section id="visualization">
-<h2>Visualization<a class="headerlink" href="#visualization" title="Link to this heading"></a></h2>
-<p>under construction</p>
-</section>
-<section id="workflow">
-<h2>Workflow<a class="headerlink" href="#workflow" title="Link to this heading"></a></h2>
-<p>under construction</p>
+<p>If you want to define your own type of elastic model, you can modify <code class="docutils literal notranslate"><span class="pre">fwat/optimize/model.py</span></code> by defining your own <code class="docutils literal notranslate"><span class="pre">mdtype</span></code> and <code class="docutils literal notranslate"><span class="pre">kltype</span></code>. Here are several important notes:</p>
+<ul class="simple">
+<li><p><strong>Do not change the base model</strong>: For the isotropic case, stick to the parameters <code class="docutils literal notranslate"><span class="pre">['vp',</span> <span class="pre">'vs',</span> <span class="pre">'rho']</span></code>, and for the anisotropic case, the base model should be <code class="docutils literal notranslate"><span class="pre">[c11-c66,</span> <span class="pre">rho]</span></code>.</p></li>
+<li><p><strong>Define your parameter set</strong>: Set the search direction names in the function <code class="docutils literal notranslate"><span class="pre">get_direc_names</span></code> by adding a prefix <code class="docutils literal notranslate"><span class="pre">d</span></code> to each of your parameters.</p></li>
+<li><p><strong>Implement your own <code class="docutils literal notranslate"><span class="pre">convert_model</span></code></strong>: This function should convert the base model to your parameter set and vice versa.</p></li>
+<li><p><strong>Implement <code class="docutils literal notranslate"><span class="pre">convert_to_visual</span></code></strong>: This function will return the visualization model for plotting. It can differ from your parameter set. For example, you may include <code class="docutils literal notranslate"><span class="pre">gcp</span></code> and <code class="docutils literal notranslate"><span class="pre">gsp</span></code> in your parameter set, but for visualization, it is preferable to use <code class="docutils literal notranslate"><span class="pre">G0</span></code> and <code class="docutils literal notranslate"><span class="pre">phi</span></code>.</p></li>
+<li><p><strong>Implement your <code class="docutils literal notranslate"><span class="pre">get_opt_model</span></code></strong>: This function will convert your user-defined model to a dimensionless model (e.g., changing <code class="docutils literal notranslate"><span class="pre">vs</span></code> to <code class="docutils literal notranslate"><span class="pre">log(vs)</span></code>) used for gradient-based optimization.</p></li>
+<li><p><strong>Implement <code class="docutils literal notranslate"><span class="pre">model_update</span></code></strong>: This function guides you in updating your model. For dimensionless parameters, you will directly add the search direction, and for parameters with physical units, you will apply an exponential factor based on the search direction.</p></li>
+<li><p><strong>Implement <code class="docutils literal notranslate"><span class="pre">convert_kl</span></code></strong>: This function handles the derivative conversion between the base model and your model. Do not re-derive everything yourself; instead, use <code class="docutils literal notranslate"><span class="pre">fwat/optimize/auto_kergen.py</span></code> to auto-generate the required conversions.</p></li>
+</ul>
 </section>
 </section>
 
@@ -634,6 +727,7 @@ Edit these functions to match your working environment, for example, by adding G
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="cube2sph.html" class="btn btn-neutral float-left" title="Cube2sph Tutorial" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="visual.html" class="btn btn-neutral float-right" title="Visualization for Model" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

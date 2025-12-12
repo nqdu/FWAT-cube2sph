@@ -86,6 +86,8 @@ optimize:
   #     0: c11-c66,rho
   #     1: vp,vs,rho,gcp,gsp
   #     2. vph,vpv,vsh,vsv,rho,eta,gcp,gsp
+  #     3. vp,vs,rho,kappaa,kappab,eta,gcp,gsp  where kappaa = (vph/vpv) / vpv, vp = sqrt((2*vph**2+vpv**2)/3), kappab = (vsh - vsv) / vsv, vs = sqrt((2*vsh**2 + vsv**2) / 3)
+
   MODEL_TYPE: iso 
   KERNEL_SET: 2
   MASK_VARS: [] # set all the gradients related to index in it to 0
@@ -221,6 +223,7 @@ The `optimize` block defines parameters for the optimization process in FWI.
   - `0`: `c11`–`c66`, `rho`  
   - `1`: `vp`, `vs`, `rho`, `gcp`, `gsp`  
   - `2`: `vph`, `vpv`, `vsh`, `vsv`, `rho`, `eta`, `gcp`, `gsp`  
+  - `3`: `vp`, `vs`, `rho`, `kappaa`,`kappab`, `eta`, `gcp`,`gsp`
 
 - **`KERNEL_SET`** – Kernel set index.  
   Example: `2`
@@ -353,11 +356,85 @@ For multi-channel noise simulation, provide the following files:
 - `FORCESOLUTION_${NAME}_Z`
 - `FORCESOLUTION_${NAME}_N`
 - `FORCESOLUTION_${NAME}_E`
-- `STATIONS_${NAME}_R` / `STATIONS_${NAME}_T`
-- `STATIONS_${NAME}_Z`
-The stations in each `STATION_${NAME}_[RTZ]` can be different. You should merge all `rot_${NAME}_{RTZ}` together by 
-```bash
-cat rot_${NAME}_{RTZ} |sort -n |uniq > rot_${NAME}
+- `STATIONS_${NAME}_RR/TT/ZZ/RZ` (stations used for `RR,TT,ZZ,RZ`)
+
+The stations in each `STATION_${NAME}_[RR/TT/ZZ/RT]` can be different. You should merge all `rot_${NAME}_{RTZ}` together by using this python file
+```python
+import numpy as np
+import glob 
+import sys 
+import os 
+
+def read_rot_file(mydict:dict,filename):
+
+    with open(filename,'r') as fio:
+        lines = fio.readlines()
+        n = 0
+        while n < len(lines):
+            line = lines[n].strip()
+            
+            # get keys
+            info = line.split()
+            key = info[0] + '_' + info[1]
+
+            # get values, 3x3 matrix
+            a = np.zeros((3,3),dtype=np.float64)
+            for i in range(3):
+                n += 1
+                line = lines[n].strip()
+                info = line.split()
+                for j in range(3):
+                    a[i,j] = float(info[j])
+            
+            n += 1
+            # check if key exists
+            if key not in mydict:
+                mydict[key] = a
+    
+    return mydict
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python merge_rot_file.py path ...")
+        print("example: python merge_rot_file.py src_rec")
+        sys.exit(1)
+    
+    path = sys.argv[1]
+
+    # get all rot files, start with rot_*_[ZZ/TT/RR]
+    input_files = glob.glob(f"{path}/rot_*_*")
+
+    # got all names
+    all_names = set()
+    for f in input_files:
+        parts = os.path.basename(f).split('_')
+        all_names.add(parts[1])
+
+    # loop each names
+    for name in all_names:
+        mydict = dict()
+        filenames = glob.glob(f"{path}/rot_{name}_*")
+        for f in filenames:
+            if f"rot_{name}_" in f:
+                mydict = read_rot_file(mydict,f)
+
+                # remove the file after reading
+                os.remove(f)
+        
+        # write merged file
+        output_file = f"{path}/rot_{name}"
+        with open(output_file,'w') as fio:
+            keys=  sorted(mydict.keys())
+            for key in keys:
+                a,b = key.split('_')
+                fio.write(f"{a}\t {b}\n")
+                a = mydict[key]
+                for i in range(3):
+                    fio.write(f"{a[i,0]}\t {a[i,1]}\t {a[i,2]}\n")
+
+if __name__ == "__main__":
+    main()
+
 ```
 
 ### Create the CMT Solution File
@@ -426,15 +503,35 @@ Contains the environment module commands required to load dependencies on the cl
   ```
 
 ### `run_fwi.sh` and `run_forward.sh`
-These scripts implement several functions that add SLURM job headers, making them executable on a cluster.  
-The functions include:
-- `SHELL_HEADER_SEM`
-- `SHELL_HEADER_POST`
-- `SHELL_HEADER_WOLFE`
-- `WAIT_FINISH`
+
+These scripts implement several functions to add SLURM job headers, enabling execution on a cluster. Both scripts leverage the job array capabilities of SLURM.  
+
+The functions included are:
+- **`SHELL_HEADER_SEM`**
+- **`SHELL_HEADER_POST`**
+- **`SHELL_HEADER_WOLFE`**
+- **`WAIT_FINISH`**
 
 **Note:**  
-Edit these functions to match your working environment, for example, by adding GPU-specific flags, account information, or other SLURM parameters.
+Be sure to modify these functions according to your working environment. This may involve adding GPU-specific flags, account details, or other SLURM parameters.
+
+### `run_fwi_big_job.sh`
+
+This script facilitates an FWI workflow and serves as an alternative to `run_fwi.sh`. It launches a large job that may span multiple nodes and run for several hours. The input parameters specify the number of processes and the number of iterations. Events will be allocated across all processes utilized in this script, and the workflow will continue iterating until it completes the specified iterations or the allotted time expires.  
+
+To submit the job locally, use the following command:
+```bash
+bash run_fwi_big_job.sh 32 10
+```
+In this example, the job will launch `32` MPI processes and iterate `10` times.
+
+To run the job on SLURM/PBS, use:
+```bash
+bash run_fwi_big_job.sh 4 64 10
+```
+This command will launch a SLURM/PBS job with `4` nodes and `64` MPI processes per node (a total of 256 processes), and will iterate `10` times.
+
+In both cases, the script will launch `NPROCS_IN_TOTAL / NPROCS` simulations (where `NPROCS` is defined in the `Par_file`).
 
 ## Data Preparation
 ### Teleseismic Waveform Data
@@ -455,10 +552,19 @@ Before running a forward or adjoint simulation, ensure the following items are p
 - **`fwat_data`** - Data directory. All files must be provided in SAC format with all required headers. Seismograms for each event should be saved in a {NAME} directory, or in {NAME}_{RTZ} for multi-channel noise. For teleseismic data, the time t = 0 must correspond to the direct arrival time.
 
 ## User-Defined Parameter Set
-under construction
 
-## Visualization 
-under construction
+If you want to define your own type of elastic model, you can modify `fwat/optimize/model.py` by defining your own `mdtype` and `kltype`. Here are several important notes:
 
-## Workflow 
-under construction
+- **Do not change the base model**: For the isotropic case, stick to the parameters `['vp', 'vs', 'rho']`, and for the anisotropic case, the base model should be `[c11-c66, rho]`.
+  
+- **Define your parameter set**: Set the search direction names in the function `get_direc_names` by adding a prefix `d` to each of your parameters.
+  
+- **Implement your own `convert_model`**: This function should convert the base model to your parameter set and vice versa.
+
+- **Implement `convert_to_visual`**: This function will return the visualization model for plotting. It can differ from your parameter set. For example, you may include `gcp` and `gsp` in your parameter set, but for visualization, it is preferable to use `G0` and `phi`.
+
+- **Implement your `get_opt_model`**: This function will convert your user-defined model to a dimensionless model (e.g., changing `vs` to `log(vs)`) used for gradient-based optimization.
+
+- **Implement `model_update`**: This function guides you in updating your model. For dimensionless parameters, you will directly add the search direction, and for parameters with physical units, you will apply an exponential factor based on the search direction.
+
+- **Implement `convert_kl`**: This function handles the derivative conversion between the base model and your model. Do not re-derive everything yourself; instead, use `fwat/optimize/auto_kergen.py` to auto-generate the required conversions.
