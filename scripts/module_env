@@ -1,5 +1,5 @@
 # environments
-module add fwi/gcc
-source /scinet/vast/etc/vastpreload-openmpi.bash
-export UCX_VFS_ENABLE=n
-export OMP_NUM_THREADS=1
+# module add fwi/gcc
+# source /scinet/vast/etc/vastpreload-openmpi.bash
+# export UCX_VFS_ENABLE=n
+# export OMP_NUM_THREADS=1

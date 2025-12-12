@@ -32,19 +32,24 @@ if [ $do_mask -ne 0 ]; then
   echo "Select points inside the region ..."
   gmt select points.xyz $bounds -Dh -Nk/s  > out.txt 
 else 
-  cat points.xyz > out.txt
+  :> out.txt
 fi
 
 # read back
 python << EOF
 import numpy as np
-data = np.loadtxt("out.txt")
-idx = np.asarray(data[:,2], dtype=int)
+import os 
 points = np.loadtxt("points.xyz")
+if os.path.getsize("out.txt") == 0:
+    idx = np.array([], dtype=int)
+else:
+    data = np.loadtxt("out.txt",ndmin=2,)
+    idx = np.asarray(data[:,2], dtype=int)
+
 points[:,-1] = 1.
 points[idx,-1] = np.nan
 
 np.savetxt("profiles/mask.dat", points)
 EOF
 
-rm out.txt points.xyz
+#rm out.txt points.xyz

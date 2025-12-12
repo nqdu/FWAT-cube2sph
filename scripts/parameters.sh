@@ -4,7 +4,7 @@
 SEM_PATH=~/specfem3d-cube2sph  # solver location
 MPIRUN=mpirun
 
-PLATFORM="local" # local/slurm
+PLATFORM="slurm" # local/slurm
 
 # simulation types
 SIMU_TYPES=("noise")

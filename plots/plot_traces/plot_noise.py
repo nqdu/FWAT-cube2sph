@@ -40,6 +40,11 @@ def plot_event(line:str,M1:str,solver:str,
     scomp = comp[0]
     rcomp = comp[1]
 
+    if scomp == 'T':
+        scomp = 'N'
+    if scomp == 'R':
+        scomp = 'E'
+
     # get path
     info = line.split()
     evtid = info[0]
@@ -58,7 +63,7 @@ def plot_event(line:str,M1:str,solver:str,
 
         # compute distance
         src_rec = f"{solver}/../src_rec/"
-        statxt = np.loadtxt(f"{src_rec}/STATIONS_{evtid}_{scomp}_globe",dtype=str,ndmin=2)
+        statxt = np.loadtxt(f"{src_rec}/STATIONS_{evtid}_{comp}_globe",dtype=str,ndmin=2)
         dist = compute_epc_dist(float(info[1]),float(info[2]),statxt)
 
         # sort distance
@@ -67,8 +72,8 @@ def plot_event(line:str,M1:str,solver:str,
         statxt[:,:] = statxt[idx,:]
 
         # open h5file
-        fobs = h5py.File(f"{path2last}/seismogram.obs.{band}.h5","r")
-        fsyn = h5py.File(f"{path2last}/seismogram.syn.{band}.h5","r")
+        fobs = h5py.File(f"{path2last}/seismogram_{rcomp}.obs.{band}.h5","r")
+        fsyn = h5py.File(f"{path2last}/seismogram_{rcomp}.syn.{band}.h5","r")
 
         # make sure station with same number
         assert(len(fsyn.keys()) == len(fobs.keys()))
@@ -126,7 +131,7 @@ def plot_event(line:str,M1:str,solver:str,
         ax1.set_xlabel("Time (s)")
         ax1.set_ylabel("Station No.")
         ax1.legend(loc='upper left')
-        fig.savefig(f"{outdir}/{evtid}.{band}.jpg",dpi=300)
+        fig.savefig(f"{outdir}/{evtid}_{comp}.{band}.jpg",dpi=300)
         fig.clear()
         plt.close(1)
 
@@ -142,8 +147,8 @@ def main():
         exit(1)
     
     # set directory
-    path = "../"
-    comp = 'ZZ'
+    path = "../../"
+    comp = ['ZZ','TT']
 
     #### stop here
 
@@ -165,13 +170,15 @@ def main():
     infile.close()
 
     # plot figures
-    args = []
-    for line in lines:
-        args.append((line,M1,solver,seisdir,comp,paramfile))
-    pool = Pool(4)
-    pool.starmap(plot_event,args)
-    pool.close()
-    pool.join()
+    for c in comp:
+        print(f"Plotting component {c} ...")
+        args = []
+        for line in lines:
+            args.append((line,M1,solver,seisdir,c,paramfile))
+        pool = Pool(4)
+        pool.starmap(plot_event,args)
+        pool.close()
+        pool.join()
 
 if __name__ == "__main__":
     main()
