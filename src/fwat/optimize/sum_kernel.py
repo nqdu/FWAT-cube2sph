@@ -203,6 +203,16 @@ def run(argv):
         kl = np.asarray(kl,dtype='f4')
         f.write_record(kl)
         f.close()
+    
+    if PRECOND == 'z_sqrt_precond':
+        outname = KERNEL_DIR + "/proc%06d"%myrank + "_hess_kernel" + '.bin'
+        kl = compute_zpred_hess(iter_cur)
+        idx = np.logical_not(kl == 1.0e-8)
+        kl[idx] = np.sqrt(kl[idx])
+        f = FortranIO(outname,"w")
+        kl = np.asarray(kl,dtype='f4')
+        f.write_record(kl)
+        f.close()
 
     # sum hess if required
     if PRECOND == 'default':

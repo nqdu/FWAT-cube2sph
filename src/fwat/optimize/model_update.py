@@ -73,10 +73,7 @@ def run(argv):
     step_fac = opt['alpha']
     step_fac_in_per = params['MAX_PER']
 
-    # first lbfgs step_fac = step_fac_in_per
-    if opt['iter'] == opt['iter_start'] and opt['iter_ls'] == 0:
-        step_fac = -1
-    
+    # first lbfgs step_fac = step_fac_in_per    
     if opt['iter'] == opt['iter_start'] + 1 and opt['iter_ls'] == 0:
         # init step_fac is 1
         step_fac = 1.

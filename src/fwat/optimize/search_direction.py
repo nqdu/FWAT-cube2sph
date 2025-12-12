@@ -310,6 +310,9 @@ def run():
     # get search direction
     get_search_direction(iter,LBFGS_FILE)
 
+    # finalize mpi
+    MPI.Finalize()
+
 def main():
     run()
 

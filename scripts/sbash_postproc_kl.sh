@@ -74,7 +74,7 @@ fi
 LOCAL_PATH=${FWAT_OPT_DIR}/MODEL_${MODEL}
 change_par LOCAL_PATH $LOCAL_PATH ./DATA/Par_file
 change_par LOCAL_PATH $LOCAL_PATH ./DATA/meshfem3D_files/Mesh_Par_file
-info=`fwat-utils getparam ${FWAT_OPT_DIR}/SMOOTHING  | sed 's/\[\|]//g' | sed 's/,/ /g'`
+info=`fwat-utils getparam optimize/SMOOTHING  | sed 's/\[\|]//g' | sed 's/,/ /g'`
 sigma_h=`echo $info | awk  '{print $1}'`
 sigma_v=`echo $info | awk  '{print $2}'`
 

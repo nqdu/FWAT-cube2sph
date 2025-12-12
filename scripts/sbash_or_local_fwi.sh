@@ -1,14 +1,3 @@
-#!/bin/bash
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=192
-#SBATCH --time=00:30:00
-#SBATCH --job-name=ADJ
-#SBATCH --output=LOG/ADJ-%j.txt
-#SBATCH --account=rrg-liuqy
-#SBATCH --partition=compute
-#SBATCH --mail-type=FAIL
-#SBATCH --mail-user=nanqiao.du@mail.utoronto.ca
-
 ###################################################
 # error flag
 set -e 
@@ -47,7 +36,7 @@ run_one_simu_() {
     cd $work_dir
 
     # count stations used
-    nsta_used=`awk 'END{print NR}' ${FWAT_SRC_REC}/DATA/STATIONS`
+    nsta_used=`awk 'END{print NR}' $evtdir/DATA/STATIONS`
   done 
 
   # run measure

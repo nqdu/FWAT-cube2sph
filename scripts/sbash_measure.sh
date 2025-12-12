@@ -95,7 +95,7 @@ for i in `seq 1 $NJOBS`; do
     cd $work_dir
 
     # count stations used
-    nsta_used=`awk 'END{print NR}' ${FWAT_SRC_REC}/DATA/STATIONS`
+    nsta_used=`awk 'END{print NR}' $evtdir/DATA/STATIONS`
   done 
 
   # run measure
@@ -103,7 +103,7 @@ for i in `seq 1 $NJOBS`; do
   echo "measure adjoint source for $evtid ..."
   cd $work_dir
   date
-  local nproc_run=$NPROC 
+  nproc_run=$NPROC 
   if [ $nsta_used -lt $NPROC ]; then
     nproc_run=$nsta_used
   fi

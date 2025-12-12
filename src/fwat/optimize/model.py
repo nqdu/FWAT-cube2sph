@@ -28,6 +28,7 @@ class FwatModel:
             For dtti:
                 * 1 : vp, vs, rho, gcp, gsp
                 * 2 : vph, vpv, vsh, vsv, rho, eta, gcp, gsp
+                * 3 : vp,vs,rho,(vph-vpv)/vpv,(vsh-vsv)/vsv, eta, gcp, gsp
         """
         self._mdtype = mdtype
         self._kltype = kltype
@@ -77,6 +78,11 @@ class FwatModel:
                 direc_list = ["dalpha","dbeta","drho","dGcp","dGsp"]
             elif self._kltype == 2:
                 direc_list = ["dalphah","dalphav","dbetah","dbetav","drho","deta","dGcp","dGsp"]
+            elif self._kltype == 3:
+                direc_list = ["dalpha","dbeta","drho","dkappaa","dkappab","deta","dGcp","dGsp"]
+            else:
+                print(f"not implemented for kltype = {self._kltype}")
+                exit(1)
         else:
             print(f"not implemented for modeltype = {self._mdtype}")
             exit(1)
@@ -156,7 +162,7 @@ class FwatModel:
 
                 # get parameters
                 A = model[_Index(0,0),...]
-                C = model[_Index(1,1),...]
+                C = model[_Index(2,2),...]
                 L = 0.5 * (model[_Index(3,3),...] + model[_Index(4,4),...])
                 N = model[_Index(5,5),...]
                 F = model[_Index(0,2),...]
@@ -202,6 +208,90 @@ class FwatModel:
                 model_new[_Index(5,5),...] = N 
                 model_new[_Index(3,4),...] = -gs
                 model_new[-1,...] = rho
+        elif self._kltype == 3: # vp,vs,rho,(vph-vpv)/vpv,(vsh-vsv)/vsv, eta,gcp,gsp
+            if not backward:
+                rho = model[-1,:] * 1.
+                new_shape = (8,) + model.shape[1:]
+                model_new = np.zeros(new_shape)
+
+                # get parameters
+                A = model[_Index(0,0),...]
+                C = model[_Index(2,2),...]
+                L = 0.5 * (model[_Index(3,3),...] + model[_Index(4,4),...])
+                N = model[_Index(5,5),...]
+                F = model[_Index(0,2),...]
+                eta = F / (A - 2 * L)
+                gcp = (model[_Index(4,4),...] - L) / L
+                gsp = -model[_Index(3,4),...] / L 
+
+                # get vpv/vph and vsv/vsh
+                vph = np.sqrt(A / rho) # vph
+                vpv = np.sqrt(C / rho) # vpv
+                vsh = np.sqrt(N / rho) # vsh
+                vsv = np.sqrt(L / rho) # vsv
+
+                # compute kappa, and voigt averaged vp, vs
+                vp = np.sqrt((2 * vph**2 + vpv**2) / 3)
+                vs = np.sqrt((2 * vsh**2 + vsv**2) / 3)
+                kappaa = (vph - vpv) / vpv
+                kappab = (vsh - vsv) / vsv
+
+                # save to model_new
+                model_new[0,...] = vp * 1.
+                model_new[1,...] = vs * 1.
+                model_new[2,...] = rho * 1.
+                model_new[3,...] = kappaa * 1.
+                model_new[4,...] = kappab * 1.
+                model_new[5,...] = eta * 1. 
+                model_new[6,...] = gcp * 1. 
+                model_new[7,...] = gsp * 1. 
+
+            else:
+                new_shape = (22,) + model.shape[1:]
+                model_new = np.zeros(new_shape)
+
+                # get parameters
+                rho = model[2,...]
+                vp = model[0,...]
+                vs = model[1,...]
+                kappaa = model[3,...]
+                kappab = model[4,...]
+                eta = model[5,...]
+                gcp = model[6,...]
+                gsp = model[7,...]
+
+                # compute vph,vpv,vsh,vsv
+                # vs = sqrt((2*vsh^2 + vsv^2)/3)
+                # kappab = (vsh - vsv)/vsv
+                # => vsv^2 = 3 * vs^2 / (2 * (1 + kappab)^2 + 1)
+                # => vsh^2 = (1 + kappab)**2 * vsv^2
+                vpv_sq = 3 * vp**2 / (2 * (1 + kappaa)**2 + 1)
+                vph_sq = (1 + kappaa)**2 * vpv_sq
+                vsv_sq = 3 * vs**2 / (2 * (1 + kappab)**2 + 1)
+                vsh_sq = (1 + kappab)**2 * vsv_sq
+
+                # Lame parameters
+                A = vph_sq * rho 
+                C = vpv_sq * rho 
+                L = vsv_sq * rho
+                N = vsh_sq * rho
+                F = eta * (A - 2 * L)
+                gc = gcp * L
+                gs = gsp * L
+
+                # copy to cijkl
+                model_new[_Index(0,0),...] = A
+                model_new[_Index(1,1),...] = A
+                model_new[_Index(2,2),...] = C 
+                model_new[_Index(0,1),...] = A - 2 * N 
+                model_new[_Index(0,2),...] = F
+                model_new[_Index(1,2),...] = F
+                model_new[_Index(3,3),...] = L - gc 
+                model_new[_Index(4,4),...] = L + gc 
+                model_new[_Index(5,5),...] = N 
+                model_new[_Index(3,4),...] = -gs
+                model_new[-1,...] = rho
+
         else:
             print(f"not implemented for kltype = {self._kltype}")
             exit(1)
@@ -287,11 +377,32 @@ class FwatModel:
                 phi = 0.5 * np.arctan2(gsp,gcp)
                 g0p = np.hypot(gsp,gcp)
 
+                # zero out phi when g0p < 1.0e-2
+                idx = g0p < 1.0e-2
+                phi[idx] = 0.
+
                 # copy back to model_user
-                model_user[5,...] = phi * 1.
-                model_user[6,...] = g0p * 1.
-                plot_names[5] = "phi"
-                plot_names[6] = "G0"
+                model_user[6,...] = phi * 1.
+                model_user[7,...] = g0p * 1.
+                plot_names[6] = "phi"
+                plot_names[7] = "G0"
+
+            elif self._kltype == 3: # vp,vs,rho,vph/vpv,vsh/vsv, eta,gcp,gsp
+                gcp = model_user[6,...]
+                gsp = model_user[7,...]
+                phi = 0.5 * np.arctan2(gsp,gcp)
+                g0p = np.hypot(gsp,gcp)
+
+                # zero out phi when g0p < 1.0e-2
+                idx = g0p < 1.0e-2
+                phi[idx] = 0.
+                
+                # copy back to model_user
+                model_user[6,...] = phi * 1.
+                model_user[7,...] = g0p * 1.
+                plot_names[6] = "phi"
+                plot_names[7] = "G0"
+
             else:
                 print(f"not implemented for kltype = {self._kltype}")
                 exit(1)
@@ -327,16 +438,21 @@ class FwatModel:
                 md_used[:3,...] = np.log(md[:3,...])
             elif self._kltype == 2: # vph,vpv,vsh,vsv,rho,eta,gcp,gsp
                 md_used[:5,...] = np.log(md[:5,...])
+            elif self._kltype == 3: # vp,vs,rho,vph/vpv,vsh/vsv, eta,gcp,gsp
+                md_used[:3,...] = np.log(md[:3,...])
+            else:
+                print(f"not implemented for kltype = {self._kltype}")
+                exit(1)
         
         return md_used
     
-    def model_update(self,md_opt:np.ndarray,direc:np.ndarray):
+    def model_update(self,md_usr:np.ndarray,direc:np.ndarray):
         """
         update model by given direction
 
         Parameters
         -------------
-        md_opt: np.ndarray
+        md_usr: np.ndarray
             current user defined model used in optimization
         direc: np.ndarray
             search direction in user defined model
@@ -346,21 +462,27 @@ class FwatModel:
         md_update: np.ndarray
             updated user defined model
         """
-        md_update = md_opt * 1.
+        md_update = md_usr * 1.
         if self._mdtype == "iso":
             if self._kltype == 1: # vp,vs,rho
-                md_update = md_opt * np.exp(direc)
-            elif self._kltype == 2: # vp/vs,vs,rho
-                md_update[0,...] = md_opt[0,...] + direc[0,...]
-                md_update[1:,...] = md_opt[1:,...] * np.exp(direc[1:,...])
+                md_update = md_usr * np.exp(direc)
+            elif self._kltype == 2  : # vp/vs,vs,rho
+                md_update[0,...] = md_usr[0,...] + direc[0,...]
+                md_update[1:,...] = md_usr[1:,...] * np.exp(direc[1:,...])
         
         elif self._mdtype == "dtti":
             if self._kltype == 1: # vp,vs,rho,gcp,gsp
-                md_update[3:,...] = md_opt[3:,...] + direc[3:,...]
-                md_update[:3,...] = md_opt[:3,...] * np.exp(direc[:3,...])
+                md_update[3:,...] = md_usr[3:,...] + direc[3:,...]
+                md_update[:3,...] = md_usr[:3,...] * np.exp(direc[:3,...])
             elif self._kltype == 2: # vph,vpv,vsh,vsv,rho,eta,gcp,gsp
-                md_update[5:,...] = md_opt[5:,...] + direc[5:,...]
-                md_update[:5,...] = md_opt[:5,...] * np.exp(direc[:5,...])
+                md_update[5:,...] = md_usr[5:,...] + direc[5:,...]
+                md_update[:5,...] = md_usr[:5,...] * np.exp(direc[:5,...])
+            elif self._kltype == 3: # vp,vs,rho,vph/vpv,vsh/vsv, eta,gcp,gsp
+                md_update[3:,...] = md_usr[3:,...] + direc[3:,...]
+                md_update[:3,...] = md_usr[:3,...] * np.exp(direc[:3,...])
+            else:
+                print(f"not implemented for kltype = {self._kltype}")
+                exit(1)
 
         return md_update
     
@@ -392,7 +514,7 @@ class FwatModel:
             # get relative change if required
             md_newkl[0:3,...] *= md_new[0:3,...]
             
-        elif self._kltype == 2:
+        elif self._kltype == 2: # vph,vpv,vsh,vsv,rho,eta,gcp,gsp
             vph = md_new[0,...] * 1.
             vpv = md_new[1,...] * 1.
             vsh = md_new[2,...] * 1.
@@ -425,6 +547,89 @@ class FwatModel:
 
             # get relative change if required
             md_newkl[0:5,...] *= md_new[0:5,...]
+        
+        elif self._kltype == 3: # vp,vs,rho,(vph-vpv)/vpv,(vsh-vsv)/vsv, eta,gcp,gsp
+            vp = md_new[0,...] * 1.
+            vs = md_new[1,...] * 1.
+            rho = md_new[2,...] * 1.
+            kappaa = md_new[3,...] * 1.
+            kappab = md_new[4,...] * 1.
+            eta = md_new[5,...] * 1.
+            gcp = md_new[6,...]
+            gsp = md_new[7,...]
+
+            # auto generated by sympy
+            md_newkl = md_new * 0
+            md_newkl[0,...] = md_kl[0,...]*(6*rho*vp*(kappaa + 1)**2/(2*(kappaa + 1)**2 + \
+                1))+md_kl[1,...]*(6*rho*vp*(kappaa + 1)**2/(2*(kappaa + 1) \
+                **2 + 1))+md_kl[2,...]*(6*eta*rho*vp*(kappaa + 1)**2/(2* \
+                (kappaa + 1)**2 + 1))+md_kl[6,...]*(6*rho*vp*(kappaa + 1)**2 \
+                /(2*(kappaa + 1)**2 + 1))+md_kl[7,...]*(6*eta*rho*vp* \
+                (kappaa + 1)**2/(2*(kappaa + 1)**2 + 1))+md_kl[11,...]*(6* \
+                rho*vp/(2*(kappaa + 1)**2 + 1))
+            md_newkl[1,...] = md_kl[1,...]*(-12*rho*vs*(kappab + 1)**2/(2*(kappab + 1)**2 \
+                + 1))+md_kl[2,...]*(-12*eta*rho*vs/(2*(kappab + 1)**2 + 1))+ \
+                md_kl[7,...]*(-12*eta*rho*vs/(2*(kappab + 1)**2 + 1))+ \
+                md_kl[15,...]*(-6*gcp*rho*vs/(2*(kappab + 1)**2 + 1) + 6*rho \
+                *vs/(2*(kappab + 1)**2 + 1))+md_kl[16,...]*(-6*gsp*rho*vs/(2 \
+                *(kappab + 1)**2 + 1))+md_kl[18,...]*(6*gcp*rho*vs/(2* \
+                (kappab + 1)**2 + 1) + 6*rho*vs/(2*(kappab + 1)**2 + 1))+ \
+                md_kl[20,...]*(6*rho*vs*(kappab + 1)**2/(2*(kappab + 1)**2 + \
+                1))
+            md_newkl[2,...] = md_kl[-1,...]* (1)+md_kl[0,...]*(3*vp**2*(kappaa + 1)**2/(2* \
+                (kappaa + 1)**2 + 1))+md_kl[1,...]*(3*vp**2*(kappaa + 1)**2/ \
+                (2*(kappaa + 1)**2 + 1) - 6*vs**2*(kappab + 1)**2/(2* \
+                (kappab + 1)**2 + 1))+md_kl[2,...]*(eta*(3*vp**2*(kappaa + \
+                1)**2/(2*(kappaa + 1)**2 + 1) - 6*vs**2/(2*(kappab + 1)**2 \
+                + 1)))+md_kl[6,...]*(3*vp**2*(kappaa + 1)**2/(2*(kappaa + 1) \
+                **2 + 1))+md_kl[7,...]*(eta*(3*vp**2*(kappaa + 1)**2/(2* \
+                (kappaa + 1)**2 + 1) - 6*vs**2/(2*(kappab + 1)**2 + 1)))+ \
+                md_kl[11,...]*(3*vp**2/(2*(kappaa + 1)**2 + 1))+ \
+                md_kl[15,...]*(-3*gcp*vs**2/(2*(kappab + 1)**2 + 1) + 3*vs** \
+                2/(2*(kappab + 1)**2 + 1))+md_kl[16,...]*(-3*gsp*vs**2/(2* \
+                (kappab + 1)**2 + 1))+md_kl[18,...]*(3*gcp*vs**2/(2*(kappab \
+                + 1)**2 + 1) + 3*vs**2/(2*(kappab + 1)**2 + 1))+ \
+                md_kl[20,...]*(3*vs**2*(kappab + 1)**2/(2*(kappab + 1)**2 + \
+                1))
+            md_newkl[3,...] = md_kl[0,...]*(3*rho*vp**2*(-4*kappaa - 4)*(kappaa + 1)**2/(2 \
+                *(kappaa + 1)**2 + 1)**2 + 3*rho*vp**2*(2*kappaa + 2)/(2* \
+                (kappaa + 1)**2 + 1))+md_kl[1,...]*(3*rho*vp**2*(-4*kappaa - \
+                4)*(kappaa + 1)**2/(2*(kappaa + 1)**2 + 1)**2 + 3*rho*vp**2 \
+                *(2*kappaa + 2)/(2*(kappaa + 1)**2 + 1))+md_kl[2,...]*(eta* \
+                (3*rho*vp**2*(-4*kappaa - 4)*(kappaa + 1)**2/(2*(kappaa + 1) \
+                **2 + 1)**2 + 3*rho*vp**2*(2*kappaa + 2)/(2*(kappaa + 1)**2 \
+                + 1)))+md_kl[6,...]*(3*rho*vp**2*(-4*kappaa - 4)*(kappaa + \
+                1)**2/(2*(kappaa + 1)**2 + 1)**2 + 3*rho*vp**2*(2*kappaa + \
+                2)/(2*(kappaa + 1)**2 + 1))+md_kl[7,...]*(eta*(3*rho*vp**2* \
+                (-4*kappaa - 4)*(kappaa + 1)**2/(2*(kappaa + 1)**2 + 1)**2 + \
+                3*rho*vp**2*(2*kappaa + 2)/(2*(kappaa + 1)**2 + 1)))+ \
+                md_kl[11,...]*(3*rho*vp**2*(-4*kappaa - 4)/(2*(kappaa + 1)** \
+                2 + 1)**2)
+            md_newkl[4,...] = md_kl[1,...]*(-6*rho*vs**2*(-4*kappab - 4)*(kappab + 1)**2/ \
+                (2*(kappab + 1)**2 + 1)**2 - 6*rho*vs**2*(2*kappab + 2)/(2* \
+                (kappab + 1)**2 + 1))+md_kl[2,...]*(-6*eta*rho*vs**2*(-4* \
+                kappab - 4)/(2*(kappab + 1)**2 + 1)**2)+md_kl[7,...]*(-6*eta \
+                *rho*vs**2*(-4*kappab - 4)/(2*(kappab + 1)**2 + 1)**2)+ \
+                md_kl[15,...]*(-3*gcp*rho*vs**2*(-4*kappab - 4)/(2*(kappab + \
+                1)**2 + 1)**2 + 3*rho*vs**2*(-4*kappab - 4)/(2*(kappab + 1) \
+                **2 + 1)**2)+md_kl[16,...]*(-3*gsp*rho*vs**2*(-4*kappab - 4) \
+                /(2*(kappab + 1)**2 + 1)**2)+md_kl[18,...]*(3*gcp*rho*vs**2* \
+                (-4*kappab - 4)/(2*(kappab + 1)**2 + 1)**2 + 3*rho*vs**2*(-4 \
+                *kappab - 4)/(2*(kappab + 1)**2 + 1)**2)+md_kl[20,...]*(3* \
+                rho*vs**2*(-4*kappab - 4)*(kappab + 1)**2/(2*(kappab + 1)** \
+                2 + 1)**2 + 3*rho*vs**2*(2*kappab + 2)/(2*(kappab + 1)**2 + \
+                1))
+            md_newkl[5,...] = md_kl[2,...]*(3*rho*vp**2*(kappaa + 1)**2/(2*(kappaa + 1)** \
+                2 + 1) - 6*rho*vs**2/(2*(kappab + 1)**2 + 1))+md_kl[7,...]* \
+                (3*rho*vp**2*(kappaa + 1)**2/(2*(kappaa + 1)**2 + 1) - 6*rho \
+                *vs**2/(2*(kappab + 1)**2 + 1))
+            md_newkl[6,...] = md_kl[15,...]*(-3*rho*vs**2/(2*(kappab + 1)**2 + 1))+ \
+                md_kl[18,...]*(3*rho*vs**2/(2*(kappab + 1)**2 + 1))
+            md_newkl[7,...] = md_kl[16,...]*(-3*rho*vs**2/(2*(kappab + 1)**2 + 1))
+            
+            # get relative change if required
+            md_newkl[0:3,...] *= md_new[0:3,...]
+            
         else:
             print(f"not implemented for kltype = {self._kltype}")
             exit(1)
