@@ -78,7 +78,9 @@ def run(argv):
         # init step_fac is 1
         step_fac = 1.
 
-    if step_fac <= 0 or step_fac * direc_max > step_fac_in_per:
+    # limit step_fac
+    flag = (step_fac > 0) and (step_fac * direc_max > step_fac_in_per) and opt['iter_ls'] ==0 
+    if step_fac <= 0 or flag:
         step_fac = step_fac_in_per / direc_max
     
     if myrank == 0:

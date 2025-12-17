@@ -21,7 +21,7 @@ flag: 'INIT'
 # line search
 M1: 1.0e-4 # Wolfe conditions parameter 1 (Nocedal value)
 M2: 0.9  # Wolfe conditions parameter 2 (Nocedal value)
-FACTOR: 10 # Bracketting parameter (Gilbert value
+FACTOR: 2 # Bracketting parameter (Gilbert value)
 MAXLS: 100
 alpha_L: 0
 alpha_R: 0

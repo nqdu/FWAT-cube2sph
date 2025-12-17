@@ -387,7 +387,7 @@ class FwatModel:
                 plot_names[6] = "phi"
                 plot_names[7] = "G0"
 
-            elif self._kltype == 3: # vp,vs,rho,vph/vpv,vsh/vsv, eta,gcp,gsp
+            elif self._kltype == 3: # vp,vs,rho,(vph-vpv)/vpv,(vsh-vsv)/vsv, eta,gcp,gsp
                 gcp = model_user[6,...]
                 gsp = model_user[7,...]
                 phi = 0.5 * np.arctan2(gsp,gcp)
@@ -438,7 +438,7 @@ class FwatModel:
                 md_used[:3,...] = np.log(md[:3,...])
             elif self._kltype == 2: # vph,vpv,vsh,vsv,rho,eta,gcp,gsp
                 md_used[:5,...] = np.log(md[:5,...])
-            elif self._kltype == 3: # vp,vs,rho,vph/vpv,vsh/vsv, eta,gcp,gsp
+            elif self._kltype == 3: # vp,vs,rho,(vph-vpv)/vpv,(vsh-vsv)/vsv, eta,gcp,gsp
                 md_used[:3,...] = np.log(md[:3,...])
             else:
                 print(f"not implemented for kltype = {self._kltype}")
