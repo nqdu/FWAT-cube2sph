@@ -226,6 +226,10 @@ class NoiseMC_PreOP():
     def _rotate_XYZ_to_ZNE(self):
         from .cube2sph_rotate import rotate_seismo_fwd
 
+        # get rotation list
+        istart,iend = alloc_mpi_jobs(len(self.sta_names),self.nprocs,self.myrank)
+        rot_list = [self.sta_names[i] for i in range(istart,iend+1)]
+
         # loop each synthetic directory
         for ic in range(len(self.scomp_syn)):
             fn_matrix = f"{self.SRC_REC}/rot_{self.evtid}"
@@ -235,11 +239,15 @@ class NoiseMC_PreOP():
             to_template='${nt}.${sta}.BX${comp}.sem.npy'
 
             # rotate seismograms from XYZ to ZNE
-            out = rotate_seismo_fwd(fn_matrix,from_dir,to_dir,from_template,to_template)
+            out = rotate_seismo_fwd(rot_list, fn_matrix, from_dir, to_dir, from_template, to_template)
             self.seismogram.update(out)
 
     def _rotate_ZNE_to_XYZ(self):
         from .cube2sph_rotate import rotate_seismo_adj
+
+        # get rotation list
+        istart,iend = alloc_mpi_jobs(len(self.sta_names),self.nprocs,self.myrank)
+        rot_list = [self.sta_names[i] for i in range(istart,iend+1)]
 
         # loop each synthetic directory
         for ic in range(len(self.scomp_syn)):
@@ -250,7 +258,7 @@ class NoiseMC_PreOP():
             to_template='${nt}.${sta}.BX${comp}.adj'
 
             # rotate seismograms from XYZ to ZNE
-            rotate_seismo_adj(fn_matrix,from_dir,to_dir,from_template,to_template)
+            rotate_seismo_adj(rot_list, fn_matrix, from_dir, to_dir, from_template, to_template)
 
     def _get_bandname(self,ib:int):
         return 'T%03g_T%03g' %(self.Tmin[ib],self.Tmax[ib])
@@ -746,8 +754,8 @@ class NoiseMC_PreOP():
                     bandname = self._get_bandname(ib) 
                     for ic in range(3):
                         #data = np.load(f"{syndir}/OUTPUT_FILES/{bandname}/{name}.{self.chcode}{comps_read[ic]}.adj.sem.npy")
-                        data = self.seismogram_adj[f"{syndir}/OUTPUT_FILES/{bandname}/{name}.{self.chcode}{comps_read[ic]}.adj.sem.npy"]
-                        adj[ic,:] += data[:,1]
+                        key = f"{syndir}/OUTPUT_FILES/{bandname}/{name}.{self.chcode}{comps_read[ic]}.adj.sem.npy"
+                        adj[ic,:] += self.seismogram_adj[key][:,1]
                 
                 # save to SEM/
                 data = np.zeros((self.npt_syn,2)) 

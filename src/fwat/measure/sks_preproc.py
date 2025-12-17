@@ -191,7 +191,7 @@ class SKS_PreOP(FwatPreOP):
 
         freqmin = 1. / self.Tmax[ib]
         freqmax = 1. / self.Tmin[ib]
-        out_dir = f"{self.syndir}/OUTPUT_FILES/"
+        out_dir = f"{self.syndir}/OUTPUT_FILES"
 
         # get vars
         t0_syn = self.t0_syn
@@ -243,7 +243,7 @@ class SKS_PreOP(FwatPreOP):
 
                 # read syn data and preprocessing
                 #sdata = np.load(f"{out_dir}/{name}.sem.npy")[:,1]
-                sdata = self.seismogram[f"{out_dir}/{name}.sem.npy"][:,1]
+                sdata = self.seismogram[f"{out_dir}/{name}.sem.npy"][:,1] * 1.
                 sdata = bandpass(sdata,dt_syn,freqmin,freqmax)
                 syn_data[ic,:] = sdata * taper 
 
@@ -338,12 +338,12 @@ class SKS_PreOP(FwatPreOP):
             data[:,1] = adjsrc_T
             outname = f"{out_dir}/{bandname}/{self.netwk[i]}.{self.stnm[i]}.{self.chcode}T.adj.sem.npy"
             #np.save(outname,data)
-            self.seismogram_adj[outname] = data
+            self.seismogram_adj[outname] = data * 1.
 
             data[:,1] = adjsrc_R
             outname = f"{out_dir}/{bandname}/{self.netwk[i]}.{self.stnm[i]}.{self.chcode}R.adj.sem.npy"
             #np.save(outname,data)
-            self.seismogram_adj[outname] = data
+            self.seismogram_adj[outname] = data * 1.
 
         # save SI 
         if cal_obs_si: self._write_si_obs(si_obs_data)

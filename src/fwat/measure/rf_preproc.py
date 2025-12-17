@@ -318,7 +318,7 @@ class RF_PreOP(FwatPreOP):
         # get frequency band
         freqmin = 1. / self.Tmax[0]
         freqmax = 1. / self.Tmin[0]
-        out_dir = f"{self.syndir}/OUTPUT_FILES/"
+        out_dir = f"{self.syndir}/OUTPUT_FILES"
 
         # get vars
         t0_syn = self.t0_syn

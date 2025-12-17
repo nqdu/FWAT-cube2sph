@@ -115,7 +115,7 @@ class Tele_PreOP(FwatPreOP):
         freqmax = 1. / self.Tmin[ib]
 
         # get frequency band
-        out_dir = f"{self.syndir}/OUTPUT_FILES/"
+        out_dir = f"{self.syndir}/OUTPUT_FILES"
 
         # get time window 
         dt_syn = self.dt_syn
@@ -139,7 +139,7 @@ class Tele_PreOP(FwatPreOP):
 
                 # read data
                 #syn_data = np.load(f"{out_dir}/{name}.sem.npy")[:,1]
-                syn_data = self.seismogram[f"{out_dir}/{name}.sem.npy"][:,1]
+                syn_data = self.seismogram[f"{out_dir}/{name}.sem.npy"][:,1] * 1.
                 obs_tr = SACTrace.read(f"{self.DATA_DIR}/{self.evtid}/{name}.sac")
                 t0_obs = obs_tr.b 
                 dt_obs = obs_tr.delta 
@@ -179,7 +179,7 @@ class Tele_PreOP(FwatPreOP):
         bandname = self._get_bandname(ib)
         freqmin = 1. / self.Tmax[ib]
         freqmax = 1. / self.Tmin[ib]
-        out_dir = f"{self.syndir}/OUTPUT_FILES/"
+        out_dir = f"{self.syndir}/OUTPUT_FILES"
 
         # get vars
         t0_syn = self.t0_syn
@@ -274,7 +274,7 @@ class Tele_PreOP(FwatPreOP):
                 data[:,0] = t0_syn + np.arange(npt_syn) * dt_syn
                 data[:,1] = adjsrc
                 name = self._get_station_code(i,ic) + ".adj.sem.npy"
-                self.seismogram_adj[f"{out_dir}/{bandname}/{name}"] = data 
+                self.seismogram_adj[f"{out_dir}/{bandname}/{name}"] = data * 1.
                 # np.save(f"{out_dir}/{bandname}/{name}",data)
 
                 # save SAC obs and syn
@@ -319,7 +319,7 @@ class Tele_PreOP(FwatPreOP):
 
         # get frequency band
         bandname = self._get_bandname(ib)
-        out_dir = f"{self.syndir}/OUTPUT_FILES/"
+        out_dir = f"{self.syndir}/OUTPUT_FILES"
 
         # get vars
         t0_syn = self.t0_syn
@@ -388,11 +388,11 @@ class Tele_PreOP(FwatPreOP):
             data[:,1] = adj_z
             name = self._get_station_code(i,ic_z) + ".adj.sem.npy"
             #np.save(f"{out_dir}/{bandname}/{name}",data)
-            self.seismogram_adj[f"{out_dir}/{bandname}/{name}"] = data
+            self.seismogram_adj[f"{out_dir}/{bandname}/{name}"] = data * 1.
             data[:,1] = adj_r
             name = self._get_station_code(i,ic_r) + ".adj.sem.npy"
             #np.save(f"{out_dir}/{bandname}/{name}",data)
-            self.seismogram_adj[f"{out_dir}/{bandname}/{name}"] = data
+            self.seismogram_adj[f"{out_dir}/{bandname}/{name}"] = data * 1.
 
             # save obs and synthetic data
             for ic in range(1): # only one component
