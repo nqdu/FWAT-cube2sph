@@ -14,7 +14,7 @@ EOF
 #SBATCH --ntasks-per-node=$nproc_per_node
 #SBATCH --time=00:15:59
 #SBATCH --job-name=FWI
-#SBATCH --output=LOG/FWI_%j.log 
+#SBATCH --output=LOG/FWI.log 
 #SBATCH --account=rrg-liuqy
 #SBATCH --partition=compute
 #SBATCH --mail-type=FAIL
