@@ -120,6 +120,9 @@ class FwatPreOP:
     def _rotate_XYZ_to_ZNE(self):
         from .cube2sph_rotate import rotate_seismo_fwd
 
+        # get rotation list
+        rot_list = [self.netwk[i] + "." + self.stnm[i] for i in range(self._istart,self._istart + self.nsta_loc)]
+
         # set parameters
         fn_matrix = f"{self.SRC_REC}/rot_{self.evtid}"
         from_dir = f"{self.syndir}/OUTPUT_FILES/"
@@ -129,10 +132,13 @@ class FwatPreOP:
 
         # rotate seismograms from XYZ to ZNE
         self.seismogram =  \
-            rotate_seismo_fwd(fn_matrix,from_dir,to_dir,from_template,to_template)
+            rotate_seismo_fwd(rot_list,fn_matrix,from_dir,to_dir,from_template,to_template)
     
     def _rotate_ZNE_to_XYZ(self):
         from .cube2sph_rotate import rotate_seismo_adj
+
+        # get rotation list
+        rot_list = [self.netwk[i] + "." + self.stnm[i] for i in range(self._istart,self._istart + self.nsta_loc)]
 
         # set parameters
         fn_matrix = f"{self.SRC_REC}/rot_{self.evtid}"
@@ -142,7 +148,7 @@ class FwatPreOP:
         to_template='${nt}.${sta}.BX${comp}.adj'
 
         # rotate seismograms from XYZ to ZNE
-        rotate_seismo_adj(fn_matrix,from_dir,to_dir,from_template,to_template)
+        rotate_seismo_adj(rot_list,fn_matrix,from_dir,to_dir,from_template,to_template)
 
     def _print_measure_info(self,bandname,tstart,tend,tr_chi,am_chi,window_chi):
         """ 
@@ -246,8 +252,7 @@ class FwatPreOP:
                 for ic,ch in enumerate(comps_read):
                     name = f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}{ch}.adj.sem.npy"
                     if f"{input_dir}/{name}" in self.seismogram_adj:
-                        data = self.seismogram_adj[f"{input_dir}/{name}"]
-                        adj[ic,:] += data[:,1]
+                        adj[ic,:] += self.seismogram_adj[f"{input_dir}/{name}"][:,1]
                 
             # rotation if required
             if need_rotate:
@@ -364,7 +369,7 @@ class FwatPreOP:
                     filename = f"{self.syndir}/OUTPUT_FILES/{name}"
                     data[:,1] = temp_syn[ic,:] 
                     #data.tofile(filename)
-                    self.seismogram[filename] = data 
+                    self.seismogram[filename] = data.copy()
         MPI.COMM_WORLD.Barrier()
 
     def save_forward(self):

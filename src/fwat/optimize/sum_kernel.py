@@ -104,7 +104,8 @@ def run(argv):
     with open(f"{PARAM_FILE}","r") as fio:
         PRECOND = yaml.safe_load(fio)['optimize']['PRECOND_TYPE']
 
-    assert(PRECOND in ['default','none','z_precond','z2_precond'])
+    assert(PRECOND in ['default','none','z_precond','z2_precond','z_sqrt_precond']), \
+        f"PRECOND_TYPE = {PRECOND} not supported "
     KERNEL_DIR = f'./{OPT_DIR}/SUM_KERNELS_{MODEL}'
     os.makedirs(KERNEL_DIR,exist_ok=True)
     

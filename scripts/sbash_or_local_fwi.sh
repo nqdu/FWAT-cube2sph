@@ -9,6 +9,19 @@ run_one_simu_() {
   local run_opt=$4 
   local fwd=$5
 
+  # check if we are in slurm
+  local hostfile=""
+  local my_hostfile="$work_dir/hostfile_${evtid}.txt"
+  if [ -n "$SLURM_JOB_ID" ]; then
+    hostfile="--hostfile $my_hostfile"
+
+    # atomic checkout of cores 
+    flock -x "$GLOBAL_SLOTS" bash -c "
+            head -n $NPROC '$GLOBAL_SLOTS' > '$my_hostfile'
+            sed -i '1,${NPROC}d' '$GLOBAL_SLOTS'
+        "
+  fi
+
   # prepare files
   fwat-main prepare forward $simu_type $iter $evtid $run_opt
 
@@ -24,8 +37,7 @@ run_one_simu_() {
     cd $evtdir/
     echo ""
     echo "forward simulation for $evtid_wk `date` ..."
-    date
-    $MPIRUN -np $NPROC $SEM_PATH/bin/xspecfem3D
+    $MPIRUN $hostfile -np $NPROC $SEM_PATH/bin/xspecfem3D
     echo "finished $evtid_wk at `date`"
 
     # merge all seismograms to one big file
@@ -47,7 +59,7 @@ run_one_simu_() {
   if [ $nsta_used -lt $NPROC ]; then
     nproc_run=$nsta_used
   fi
-  $MPIRUN -np $nproc_run fwat-main measure $simu_type $iter $evtid $run_opt >> $fwd 
+  $MPIRUN $hostfile -np $nproc_run fwat-main measure $simu_type $iter $evtid $run_opt >> $fwd 
   echo "finished measure for $evtid at `date`"
 
   # adjoint simulation
@@ -58,7 +70,7 @@ run_one_simu_() {
     cd $evtdir/
     echo ""
     echo "adjoint simulation for $evtid_wk at `date` ..."
-    $MPIRUN -np $NPROC $SEM_PATH/bin/xspecfem3D
+    $MPIRUN $hostfile -np $NPROC $SEM_PATH/bin/xspecfem3D
     echo "finished adjoint for $evtid_wk at `date`"
     echo " "
     cd $work_dir
@@ -83,9 +95,14 @@ run_one_simu_() {
   # print flags
   echo " " >> $fwd 
   echo "******************************************************" >> $fwd
-  echo "finish event $ievt of $nevts, pair $ievt - $ievt_ed" >> $fwd 
+  echo "finish event $ievt of $nevts" >> $fwd 
   echo " " >> $fwd
 
+  # clean my hostfile
+  if [ -n "$SLURM_JOB_ID" ]; then
+    flock -x "$GLOBAL_SLOTS" bash -c "cat '$my_hostfile' >> '$GLOBAL_SLOTS'"
+    \rm "$my_hostfile"
+  fi
 }
 
 run_measure()
@@ -115,43 +132,37 @@ run_measure()
   local MODEL=M`printf %02d $iter`
   local run_opt=3
   if [  "$FLAG" == "LS" ]; then 
-    local run_opt=2
-    local fwd=LOG/output_fwat3_log.$MODEL.$simu_type.$i.txt
+    run_opt=2
     MODEL=$MODEL.ls
   fi
 
   # log files
-  local fwd_tag=LOG/output_fwat1_log.$MODEL.$simu_type
-  for ((i=0; i < $nsimus_parallel; i++)); do
-    local simu_type=${SIMU_TYPES[0]}
-    
+  local nevts=${#evtid_list[@]}
+  local fwd_tag=LOG/output_fwat1_log.$MODEL
+  for((i=0; i <$nevts; i++)); do
+    local simu_type=${simu_type_list[$i]}
+    local ijob=$(( i % nsimus_parallel ))
+    fwd_tag=LOG/output_fwat1_log.$MODEL.$simu_type
     if [  "$FLAG" == "LS" ]; then 
-      fwd_tag=LOG/output_fwat3_log.$MODEL.$simu_type
+      fwd_tag=LOG/output_fwat2_log.$MODEL.$simu_type
     fi
-    :> $fwd_tag.$i.txt
+    :> $fwd_tag.$ijob.txt
   done
 
   # loop over all events 
-  local nevts=${#evtid_list[@]}
-  for (( i=0; i<$nevts; i+=nsimus_parallel )); do
-    # manually launch simu in parallel
-    for (( j=0; j<$nsimus_parallel; j++ )); do
-      local idx=$(( i + j ))
-      if [ "$idx" -ge "$nevts" ]; then
-        break
-      fi
+  for (( i=0; i<$nevts; i+=1 )); do
+    local evtid=${evtid_list[$i]}
+    local simu_type=${simu_type_list[$i]}
 
-      # get id
-      local evtid=${evtid_list[$idx]}
-      local simu_type=${simu_type_list[$idx]}
-      #echo "launching event $evtid $simu_type  iter $iter  run_opt $run_opt  in background ..."
-      run_one_simu_ $simu_type $evtid $iter $run_opt $fwd_tag.$j.txt &
-    done 
+    run_one_simu_ $simu_type $evtid $iter $run_opt $fwd_tag.$(( i % nsimus_parallel )).txt &
 
-    # wait for all to finish
-    wait
-    
+    # throttle number of parallel jobs
+    while [ $(jobs  -rp | wc -l) -ge $nsimus_parallel ]; do
+      sleep 3
+    done
   done 
+
+  wait # wait for all jobs to finish
 }
 
 source module_env
@@ -172,6 +183,15 @@ else
   fi
   NPROCS_TOTAL=$(( SLURM_NNODES * SLURM_NTASKS_PER_NODE ))
   max_iter=$1
+
+  GLOBAL_SLOTS="all_slots.txt"
+  :> $GLOBAL_SLOTS
+  # Loop through each node name and append it 64 times
+  for node in $(scontrol show hostname $SLURM_JOB_NODELIST); do
+    for ((i=1; i<=$SLURM_NTASKS_PER_NODE; i++)); do
+        echo "$node" >> "$GLOBAL_SLOTS"
+    done
+  done
 fi
 
 # working directory
