@@ -81,25 +81,26 @@ def run(argv):
         # read forward kernel 
         filename = f"{KERNEL_DIR}/{grad_list_base[i]}.h5"
         f = h5py.File(filename,"r")
-        grad_sub_base[i,:] = f[str(myrank)][:].reshape(nspec,NGLL3)
+        dset = f[str(myrank)]
+        grad_sub_base[i,...] = np.array(dset).reshape(nspec,NGLL3)
         f.close()
 
         # read model
         filename = f"{MODEL_DIR}/proc%06d_{mod_list[i]}.bin" %(myrank)
         fio = FortranIO(filename,"r")
-        mod_sub_base[i,:] = fio.read_record('f4').reshape(nspec,NGLL3)
+        mod_sub_base[i,...] = fio.read_record('f4').reshape(nspec,NGLL3)
         fio.close()
 
         # kernel for line search
         filename = f"{KERNEL_DIR}.ls/{grad_list_base[i]}.h5"
         f = h5py.File(filename,"r")
-        grad_sub1_base[i,:] = f[str(myrank)][:].reshape(nspec,NGLL3)
+        grad_sub1_base[i,...] = np.array(f[str(myrank)][:]).reshape(nspec,NGLL3)
         f.close()
 
         # read model for line search
         filename = f"{MODEL_DIR}.ls/proc%06d_{mod_list[i]}.bin" %(myrank)
         fio = FortranIO(filename,"r")
-        mod_sub1_base[i,:] = fio.read_record('f4').reshape(nspec,NGLL3)
+        mod_sub1_base[i,...] = fio.read_record('f4').reshape(nspec,NGLL3)
         fio.close()
     
     # convert to user defined model
@@ -111,7 +112,8 @@ def run(argv):
         # search direction
         filename = f"{KERNEL_DIR}/{direc_list[i]}.h5"
         f = h5py.File(filename,"r")
-        direc[i,:] = f[str(myrank)][:].reshape(nspec,NGLL3)
+        dset = f[str(myrank)]
+        direc[i,:] = np.array(dset).reshape(nspec,NGLL3)
         f.close()
 
     # initialize alpha_L/R if required
