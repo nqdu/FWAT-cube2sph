@@ -61,7 +61,8 @@ def run(argv):
         
         # load
         f = h5py.File(filename,"r")
-        direc_vp = f[str(myrank)][:]
+        dset = f[str(myrank)]
+        direc_vp = np.array(dset)
         direc_max0 = max(direc_max0,np.max(np.abs(direc_vp)))
         f.close()
 
@@ -72,6 +73,10 @@ def run(argv):
     # correct step_fac
     step_fac = opt['alpha']
     step_fac_in_per = params['MAX_PER']
+
+    if opt['iter']  == opt['iter_start'] and opt['flag'] == 'INIT':
+        # first gd step_fac = -1
+        step_fac = -1.
 
     # first lbfgs step_fac = step_fac_in_per    
     if opt['iter'] == opt['iter_start'] + 1 and opt['iter_ls'] == 0:
@@ -112,7 +117,8 @@ def run(argv):
     for i in range(nker):
         filename = KERNEL_DIR + dname_list[i] + ".h5"
         f = h5py.File(filename,"r")
-        direc[i,...] = f[str(myrank)][:]
+        dset = f[str(myrank)]
+        direc[i,...] = np.array(dset)
         f.close()
 
     # new model

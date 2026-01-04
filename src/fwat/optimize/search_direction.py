@@ -31,7 +31,7 @@ def get_model_grad(iter:int,nspec:int,M:FwatModel):
         # read kernel 
         filename = KERNEL_DIR + grad_list[i] + ".h5"
         fio = h5py.File(filename,"r")
-        ker_vec[i,:,:] = fio[str(myrank)][:].reshape(nspec,NGLL3)
+        ker_vec[i,:,:] = np.array(fio[str(myrank)]).reshape(nspec,NGLL3)
         fio.close()
 
         # read model
@@ -155,7 +155,7 @@ def get_lbfgs_direc(iter:int,paramfile:str,M:FwatModel):
     filename += "/hess_kernel.h5"
     if myrank == 0: print(f"reading hess from {filename}")
     fio = h5py.File(filename,"r")
-    hess = fio[str(myrank)][:].reshape(nspec,NGLL3)
+    hess = np.array(fio[str(myrank)]).reshape(nspec,NGLL3)
     fio.close()
 
     # get hessian max
@@ -233,7 +233,7 @@ def get_sd_direction(iter:int,paramfile:str,M:FwatModel):
     filename += "/hess_kernel.h5"
     if myrank == 0: print(f"reading hess from {filename}")
     fio = h5py.File(filename,"r")
-    hess = fio[str(myrank)][:].reshape(nspec,NGLL3)
+    hess = np.array(fio[str(myrank)]).reshape(nspec,NGLL3)
     fio.close()
 
     # get gradient

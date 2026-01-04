@@ -8,8 +8,10 @@ from scipy.integrate import trapezoid
 
 def measure_adj_cross_conv(
     obs_v,syn_v,obs_h,syn_h,
-    t0,dt,min_period,max_period,
-    tstart,tend,maxit:int=120,taper_ratio = 0.05):
+    t0,dt,
+    tstart,tend,
+    taper_ratio = 0.05
+):
 
     """
     Parameters
@@ -50,36 +52,34 @@ def measure_adj_cross_conv(
     assert len(obs_v) == len(syn_v), "Observed and synthetic data must have the same length"
     assert len(obs_h) == len(obs_v), "Observed_h and observed_r must have the same length"
 
-    # get window info
-    lpt, rpt, taper0 = taper_window(t0, dt, nt, tstart, tend, p=taper_ratio)
-    taper = obs_v * 0 
-    taper[lpt:rpt] = taper0 
+    # filter
+    vsyn = syn_v * 1.
+    hsyn = syn_h * 1.
+    vobs = obs_v * 1.
+    hobs = obs_h * 1.
 
-    # get windowed data
-    vsyn = syn_v * taper 
-    hsyn = syn_h * taper 
-    vobs = obs_v * taper
-    hobs = obs_h * taper 
+    # get window info
+    lpt, rpt, taper0 = taper_window(t0, dt, nt*2-1, tstart, tend, p=taper_ratio)
+    taper = np.zeros(nt*2-1)
+    taper[lpt:rpt] = taper0 
+    taper[:] = 1.
 
     # compute convolution of h/v
-    chi1 = convolve(vobs,hsyn,'same') * dt
-    chi2 = convolve(vsyn,hobs,'same') * dt
-    dchi = chi1 - chi2 
+    chi1 = convolve(vobs,hsyn,'full') * dt
+    chi2 = convolve(vsyn,hobs,'full') * dt
+    dchi = (chi1 - chi2) * taper
 
     # misfit function
     mis = 0.5 * trapezoid(dchi**2,dx=dt)
 
     # reverse several arrays
-    v_rev = vobs[::-1]
-    h_rev = hobs[::-1]
+    v_rev = vobs[::-1].copy()
+    h_rev = hobs[::-1].copy()
     
     # adjoint source
-    adj_z = -convolve(dchi,h_rev,'same') * dt
-    adj_r = convolve(dchi,v_rev,'same') * dt
-
-    # filter
-    adj_r = bandpass(adj_r,dt,1./max_period,1./min_period) * taper
-    adj_z = bandpass(adj_z,dt,1./max_period,1./min_period) * taper
+    dchi_adj = dchi * taper 
+    adj_z = -convolve(dchi_adj,h_rev,'valid') * dt
+    adj_r = convolve(dchi_adj,v_rev,'valid') * dt
 
     # measure_adj arrays
     tr_chi = mis
@@ -91,9 +91,8 @@ def measure_adj_cross_conv(
     win_chi[20-1] = nt * dt
 
     # also return the cross-conv for visualization
-    cc1 = obs_v * 0.
     cc1 = chi1 * taper 
-    cc2 = obs_v * 0. 
     cc2 = chi2 * taper
 
-    return tr_chi,am_chi,win_chi,adj_r,adj_z,cc1,cc2
+    
+    return tr_chi,am_chi,win_chi,adj_z,adj_r,cc1,cc2

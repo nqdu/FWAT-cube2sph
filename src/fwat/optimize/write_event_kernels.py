@@ -59,7 +59,7 @@ def run(argv):
         for im in range(nmod):
             filename = f"{KERNEL_DIR}/{gname_list[im]}.h5"
             fh5 = h5py.File(filename,"r")
-            grad[im,:] = fh5[str(irank)][:] * 1.
+            grad[im,:] = np.array(fh5[str(irank)])[:] * 1.
             fh5.close()
         
         # convert to plotting kernels

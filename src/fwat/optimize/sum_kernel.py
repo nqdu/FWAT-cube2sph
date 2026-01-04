@@ -166,7 +166,7 @@ def run(argv):
 
                 # read 
                 fio = h5py.File(filename,"r")
-                arr = fio[str(myrank)][:]
+                arr = np.array(fio[str(myrank)])[:]
                 fio.close()
 
                 # sum kernel
@@ -232,7 +232,7 @@ def run(argv):
 
                 # read 
                 fio = h5py.File(filename,"r")
-                arr = np.asarray(fio[str(myrank)][:],dtype='f4')
+                arr = np.array(fio[str(myrank)])[:].astype('f4')
                 fio.close()
 
                 # sum kernel

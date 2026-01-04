@@ -126,7 +126,7 @@ class NoiseMC_PreOP():
 
         # read simulation info dt,t0,npts
         fio = h5py.File(f"{self.syndirs[0]}/OUTPUT_FILES/seismograms.h5","r")
-        t = np.asarray(fio[list(fio.keys())[0]][:,0])
+        t = np.array(fio[list(fio.keys())[0]])[:,0]
         fio.close()
         self.t0_syn = t[0] * 1
         self.dt_syn = t[1] - t[0]
@@ -576,6 +576,7 @@ class NoiseMC_PreOP():
                 snr = _get_snr(dat_inp,win_b,win_e)
 
                 # normalize
+                if amp == 0.: amp = 1.
                 dat_inp *= np.max(np.abs(syn_inp[win_b:win_e])) / amp
 
                 # compute time window
@@ -788,7 +789,6 @@ class NoiseMC_PreOP():
             chs = comp[0]
             chs_enz = ''
             syndir = f"{self.SOLVER}/{self.mod}/{self.evtid}_{chs}"
-            syndir1 = f"{self.SOLVER}/{self.mod}/{self.evtid}"
 
             if chs == 'Z':
                 chs_enz = 'Z'
@@ -796,7 +796,7 @@ class NoiseMC_PreOP():
                 chs_enz = 'E'
             else: # chs == 'T'
                 chs_enz = 'N'   
-            syndir1 = syndir1 + f"_{chs_enz}"
+            syndir1 = f"{self.SOLVER}/{self.mod}/{self.evtid}" + f"_{chs_enz}"
 
             # pack all obs/syn sacs to hdf5
             for ib in range(len(self.Tmax)):
@@ -831,8 +831,8 @@ class NoiseMC_PreOP():
                                     fio.attrs['npts'] = tr.npts
                                 
                                 dsetname = tr.knetwk + "." + tr.kstnm + "." + tr.kcmpnm
-                                fio.create_dataset(dsetname,shape=tr.data.shape,dtype='f4')
-                                fio[dsetname][:] = tr.data 
+                                dst = fio.create_dataset(dsetname,shape=tr.data.shape,dtype='f4')
+                                dst[:] = np.array(tr.data) 
                         
                             # close 
                             fio.close()
