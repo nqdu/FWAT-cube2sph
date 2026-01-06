@@ -16,7 +16,6 @@ if [ "$INTP_LS" == "1" ]; then
   lsflag=".ls"
 fi 
 
-# horiz
 for param in $param_set; do 
 for iter in $run_indx; do 
   ii=`printf %02d $iter`
@@ -70,7 +69,7 @@ for iter in $run_indx; do
     proj=-JM12c
 
     gmt begin pics/$param.iter$idx.$name.$ip jpg 
-      gmt basemap $bounds $proj  -Bxaf+l"Distance,km" -Byaf+l"Depth,km" -BWSet
+      gmt basemap $bounds $proj  -Bxaf -Byaf -BWSet+t"Depth=${DEPTH_H[$((ip-1))]} km"
       gmt grdimage $filename -Cout.cpt -E200
       gmt coast -A200 -W1p,black
       gmt colorbar -G$vmin/$vmax -Cout.cpt -Bxaf+l"$param"

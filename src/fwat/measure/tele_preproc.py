@@ -315,6 +315,7 @@ class Tele_PreOP(FwatPreOP):
         """
         from obspy.io.sac import SACTrace
         from .tele.tele import get_average_amplitude
+        from .utils import bandpass
         from fwat.adjoint.cross_conv import measure_adj_cross_conv
 
         # get frequency band
@@ -376,11 +377,15 @@ class Tele_PreOP(FwatPreOP):
                     glob_syn[i, ic_r, :],
                     t0_syn,
                     dt_syn,
-                    self.Tmin[ib],
-                    self.Tmax[ib],
                     tstart[ir],
                     tend[ir],
                 )
+
+            # filter adjoint source
+            freqmin = 1. / self.Tmax[ib]
+            freqmax = 1. / self.Tmin[ib]
+            adj_r = bandpass(adj_r,dt_syn,freqmin, freqmax)
+            adj_z = bandpass(adj_z,dt_syn,freqmin, freqmax)
         
             # save adjoint source
             data = np.zeros((npt_syn,2))

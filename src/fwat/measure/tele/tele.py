@@ -108,7 +108,7 @@ def compute_stf(glob_syn,glob_obs,dt_syn,freqmin,freqmax,components):
     # load stf function
     from fwat.measure.tele.deconit import time_decon
     from mpi4py import MPI
-    from obspy import Trace
+    from fwat.measure.utils import bandpass
     from scipy.signal import convolve,correlate
 
     # get dimension
@@ -132,10 +132,7 @@ def compute_stf(glob_syn,glob_obs,dt_syn,freqmin,freqmax,components):
             stf1 = time_decon(u,w,dt_syn)
             #stf1 = compute_stf_freq(u,w,dt_syn)
             #stf1 = deconit(u,w,dt_syn,0.,1.5)
-            tr = Trace(stf1); tr.stats.delta = dt_syn
-            tr.filter("bandpass",freqmin=freqmin,freqmax=freqmax,zerophase = True,corners=4)
-            stf1 = np.asarray(tr.data,dtype='f4')
-
+            stf1 = bandpass(stf1, dt_syn, freqmin, freqmax)
             # save stf
             stf_collect[i,:] = stf1 * 1.
     

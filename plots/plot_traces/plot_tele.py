@@ -42,7 +42,7 @@ def plot_event(line:str,M1:str,solver:str,outdir:str,band:str,
                 twb:float,twe:float):
     import h5py 
 
-    M0="M00"
+    M0="M%02d" %(0)
     info = line.split()
     evtid = info[0]
     path2init = f"{solver}/{M0}/{evtid}/OUTPUT_FILES/"

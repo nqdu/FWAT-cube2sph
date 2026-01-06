@@ -157,9 +157,23 @@ def bandpass(u,dt,freqmin,freqmax,max_percentage=0.05,type_='hann'):
     win = func(len(u1),max_percentage)
     u1 = u1 * win
 
+    # check if the Tmax > window length
+    Tmax = 1. / freqmin
+    required_len = 3.0 * Tmax
+    startidx = 0
+    endidx = len(u1) - 1
+    if required_len > len(u1) * dt:
+        # padd zeros to both sides
+        npad = int((required_len - len(u1) * dt) / dt) + 1
+        u1 = np.pad(u1,(npad,npad),'constant',constant_values=(0.,0.))
+
+        startidx += npad
+        endidx += npad
+
     # filter
     sos = signal.butter(4, [freqmin,freqmax], btype='bandpass', fs=1.0/dt, output='sos')
     u1 = signal.sosfiltfilt(sos, u1)
+    u1 = u1[startidx:endidx+1]
 
     # taper again
     win = func(len(u1),max_percentage * 0.5)
