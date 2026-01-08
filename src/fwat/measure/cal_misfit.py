@@ -3,7 +3,7 @@ import os
 import sys 
 import yaml
 
-def run(argv):
+def run(argv: list) -> None:
     """
     run the misfit calculation for a given model and simulation type
     

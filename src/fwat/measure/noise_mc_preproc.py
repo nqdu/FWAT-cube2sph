@@ -133,8 +133,10 @@ class NoiseMC_PreOP():
         self.npt_syn = len(t)
 
         # seismograms 
-        self.seismogram = {}
-        self.seismogram_adj = {}
+        self.seismogram: dict[str, np.ndarray] = {}
+        self.seismogram_adj: dict[str, np.ndarray] = {}
+
+        # save sac here 
         self.seismogram_sac = {}
     
     def _get_mc_channel(self):
@@ -383,8 +385,9 @@ class NoiseMC_PreOP():
         tr = SACTrace(
             evla=self.evla,evlo=self.evlo,
             evdp=self.evdp,stla=0.,
-            stlo=0.,stel=0,lcalda=1,
-            delta = dt_syn
+            stlo=0.,stel=0,lcalda=True,
+            delta = dt_syn,
+            b=t0_syn
         )
 
         if self.myrank == 0:
@@ -539,27 +542,28 @@ class NoiseMC_PreOP():
                 # load obs_data
                 code = f"{self.sta_names[i]}.{self.chcode}{chr}"
                 obs_tr = SACTrace.read(f"{self.DATA_DIR}/{self.evtid}_{chs}/{code}.sac")
-                t0_obs = obs_tr.b 
-                dt_obs = obs_tr.delta 
-                npt_obs = obs_tr.npts
+                t0_obs = obs_tr.b * 1.
+                dt_obs = obs_tr.delta * 1.
+                npt_obs = obs_tr.npts * 1
                 npt1_inp = int((npt_obs - 1) * dt_obs / dt_inp)
                 dist = obs_tr.dist 
 
-                # bandpass obs data
+                # filter obs/syn in the band
                 obs_tr.data = bandpass(obs_tr.data,dt_obs,freqmin,freqmax)
                 syn_inp = bandpass(data[i_s,i_r,:],dt_syn,freqmin,freqmax)
 
+                # now we will resample data to (t0_inp,dt_inp,npt_cut)
                 # interp obs/syn
                 dat_inp1 = interpolate_syn(obs_tr.data,t0_obs,dt_obs,npt_obs,
                                         t0_obs + dt_inp,dt_inp,npt1_inp)
                 syn_inp = interpolate_syn(syn_inp,t0_syn,dt_syn,npt_syn,
                                          t0_inp,dt_inp,npt_cut)
-
+                
                 # compute time derivative 
                 if self.pdict['USE_EGF'] == False:
                     dat_inp1 = -dif1(dat_inp1,dt_inp)
                     if self.myrank == 0: print("CCFs => EGFs ...")
-                
+        
                 # cut 
                 dat_inp = interpolate_syn(dat_inp1,t0_obs + dt_inp,dt_inp,npt1_inp,
                                          t0_inp,dt_inp,npt_cut)
@@ -609,10 +613,10 @@ class NoiseMC_PreOP():
                 outdir = f"{self.SOLVER}/{self.mod}/{self.evtid}_{chs}/OUTPUT_FILES/{bandname}"
                 obs_tr.delta = dt_inp 
                 obs_tr.b = t0_inp 
-                obs_tr.data = dat_inp 
+                obs_tr.data = dat_inp * 1.
                 self.seismogram_sac[f"{outdir}/{code}.sac.obs"] = obs_tr.copy()
                 #obs_tr.write(f"{outdir}/{code}.sac.obs")
-                obs_tr.data = syn_inp
+                obs_tr.data = syn_inp * 1.
                 self.seismogram_sac[f"{outdir}/{code}.sac.syn"] = obs_tr.copy()
                 #obs_tr.write(f"{outdir}/{code}.sac.syn")
             # end for loop cc_comps
@@ -858,9 +862,6 @@ class NoiseMC_PreOP():
     def execute(self):
         # rotate seismograms from XYZ to ZNE
         self._rotate_XYZ_to_ZNE()
-
-        # rotate to RT
-        self._rotate_seismogram_to_RT()
 
         # save current synthetics as observation if required
         if self.run_opt == 1:

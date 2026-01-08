@@ -1,7 +1,7 @@
 import numpy as np 
 from fwat.const import PARAM_FILE
 
-def alloc_mpi_jobs(ntasks,nprocs,myrank):
+def alloc_mpi_jobs(ntasks:int,nprocs:int,myrank:int) -> tuple[int,int]:
     sub_n = ntasks // nprocs
     num_larger_procs = ntasks - nprocs * sub_n
     startid = 0
@@ -16,16 +16,16 @@ def alloc_mpi_jobs(ntasks,nprocs,myrank):
     
     endid = startid + sub_n - 1
 
-    return startid,endid
+    return (startid,endid)
 
-def read_params(paramfile:str):
+def read_params(paramfile:str) -> dict:
     import yaml
     with open(paramfile,"r") as f:
         pdict = yaml.safe_load(f)
     
     return pdict
 
-def hann_taper(npts,p):
+def hann_taper(npts:int,p:float) -> np.ndarray:
     from scipy.signal import windows
     max_len = int(npts * p)
     max_len = min(max_len, int(npts / 2))
@@ -42,7 +42,7 @@ def hann_taper(npts,p):
 
     return win
 
-def sac_cos_taper(npts,p):
+def sac_cos_taper(npts:int,p:float) -> np.ndarray:
     frac = int(npts * p) 
     frac = min(frac,int(npts/2) - 1)
 
@@ -82,7 +82,12 @@ _TAPER_ENTRY_POINT = {
     "cos": sac_cos_taper
 }
 
-def interpolate_syn(data,t1,dt1,npt1,t2,dt2,npt2,max_percentage=0.05,type_='hann'):
+def interpolate_syn(
+        data: np.ndarray, 
+        t1: float, dt1: float, npt1: int, 
+        t2: float, dt2: float, npt2: int, 
+        max_percentage: float = 0.05, 
+        type_: str = 'hann') -> np.ndarray:
     """
     interpolate data from (t1, dt1, npt1) to a new data (t2,dt2,npt2)
 
@@ -109,7 +114,10 @@ def interpolate_syn(data,t1,dt1,npt1,t2,dt2,npt2,max_percentage=0.05,type_='hann
     return temp
 
 
-def bandpass(u,dt,freqmin,freqmax,max_percentage=0.05,type_='hann'):
+def bandpass(
+        u: np.ndarray, 
+        dt: float, freqmin: float, freqmax: float, 
+        max_percentage: float = 0.05, type_: str = 'hann') -> np.ndarray:
     """
     Apply a SAC-like bandpass filter with pre-processing to a 1D signal.
 
@@ -156,6 +164,12 @@ def bandpass(u,dt,freqmin,freqmax,max_percentage=0.05,type_='hann'):
     func = _TAPER_ENTRY_POINT[type_]
     win = func(len(u1),max_percentage)
     u1 = u1 * win
+
+    # check if Nyquist freq is ok
+    nyq = 0.5 / dt
+    if freqmax >= nyq:
+        freqmax = nyq - 0.01 * nyq
+        #print(f"warning: freqmax is set to {freqmax} Hz due to Nyquist limit")
 
     # check if the Tmax > window length
     Tmax = 1. / freqmin

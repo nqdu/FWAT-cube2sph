@@ -86,8 +86,8 @@ class FwatPreOP:
         self._istart = istart 
 
         # seismograms here, only save seismograms for local stations
-        self.seismogram = {}
-        self.seismogram_adj = {}
+        self.seismogram : dict[str,np.ndarray] = {}
+        self.seismogram_adj : dict[str,np.ndarray] = {}
         self.seismo_sac = {}
 
         # sanity check 

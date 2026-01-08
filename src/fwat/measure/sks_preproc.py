@@ -114,7 +114,7 @@ class SKS_PreOP(FwatPreOP):
             print("For SKS FWI, both R and T components are required!")
             exit(1)
 
-    def save_foward(self):
+    def save_forward(self):
         import os 
         from obspy.io.sac import SACTrace
 

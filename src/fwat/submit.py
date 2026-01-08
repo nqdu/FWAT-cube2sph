@@ -133,7 +133,7 @@ class FwatSubmitor:
             else:
                 shutil.copy(f"{self.cwd}/DATA/meshfem3D_files/{f}", name)
 
-            # change local path
+        # change local path
         filename = f"{syndir}/DATA/Par_file"
         change_parfile(filename,LOCAL_PATH=LOCAL_PATH)
         filename = f"{syndir}/DATA/meshfem3D_files/Mesh_Par_file"
