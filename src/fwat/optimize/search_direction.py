@@ -115,7 +115,7 @@ def get_lbfgs_direc(iter:int,paramfile:str,M:FwatModel):
     with open(paramfile,"r") as f:
         pdict = yaml.safe_load(f)
 
-    # current search direction is -grad
+    # current get gradient descent search direction is -grad
     iter_start:int = pdict['iter_start']
 
     # get istore
@@ -180,6 +180,7 @@ def get_lbfgs_direc(iter:int,paramfile:str,M:FwatModel):
         model0,grad0 = get_model_grad(istore,nspec,M)
         grad_diff = grad1 - grad0 
         model_diff = model1 - model0
+        model_diff = M.mask_vector(model_diff)
         b_sum = compute_inner_dot(grad_diff,r_vec,weights,jaco)
         b = p[istore] * b_sum 
 

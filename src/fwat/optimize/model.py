@@ -362,7 +362,7 @@ class FwatModel:
                 g0p = np.hypot(gsp,gcp)
                 
                 # zero out phi when g0p < 1.0e-2
-                idx = g0p < 1.0e-2
+                idx = g0p < 1.0e-3
                 phi[idx] = 0.
 
                 # copy back to model_new
@@ -394,7 +394,7 @@ class FwatModel:
                 g0p = np.hypot(gsp,gcp)
 
                 # zero out phi when g0p < 1.0e-2
-                idx = g0p < 1.0e-2
+                idx = g0p < 1.0e-3
                 phi[idx] = 0.
                 
                 # copy back to model_user
@@ -671,7 +671,26 @@ class FwatModel:
             exit(1)
 
         # mask part of the kernels
-        kl_usr[self._mask_vars,...] = 0.
+        kl_usr = self.mask_vector(kl_usr)
 
 
         return md_usr,kl_usr
+    
+    def mask_vector(self,kl:np.ndarray):
+        """
+        mask part of the kernels
+
+        Parameters
+        -------------
+        kl: np.ndarray
+            kernels for user defined model
+
+        Returns
+        -------------
+        kl_masked: np.ndarray
+            masked kernels for user defined model
+        """
+        kl_masked = kl * 1.
+        kl_masked[self._mask_vars,...] = 0.
+
+        return kl_masked
