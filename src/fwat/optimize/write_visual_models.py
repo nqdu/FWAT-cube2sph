@@ -7,7 +7,7 @@ def run(argv):
     if len(argv) !=3 :
         print("need 3 parameters: MODEL_DIR model_type kernel_type")
         print("model_type and kernel_type can be find in class FwatModel")
-        print("example: fwat-model visual M06 dtti 1")
+        print("example: fwat-model visual ./optimize/MODEL_M06 dtti 1")
         exit(1)
 
     # get params
@@ -72,11 +72,9 @@ def run(argv):
 
 def main():
     import sys 
-    if len(sys.argv) !=4 :
-        print("need 3 parameters: MODEL_DIR model_type kernel_type")
-        print("example: python write_user_model.py M06 mdtype kltype")
+    if len(sys.argv) < 2:
+        run(sys.argv[:])
         exit(1)
-
     run(sys.argv[1:])
     
 if __name__ == "__main__":

@@ -71,6 +71,23 @@ def compute_inner_dot(a,b,weights,jaco):
     return q_sum * c1 * c2 
 
 def get_lbfgs_direc(iter:int,paramfile:str,M:FwatModel):
+    """
+    get l-bfgs search direction
+
+    Parameters
+    ----------
+    iter : int
+        current iteration number
+    paramfile : str
+        lbfgs parameter file
+    M : FwatModel
+        FwatModel object
+
+    Returns
+    -------
+    direc : np.ndarray
+        search direction
+    """
 
     from fwat.optimize.libgll import get_gll_weights
 
@@ -220,6 +237,24 @@ def get_lbfgs_direc(iter:int,paramfile:str,M:FwatModel):
     return direc
 
 def get_sd_direction(iter:int,paramfile:str,M:FwatModel):
+    """
+    get steepest descent search direction
+
+    Parameters
+    ----------
+    iter : int
+        current iteration number
+    paramfile : str
+        lbfgs parameter file
+    M : FwatModel
+        FwatModel object
+
+    Returns
+    -------
+    direc : np.ndarray
+        search direction
+    """
+
     comm = MPI.COMM_WORLD
     myrank = comm.Get_rank()
 
@@ -247,6 +282,16 @@ def get_sd_direction(iter:int,paramfile:str,M:FwatModel):
 
 
 def get_search_direction(iter:int,paramfile:str):
+    """
+    get search direction and save to disk
+
+    Parameters
+    ----------
+    iter : int
+        current iteration number
+    paramfile : str
+        lbfgs parameter file
+    """
 
     comm = MPI.COMM_WORLD
     myrank = comm.Get_rank()
