@@ -358,8 +358,13 @@ class FwatModel:
             if self._kltype == 1: # vp,vs,rho,gcp,gsp
                 gcp = model_user[3,...]
                 gsp = model_user[4,...]
-                phi = 0.5 * np.arctan2(gsp,gcp)
                 g0p = np.hypot(gsp,gcp)
+
+                # phi are only in [-pi/2,pi/2]
+                phi = 0.5 * np.arctan2(gsp,gcp)
+                phi_deg = np.rad2deg(phi)
+                phi_deg = (phi_deg + 90.) % 180. - 90.
+                phi = np.deg2rad(phi_deg)
                 
                 # zero out phi when g0p < 1.0e-2
                 idx = g0p < 1.0e-3
@@ -374,8 +379,13 @@ class FwatModel:
             elif self._kltype == 2: # vph,vpv,vsh,vsv,rho,eta,gcp,gsp
                 gcp = model_user[6,...]
                 gsp = model_user[7,...]
-                phi = 0.5 * np.arctan2(gsp,gcp)
                 g0p = np.hypot(gsp,gcp)
+
+                # phi are only in [-pi/2,pi/2]
+                phi = 0.5 * np.arctan2(gsp,gcp)
+                phi_deg = np.rad2deg(phi)
+                phi_deg = (phi_deg + 90.) % 180. - 90.
+                phi = np.deg2rad(phi_deg)
 
                 # zero out phi when g0p < 1.0e-2
                 idx = g0p < 1.0e-2
@@ -390,8 +400,13 @@ class FwatModel:
             elif self._kltype == 3: # vp,vs,rho,(vph-vpv)/vpv,(vsh-vsv)/vsv, eta,gcp,gsp
                 gcp = model_user[6,...]
                 gsp = model_user[7,...]
-                phi = 0.5 * np.arctan2(gsp,gcp)
                 g0p = np.hypot(gsp,gcp)
+
+                # phi are only in [-pi/2,pi/2]
+                phi = 0.5 * np.arctan2(gsp,gcp)
+                phi_deg = np.rad2deg(phi)
+                phi_deg = (phi_deg + 90.) % 180. - 90.
+                phi = np.deg2rad(phi_deg)
 
                 # zero out phi when g0p < 1.0e-2
                 idx = g0p < 1.0e-3

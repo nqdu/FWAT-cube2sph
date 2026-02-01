@@ -40,6 +40,9 @@ run_one_simu_() {
     $MPIRUN $hostfile -np $NPROC $SEM_PATH/bin/xspecfem3D
     echo "finished $evtid_wk at `date`"
 
+    # copy output_solver.txt to output_solver.fwd.txt 
+    \cp OUTPUT_FILES/output_solver.txt OUTPUT_FILES/output_solver.fwd.txt
+
     # merge all seismograms to one big file
     echo " "
     echo "packing seismograms for $evtid_wk ..."
