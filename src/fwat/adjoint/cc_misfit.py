@@ -2,7 +2,7 @@ import numpy as np
 from numba import jit 
 
 @jit(nopython=True)
-def _cal_cc_correction(s,ishift,dlna):
+def _cal_cc_correction(s: np.ndarray, ishift: int, dlna: float):
     """
     Calculate the cross-correlation correction terms.
 
@@ -39,7 +39,7 @@ def _cal_cc_correction(s,ishift,dlna):
     return s_cc_dt,s_cc_dtdlna
 
 
-def _cal_cc_error(d,s,dt,ishift,dlna,dt_sigma_min,dlna_sigma_min):
+def _cal_cc_error(d: np.ndarray, s: np.ndarray, dt: float, ishift: int, dlna: float, dt_sigma_min: float, dlna_sigma_min: float):
     """
     Calculate the cross-correlation error terms.
 
@@ -94,7 +94,9 @@ def _cal_cc_error(d,s,dt,ishift,dlna,dt_sigma_min,dlna_sigma_min):
 
     return sigma_dt, sigma_dlna
 
-def cc_measure(d,s,dt,dt_sigma_min,dlna_sigma_min,weight_by_uncertainty=True):
+def cc_measure(d: np.ndarray, s: np.ndarray, dt: float, 
+            dt_sigma_min: float, dlna_sigma_min: float, 
+            weight_by_uncertainty: bool = True):
     """
     Calculate the cross-correlation shift.
 
@@ -130,7 +132,7 @@ def cc_measure(d,s,dt,dt_sigma_min,dlna_sigma_min,weight_by_uncertainty=True):
     
     # compute time shift between data and syn
     cc = correlate(d,s,'full')
-    ishift = np.argmax(cc) - len(d) + 1
+    ishift = int(np.argmax(cc) - len(d) + 1)
     tshift = ishift * dt 
 
     # compute pearson correlation coefficient
@@ -149,30 +151,67 @@ def cc_measure(d,s,dt,dt_sigma_min,dlna_sigma_min,weight_by_uncertainty=True):
 
     return tshift,dlna,sigma_dt,sigma_dlna,cc_coef
 
-def _cc_shift_dd(d1,s1,d2,s2,dt,dt_sigma_min,dlna_sigma_min):
+def _cc_shift_dd(d1: np.ndarray, s1: np.ndarray, d2: np.ndarray, s2: np.ndarray, dt: float, dt_sigma_min: float, dlna_sigma_min: float):
+    """
+    Calculate the double-difference cross-correlation shift.
+
+    Parameters
+    ----------
+    d1 : np.ndarray
+        Observed data for first signal.
+    s1 : np.ndarray
+        Synthetic data for first signal.
+    d2 : np.ndarray
+        Observed data for second signal.
+    s2 : np.ndarray
+        Synthetic data for second signal.
+    dt : float
+        Time sampling interval.
+    dt_sigma_min : float
+        Minimum uncertainty for time shift.
+    dlna_sigma_min : float
+        Minimum uncertainty for amplitude shift.
+
+    Returns
+    -------
+    tshift_dd : float
+        Estimated double-difference time shift.
+    tshift_obs : float
+        Estimated time shift for observed data.
+    tshift_syn : float
+        Estimated time shift for synthetic data.
+    dlna_obs : float
+        Estimated logarithmic amplitude shift for observed data.
+    dlna_syn : float
+        Estimated logarithmic amplitude shift for synthetic data.
+    sigma_dt : float
+        Estimated uncertainty for time shift.
+    sigma_dlna : float
+        Estimated uncertainty for amplitude shift.
+    """
     from scipy.signal import correlate
 
     # compute time shift between data and syn
     cc1 = correlate(d1,d2,'full')
-    ishift_obs = np.argmax(cc1) - len(d1) + 1
+    ishift_obs = int(np.argmax(cc1) - len(d1) + 1)
     tshift_obs = ishift_obs * dt
 
     cc1 = correlate(s1,s2,'full')
-    ishift_syn = np.argmax(cc1) - len(s1) + 1
+    ishift_syn = int(np.argmax(cc1) - len(s1) + 1)
     tshift_syn = ishift_syn * dt
 
     # overall shift
     ishift_dd = ishift_syn - ishift_obs
-    tshift = ishift_dd * dt
+    tshift_dd = ishift_dd * dt
 
     # compute dlna
     dlna_obs = 0.5 * np.log(np.sum(d1**2) / np.sum(d2**2))
-    dlna_syn = 0.5 * np.log(np.sum(s2**2) / np.sum(s1**2))
+    dlna_syn = 0.5 * np.log(np.sum(s1**2) / np.sum(s2**2))
 
     # uncertainties
     sigma_dt,sigma_dlna = _cal_cc_error(d1,d2,dt,ishift_obs,dlna_obs,dt_sigma_min,dlna_sigma_min)
 
-    return tshift,tshift_obs,tshift_syn,dlna_obs,dlna_syn,sigma_dt,sigma_dlna
+    return tshift_dd,tshift_obs,tshift_syn,dlna_obs,dlna_syn,sigma_dt,sigma_dlna
 
 def measure_adj_cc(obs,syn,t0,dt,nt,
                min_period,max_period,
@@ -300,10 +339,12 @@ def measure_adj_cc(obs,syn,t0,dt,nt,
     return tr_chi,am_chi,win_chi,adjsrc
 
 def measure_adj_cc_dd(
-        obs1,syn1,obs2,syn2,
-        t0,dt,nt,
-        min_period,max_period,
-        tstart,tend,
+        obs1:np.ndarray,syn1:np.ndarray,
+        obs2:np.ndarray,syn2:np.ndarray,
+        t0:float,dt:float,nt:int,
+        min_period:float,max_period:float,
+        tstart:float,tend:float,
+        tshift_obs_user = None,
         taper_ratio = 0.05,
         dt_sigma_min = 1.,
         dlna_sigma_min = 0.5):
@@ -362,15 +403,17 @@ def measure_adj_cc_dd(
     d2 = obs2[lpt:rpt] * taper0
 
     # calculate time shift
-    tshift,_,_,dlna,_,sigma_dt,sigma_dlna = _cc_shift_dd(d1,s1,d2,s2,dt,dt_sigma_min,dlna_sigma_min)
-    ishfit_dd = int(tshift / dt)
+    tshift_dd,tshift_syn,_,dlna,_,sigma_dt,sigma_dlna = _cc_shift_dd(d1,s1,d2,s2,dt,dt_sigma_min,dlna_sigma_min)
+    if tshift_obs_user is not None:
+        tshift_dd = tshift_syn - tshift_obs_user
+    ishfit_dd = int(tshift_dd / dt)
 
     # compute misfit 
-    misfit_p = 0.5 * (tshift / sigma_dt) **2 
+    misfit_p = 0.5 * (tshift_dd / sigma_dt) **2 
     misfit_q = 0.5 * (dlna / sigma_dlna) ** 2  
 
     # adjoint source pre-computing
-    s1_cc_dt,_ = _cal_cc_correction(s1,-1. * ishfit_dd,0.)
+    s1_cc_dt,_ = _cal_cc_correction(s1,-ishfit_dd,0.)
     dsdt_cc1 = dif1(s1_cc_dt,dt)
     s2_cc_dt,_ = _cal_cc_correction(s2,ishfit_dd,0.)
     dsdt_cc2 = dif1(s2_cc_dt,dt)
@@ -378,8 +421,8 @@ def measure_adj_cc_dd(
     # norm
     ds1dt = dif1(s1,dt)
     nnorm = trapezoid(ds1dt*dsdt_cc2,dx=dt)
-    fp_1 = -1 * dsdt_cc2 * tshift / nnorm / sigma_dt ** 2  # -1
-    fp_2 = +1 * dsdt_cc1 * tshift / nnorm / sigma_dt ** 2  # +1
+    fp_1 = -1 * dsdt_cc2 * tshift_dd / nnorm / sigma_dt ** 2  # -1
+    fp_2 = +1 * dsdt_cc1 * tshift_dd / nnorm / sigma_dt ** 2  # +1
 
     # adjoint source
     adjsrc_1 = obs1 * 0 
@@ -395,7 +438,7 @@ def measure_adj_cc_dd(
     tr_chi = misfit_p
     am_chi = misfit_q
     win_chi = np.zeros((20))
-    win_chi[6] = tshift
+    win_chi[6] = tshift_dd
     win_chi[13-1] = 0.5 * np.sum( obs1**2 )
     win_chi[14-1] = 0.5 * np.sum( syn1**2 )
     win_chi[15-1] = tr_chi

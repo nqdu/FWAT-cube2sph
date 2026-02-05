@@ -9,7 +9,7 @@ def main():
     t = np.linspace(0,10,nt)
     dt = t[1]-t[0]
     syn = np.exp(-((t-4.5)/0.5)**2)
-    obs = np.exp(-((t-5.)/0.5)**2) + 0.2 * np.exp(-((t-4)/0.5)**2) - 0.2 * np.exp(-((t-6)/0.5)**2)
+    obs = np.exp(-((t-5.)/0.5)**2)
 
     Tmin = 1.
     Tmax = 50.
@@ -34,7 +34,7 @@ def main():
     # plot 
     plt.figure(1)
     plt.plot(t,adj,label='adj')
-    plt.plot(t,adj_mt ,label='adj-mt')
+    plt.plot(t,adj_mt ,label='adj-mt',ls='--')
     plt.legend()
     plt.savefig("cc_phase.jpg",dpi=300)
 
