@@ -380,7 +380,7 @@ def measure_adj_cc_dd(
         misfit function
     win: np.ndarray, shape(20)
         measure_adj window
-    adj: np.ndarray
+    adj_src1/2: np.ndarray
         adjoint source, shape(nt)
     """
 
