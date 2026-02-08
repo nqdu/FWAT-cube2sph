@@ -1,7 +1,8 @@
-from fwat.measure.FwatPreOP import FwatPreOP
 import numpy as np 
 from mpi4py import MPI
 
+from fwat.measure.FwatPreOP import FwatPreOP
+from ..adjoint.MeasureStats import MeasureStats
 from .tele.deconit import deconit,myconvolve,nextpow2
 from .tele.deconit import gauss_filter,apply_gaussian
 
@@ -331,14 +332,10 @@ class RF_PreOP(FwatPreOP):
         # allocate global arrays 
         nsta_loc = self.nsta_loc
 
-        # pre-allocate misfits
-        tstart = np.zeros((nsta_loc))
-        tend = np.zeros((nsta_loc))
-        win_chi = np.zeros((nsta_loc,1,20))
-        tr_chi = np.zeros((nsta_loc,1))
-        am_chi = np.zeros((nsta_loc,1))
-        tstart[:] = max(- win_tb,t0_syn)
-        tend[:] = min(win_te,t0_syn + dt_syn * npt_syn)
+        # tstart/tend for each station
+        stats_list = [MeasureStats(adj_type=self.adjsrc_type) for _ in range(nsta_loc)]
+        tstart =  max(- win_tb,t0_syn)
+        tend = min(win_te,t0_syn + dt_syn * npt_syn)
 
         # gauss filter
         gauss = gauss_filter(npt_syn,dt_syn,self._f0[ib])
@@ -407,12 +404,16 @@ class RF_PreOP(FwatPreOP):
 
             # misfit 
             chi = 0.5 * trapezoid((rf_obs - rf_syn)**2, dx=dt_syn)
-            tr_chi[ir] = chi 
-            am_chi[ir] = chi
-            win_chi[ir,0,13-1] = 0.5 * sum( rf_obs**2 )
-            win_chi[ir,0,14-1] = 0.5 * sum( rf_syn**2 )
-            win_chi[ir,0,15-1] = chi
-            win_chi[ir,0,20-1] = npt_syn * dt_syn
+            stats = MeasureStats(
+                adj_type=self.adjsrc_type,
+                misfit=chi,
+                tstart=tstart,
+                tend=tend,
+                code=f"{self.netwk[i]}.{self.stnm[i]}.BXR",
+                tr_chi=chi,
+                am_chi=chi
+            )
+            stats_list[ir] = stats
 
             # save adjoint source
             data = np.zeros((npt_syn,2))
@@ -445,4 +446,4 @@ class RF_PreOP(FwatPreOP):
             self.seismo_sac[f"{out_dir}/{bandname}/{name}.syn"] = tr.copy()
         
         # save measurement files
-        self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,win_chi)
+        self._print_measure_info(bandname,stats_list)

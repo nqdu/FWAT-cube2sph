@@ -56,7 +56,7 @@ def run(argv: list) -> None:
             band = all_bands[ib]
             filename = f"./{MISFIT}/{mod}/{evts[ievt]}_{band}_{simu_type}_window_chi"
             if os.path.exists(filename):
-                d = np.loadtxt(filename,usecols=28,ndmin=2)
+                d = np.loadtxt(filename,usecols=-1,ndmin=2)
                 chi = np.sum(d[:,0])
                 # print(band,evts[ievt],d.shape[0])
                 if np.isnan(chi):

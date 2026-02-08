@@ -1,6 +1,7 @@
 from .FwatPreOP import FwatPreOP
 import numpy as np 
 from mpi4py import MPI
+from fwat.adjoint.MeasureStats import MeasureStats
     
 def _splitting_intensity(Rsyn:np.ndarray,Tsyn:np.ndarray,dt_syn:float):
     """
@@ -196,11 +197,7 @@ class SKS_PreOP(FwatPreOP):
         nsta_loc = self.nsta_loc
 
         # misfits
-        tstart = np.zeros((nsta_loc))
-        tend = np.zeros((nsta_loc))
-        win_chi = np.zeros((nsta_loc,1,20))
-        tr_chi = np.zeros((nsta_loc,1))
-        am_chi = np.zeros((nsta_loc,1))
+        stats_list = []
 
         # loop each station
         for ir in range(nsta_loc):
@@ -209,8 +206,8 @@ class SKS_PreOP(FwatPreOP):
             syn_data = np.zeros((2,npt_syn))
 
             # time window
-            tstart[ir] = self.t_ref[i] - t_inj - win_tb
-            tend[ir] = self.t_ref[i] - t_inj + win_te
+            tstart = self.t_ref[i] - t_inj - win_tb
+            tend = self.t_ref[i] - t_inj + win_te
 
             for ic in range(self.ncomp):
                 name = self._get_station_code(i,ic)
@@ -261,15 +258,17 @@ class SKS_PreOP(FwatPreOP):
             ic_t = self.components.index("T")
 
             # compute misfit and adjoint source
-            tr_chi[ir,0],am_chi[ir,0],win_chi[ir,0,:],adj_r,adj_t,cc1,cc2 = \
+            stats,adj_r,adj_t,cc1,cc2 = \
                 measure_adj_cross_conv(
                     obs_data[ic_r,:],
                     syn_data[ic_r,:],
                     obs_data[ic_t,:],
                     syn_data[ic_t,:],
                     t0_syn,dt_syn,
-                    tstart[ir],tend[ir] + 1. / freqmax
+                    tstart,tend + 1. / freqmax
                 )
+            stats.code = f"{self.netwk[i]}.{self.stnm[i]}.cross-conv"
+            stats_list.append(stats)
 
             # filter adjoint source
             adj_r = bandpass(adj_r,dt_syn,freqmin,freqmax)
@@ -287,7 +286,7 @@ class SKS_PreOP(FwatPreOP):
             #np.save(outname,data)
             self.seismogram_adj[outname] = data * 1.
     
-        self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,win_chi)
+        self._print_measure_info(bandname,stats_list=stats_list)
     
     def cal_adj_source_si(self,ib:int):
         from obspy.io.sac import SACTrace
@@ -318,11 +317,7 @@ class SKS_PreOP(FwatPreOP):
         nsta_loc = self.nsta_loc
 
         # misfits
-        tstart = np.zeros((nsta_loc))
-        tend = np.zeros((nsta_loc))
-        win_chi = np.zeros((nsta_loc,1,20))
-        tr_chi = np.zeros((nsta_loc,1))
-        am_chi = np.zeros((nsta_loc,1))
+        stats_list = []
 
         # load si if it exists
         cal_obs_si = False
@@ -345,9 +340,9 @@ class SKS_PreOP(FwatPreOP):
 
             # time window
             taper = np.zeros((npt_syn))
-            tstart[ir] = self.t_ref[i] - t_inj - win_tb
-            tend[ir] = self.t_ref[i] - t_inj + win_te
-            lpt,rpt,taper0 = taper_window(0,dt_syn,npt_syn,tstart[ir],tend[ir])
+            tstart = self.t_ref[i] - t_inj - win_tb
+            tend = self.t_ref[i] - t_inj + win_te
+            lpt,rpt,taper0 = taper_window(0,dt_syn,npt_syn,tstart,tend)
             taper[lpt:rpt] = taper0 * 1.
 
             for ic in range(self.ncomp):
@@ -436,10 +431,17 @@ class SKS_PreOP(FwatPreOP):
             # compute misfit function
             si_diff = (SI_syn - SI_obs) * weight
             L = 0.5 * si_diff**2
-            tr_chi[ir,0] = L 
-            am_chi[ir,0] = L
-            win_chi[ir,0,6] = SI_syn
-            win_chi[ir,0,7] = SI_obs
+            stats = MeasureStats(
+                adj_type = self.adjsrc_type,
+                misfit = L,
+                tstart = tstart,
+                tend = tend,
+                tr_chi = L,
+                am_chi = L,
+                tshift = 0.
+            )
+            stats.code = f"{self.netwk[i]}.{self.stnm[i]}"
+            stats_list.append(stats)
 
             # filter adjoint source and taper it
             adjsrc_R = bandpass(adjsrc_R,dt_syn,freqmin,freqmax) * taper 
@@ -460,7 +462,7 @@ class SKS_PreOP(FwatPreOP):
         # save SI 
         if cal_obs_si: self._write_si_obs(si_obs_data)
     
-        self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,win_chi)
+        self._print_measure_info(bandname,stats_list=stats_list)
 
     
     def cal_adj_source(self, ib: int):

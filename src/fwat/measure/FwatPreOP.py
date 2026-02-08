@@ -1,5 +1,7 @@
+from os import stat
 import numpy as np 
 from mpi4py import MPI
+from fwat.adjoint.MeasureStats import MeasureStats
 from fwat.const import PARAM_FILE
 
 class FwatPreOP:
@@ -150,7 +152,7 @@ class FwatPreOP:
         # rotate seismograms from XYZ to ZNE
         rotate_seismo_adj(rot_list,fn_matrix,from_dir,to_dir,from_template,to_template)
 
-    def _print_measure_info(self,bandname,tstart,tend,tr_chi,am_chi,window_chi):
+    def _print_measure_info(self,bandname:str,stats_list:list[MeasureStats]):
         """ 
         print measure_adj info and save to file 
         
@@ -158,21 +160,11 @@ class FwatPreOP:
         ----------
         bandname: str
             band name
-        tstart: np.ndarray, shape(nsta_loc,)
-            start time of measurement window
-        tend: np.ndarray,shape(nsta_loc,)
-            end time of measurement window
-        tr_chi: np.ndarray,shape(nsta_loc,ncomp)
-            travel-time chi
-        am_chi: np.ndarray,shape(nsta_loc,ncomp)
-            amplitude chi
-        window_chi: np.ndarray,shape(nsta_loc,ncomp,20)
-            window chi and adjoint source info  (20 values)
+        stats_list: list[MeasureStats]
+            list of MeasureStats for each station and component
         """
         import os 
         import sys 
-        ncomp = tr_chi.shape[1]
-        nsta_loc = self.nsta_loc
 
         # create directory
         if self.myrank == 0:
@@ -194,24 +186,23 @@ class FwatPreOP:
                 else:
                     fio = open(outfile,"a")
 
-                for ir in range(nsta_loc):
-                    i = ir + self._istart 
-                    for ic in range(ncomp):
-                        name = self._get_station_code(i,ic)
-                        print(f'{name}')
-                        print("Measurement window No.  1")
-                        print("start and end time of window: %f %f" %(tstart[ir],tend[ir]) )
-                        print(f"adjoint source and chi value for adjoint type = {self.adjsrc_type}")
-                        print("%e" %(window_chi[ir,ic,6]))
-                        print("tr_chi = %e am_chi = %e" %(tr_chi[ir,ic],am_chi[ir,ic]))
-                        print("")
+                nmeasure = len(stats_list)
+                for im in range(nmeasure):
+                    stats = stats_list[im]
+                    
+                    # print info
+                    print(f"Measuring stats of {stats.code}")
+                    print("start and end time of window: %f %f" %(stats.tstart,stats.tend) )
+                    print(f"adjoint source and chi value for adjoint type = {self.adjsrc_type}")
+                    print("tshift = %e" %(stats.tshift))
+                    print("tr_chi = %e am_chi = %e" %(stats.tr_chi,stats.am_chi))
+                    print("")
 
-                        ch = self.components[ic]
-                        fio.write(f"{self.evtid} {self.stnm[i]} {self.netwk[i]} {self.chcode}{ch} 1 {self.adjsrc_type} ")
-                        fio.write("%g %g " %(tstart[ir],tend[ir]))
-                        for j in range(20):
-                            fio.write("%g " %(window_chi[ir,ic,j]))
-                        fio.write("%g %g 0. 0.\n" %(tr_chi[ir,ic],am_chi[ir,ic]))
+                    # write to file
+                    # format: evtid code adj_type tstart tend tshift tr_chi am_chi misfit
+                    fio.write(f"{self.evtid} {stats.code} {stats.adj_type} ")
+                    fio.write("%g %g " %(stats.tstart,stats.tend))
+                    fio.write("%g %g %g %g\n" %(stats.tshift,stats.tr_chi,stats.am_chi,stats.misfit))
                 
                 # close output file
                 fio.close()

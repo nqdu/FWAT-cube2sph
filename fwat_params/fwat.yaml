@@ -32,7 +32,7 @@ measure:
     ADJ_SRC_NORM: False  # if true, the adjoint source will be normalized
     USE_NEAR_OFFSET: True # if FALSE, reset tstart
     VERBOSE_MODE: True
-    ADJSRC_TYPE: 5 # 5/7/exp_phase/cc_time
+    ADJSRC_TYPE: 5 # 5/7/exp_phase/cc_time/cc_time_dd
 
   # sks 
   sks:

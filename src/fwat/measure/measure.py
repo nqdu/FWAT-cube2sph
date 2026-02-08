@@ -1,5 +1,6 @@
 import numpy as np 
 from typing import Final
+from fwat.adjoint.MeasureStats import MeasureStats
 
 def measure_adj(t0_inp: float,dt_inp: float,npt_inp: int,
                 t0_syn: float,dt_syn: float,npt_syn: int,
@@ -17,7 +18,7 @@ def measure_adj(t0_inp: float,dt_inp: float,npt_inp: int,
                 dt_fac: float = 2.,err_fac: float = 2.5,
                 dt_max_scale: float = 3.5,
                 ncyle_in_window: float = 1.5,
-                use_physical_disp: bool = False) -> tuple[np.ndarray,np.ndarray,np.ndarray,np.ndarray]:
+                use_physical_disp: bool = False) -> tuple[MeasureStats,np.ndarray]:
     """
     MEASURE ADJ wrapper
     """
@@ -42,4 +43,14 @@ def measure_adj(t0_inp: float,dt_inp: float,npt_inp: int,
             ncyle_in_window,use_physical_disp
         )
     
-    return tr,amp,window,adj
+    stats = MeasureStats(
+        adj_type = str(imeas),
+        misfit=tr,
+        tstart=tstart,
+        tend=tend,
+        tr_chi=tr,
+        am_chi=amp,
+        tshift = window[6]
+    )
+    
+    return stats,adj

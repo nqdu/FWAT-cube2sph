@@ -1,5 +1,10 @@
 import numpy as np 
 from numba import jit 
+from fwat.measure.utils import bandpass,taper_window
+from fwat.measure.utils import dif1
+from scipy.integrate import trapezoid
+from scipy.signal import correlate
+from .MeasureStats import MeasureStats
 
 @jit(nopython=True)
 def _cal_cc_correction(s: np.ndarray, ishift: int, dlna: float):
@@ -67,8 +72,6 @@ def _cal_cc_error(d: np.ndarray, s: np.ndarray, dt: float, ishift: int, dlna: fl
     sigma_dlna : float
         Estimated uncertainty for amplitude shift.
     """
-    from fwat.measure.utils import dif1 
-
     # apply a scaling
     s_cc_dt,s_cc_dtdlna = _cal_cc_correction(s,ishift,dlna)
 
@@ -128,8 +131,6 @@ def cc_measure(d: np.ndarray, s: np.ndarray, dt: float,
     cc_coef : float
         correlation coefficient.
     """
-    from scipy.signal import correlate
-    
     # compute time shift between data and syn
     cc = correlate(d,s,'full')
     ishift = int(np.argmax(cc) - len(d) + 1)
@@ -227,6 +228,8 @@ def measure_adj_cc(obs,syn,t0,dt,nt,
                dt_sigma_min = 1.,
                dlna_sigma_min = 0.5):
     """
+    Measure the cross-correlation adjoint source
+
     Parameters
     ------------
     obs: np.ndarray
@@ -262,17 +265,11 @@ def measure_adj_cc(obs,syn,t0,dt,nt,
 
     Returns
     ----------------
-    tr,am : float
-        misfit function (am = tr if return_type = dt)
-    win: np.ndarray, shape(20)
-        measure_adj window
+    stats: MeasureStats
+        stats class containing measurement info
     adj: np.ndarray
         adjoint source, shape(nt)
     """
-    
-    from fwat.measure.utils import bandpass,taper_window
-    from fwat.measure.utils import dif1
-    from scipy.integrate import trapezoid
 
     # make sure len(obs) == len(syn)
     assert len(obs) == len(syn), "Observed and synthetic data must have the same length"
@@ -328,22 +325,26 @@ def measure_adj_cc(obs,syn,t0,dt,nt,
     # filter adjoint source 
     adjsrc = bandpass(adjsrc,dt,1./max_period,1./min_period) * taper
 
-    # measure_adj arrays
-    win_chi = np.zeros((20))
-    win_chi[6] = tshift
-    win_chi[13-1] = 0.5 * np.sum( obs**2 )
-    win_chi[14-1] = 0.5 * np.sum( syn**2 )
-    win_chi[15-1] = tr_chi 
-    win_chi[20-1] = nt * dt
+    # stats class
+    stats = MeasureStats(
+        adj_type = 'cc_' + return_type,
+        misfit = tr_chi,
+        tstart = tstart,
+        tend = tend,
+        tr_chi = tr_chi,
+        am_chi = am_chi,
+        tshift = tshift
+    )
 
-    return tr_chi,am_chi,win_chi,adjsrc
+    return stats,adjsrc
 
 def measure_adj_cc_dd(
         obs1:np.ndarray,syn1:np.ndarray,
         obs2:np.ndarray,syn2:np.ndarray,
         t0:float,dt:float,nt:int,
         min_period:float,max_period:float,
-        tstart:float,tend:float,
+        tstart1:float,tend1:float,
+        tstart2:float,tend2:float,
         tshift_obs_user = None,
         taper_ratio = 0.05,
         dt_sigma_min = 1.,
@@ -365,8 +366,12 @@ def measure_adj_cc_dd(
         starttime/sampling/no.of points of adjoint source
     min/max_period: float
         minimum/maximum period used
-    tstart,tend: float
-        starttime/endtime of measurement window
+    tstart1,tend1: float
+        starttime/endtime of measurement window for first pair
+    tstart2,tend2: float
+        starttime/endtime of measurement window for second pair
+    tshift_obs_user: float or None
+        if not None, use user-provided time shift for observed data instead of measurement, default None
     taper_ratio: float
         taper of the window, default = 0.05
     dt_sigma_min: float
@@ -376,34 +381,36 @@ def measure_adj_cc_dd(
 
     Returns
     ----------------
-    tr,am : float
-        misfit function
-    win: np.ndarray, shape(20)
-        measure_adj window
+    stats: MeasureStats
+        stats class containing measurement info
     adj_src1/2: np.ndarray
         adjoint source, shape(nt)
     """
 
-    from fwat.measure.utils import bandpass,taper_window
-    from fwat.measure.utils import dif1
-    from scipy.integrate import trapezoid
-
     # make sure len(obs) == len(syn)
     assert len(obs1) == len(syn1), "Observed and synthetic data must have the same length"
+    assert len(obs1) == len(obs2), "Observed and synthetic data must have the same length"
 
     # get window info
-    lpt, rpt, taper0 = taper_window(t0, dt, nt, tstart, tend, p=taper_ratio)
-    taper = syn1 * 0
-    taper[lpt:rpt] = taper0 
+    lpt1, rpt1, taper1_0 = taper_window(t0, dt, nt, tstart1, tend1, p=taper_ratio)
+    taper1 = syn1 * 0
+    taper1[lpt1:rpt1] = taper1_0 
+
+    lpt2, rpt2, taper2_0 = taper_window(t0, dt, nt, tstart2, tend2, p=taper_ratio)
+    taper2 = syn2 * 0
+    taper2[lpt2:rpt2] = taper2_0
 
     # get windowed data
-    s1 = syn1[lpt:rpt] * taper0 
-    d1 = obs1[lpt:rpt] * taper0 
-    s2 = syn2[lpt:rpt] * taper0
-    d2 = obs2[lpt:rpt] * taper0
+    nlen = max(rpt1-lpt1,rpt2-lpt2)
+    s1 = np.zeros(nlen); d1 = np.zeros(nlen); 
+    s2 = np.zeros(nlen); d2 = np.zeros(nlen)
+    s1[:rpt1-lpt1] = syn1[lpt1:rpt1] * taper1_0
+    d1[:rpt1-lpt1] = obs1[lpt1:rpt1] * taper1_0
+    s2[:rpt2-lpt2] = syn2[lpt2:rpt2] * taper2_0
+    d2[:rpt2-lpt2] = obs2[lpt2:rpt2] * taper2_0
 
     # calculate time shift
-    tshift_dd,tshift_syn,_,dlna,_,sigma_dt,sigma_dlna = _cc_shift_dd(d1,s1,d2,s2,dt,dt_sigma_min,dlna_sigma_min)
+    tshift_dd,tshift_syn,tshift_obs,dlna,_,sigma_dt,sigma_dlna = _cc_shift_dd(d1,s1,d2,s2,dt,dt_sigma_min,dlna_sigma_min)
     if tshift_obs_user is not None:
         tshift_dd = tshift_syn - tshift_obs_user
     ishfit_dd = int(tshift_dd / dt)
@@ -421,27 +428,31 @@ def measure_adj_cc_dd(
     # norm
     ds1dt = dif1(s1,dt)
     nnorm = trapezoid(ds1dt*dsdt_cc2,dx=dt)
+    if nnorm == 0.:
+        print(nnorm,tshift_dd,sigma_dt,tshift_syn,tshift_obs)
+        print(np.max(abs(ds1dt)),np.max(abs(dsdt_cc2)),np.max(abs(s1)),np.max(abs(s2)   ))
     fp_1 = -1 * dsdt_cc2 * tshift_dd / nnorm / sigma_dt ** 2  # -1
     fp_2 = +1 * dsdt_cc1 * tshift_dd / nnorm / sigma_dt ** 2  # +1
 
     # adjoint source
     adjsrc_1 = obs1 * 0 
     adjsrc_2 = obs2 * 0
-    adjsrc_1[lpt:rpt] = fp_1 * taper0
-    adjsrc_2[lpt:rpt] = fp_2 * taper0
+    adjsrc_1[lpt1:rpt1] = fp_1[:rpt1-lpt1] * taper1_0
+    adjsrc_2[lpt2:rpt2] = fp_2[:rpt2-lpt2] * taper2_0
 
     # filter
-    adjsrc_1 = bandpass(adjsrc_1,dt,1./max_period,1./min_period) * taper
-    adjsrc_2 = bandpass(adjsrc_2,dt,1./max_period,1./min_period) * taper
+    adjsrc_1 = bandpass(adjsrc_1,dt,1./max_period,1./min_period) * taper1
+    adjsrc_2 = bandpass(adjsrc_2,dt,1./max_period,1./min_period) * taper2
 
-    #
-    tr_chi = misfit_p
-    am_chi = misfit_q
-    win_chi = np.zeros((20))
-    win_chi[6] = tshift_dd
-    win_chi[13-1] = 0.5 * np.sum( obs1**2 )
-    win_chi[14-1] = 0.5 * np.sum( syn1**2 )
-    win_chi[15-1] = tr_chi
-    win_chi[20-1] = nt * dt
+    # stats class
+    stats = MeasureStats(
+        adj_type = 'cc_dd',
+        misfit = misfit_p,
+        tstart = min(tstart1,tstart2),
+        tend = max(tend1,tend2),
+        tr_chi = misfit_p,
+        am_chi = misfit_q,
+        tshift = tshift_dd
+    )
 
-    return tr_chi,am_chi,win_chi,adjsrc_1,adjsrc_2
+    return stats,adjsrc_1,adjsrc_2

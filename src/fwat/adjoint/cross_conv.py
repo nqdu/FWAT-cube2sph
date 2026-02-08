@@ -5,6 +5,7 @@ from fwat.measure.utils import bandpass,taper_window
 from fwat.measure.tele.deconit import time_decon
 from scipy.signal import convolve 
 from scipy.integrate import trapezoid
+from fwat.adjoint.MeasureStats import MeasureStats
 
 def measure_adj_cross_conv(
     obs_v,syn_v,obs_h,syn_h,
@@ -81,18 +82,19 @@ def measure_adj_cross_conv(
     adj_z = -convolve(dchi_adj,h_rev,'valid') * dt
     adj_r = convolve(dchi_adj,v_rev,'valid') * dt
 
-    # measure_adj arrays
-    tr_chi = mis
-    am_chi = mis 
-    win_chi = np.zeros((20))
-    win_chi[13-1] = 0.5 * np.sum( obs_v**2 + obs_h**2 )
-    win_chi[14-1] = 0.5 * np.sum( syn_v**2 + syn_h**2 )
-    win_chi[15-1] = tr_chi 
-    win_chi[20-1] = nt * dt
+    # stats 
+    stats = MeasureStats(
+        adj_type="cross_conv",
+        misfit=mis,
+        tr_chi=mis,
+        am_chi=mis,
+        tstart = tstart,
+        tend = tend
+    )
 
     # also return the cross-conv for visualization
     cc1 = chi1 * taper 
     cc2 = chi2 * taper
 
     
-    return tr_chi,am_chi,win_chi,adj_z,adj_r,cc1,cc2
+    return stats,adj_z,adj_r,cc1,cc2
