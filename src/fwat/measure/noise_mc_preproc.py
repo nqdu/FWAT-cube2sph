@@ -3,8 +3,9 @@ from mpi4py import MPI
 import os 
 from fwat.const import PARAM_FILE
 from obspy.io.sac import SACTrace
-from fwat.measure.utils import cumtrapz1,dif1
-from fwat.measure.utils import alloc_mpi_jobs
+from fwat.measure.utils import cumtrapz1,dif1,bandpass \
+                                ,interpolate_syn,alloc_mpi_jobs
+from fwat.adjoint.MeasureStats import MeasureStats
 
 def _get_snr(data:np.ndarray,win_b:int,win_e:int):
     """
@@ -66,6 +67,24 @@ def _get_rotate_matrix(azd,bazd,rotate_src=True,rotate_sta = True):
         ])
 
     return R_s,R_r
+
+def _get_window_by_group_vel(dist:float,vmin:float,vmax:float,Tmax:float,
+                            npt:int,t0_inp:float,dt_inp:float):
+
+    # start/end index of the normalized window
+    win_b = np.floor((dist / vmax - Tmax / 2. + t0_inp) / dt_inp)
+    win_e = np.floor((dist / vmin + Tmax / 2. - t0_inp) / dt_inp)
+    win_b = int(max(win_b,0))
+    win_e = int(min(win_e,npt-1))
+
+
+    # compute time window
+    tstart = dist / vmax - Tmax * 0.5 
+    tend = dist / vmin + Tmax * 0.5 
+    tstart = max(tstart,t0_inp)
+    tend = min(tend,t0_inp+(npt-1)*dt_inp)
+
+    return win_b,win_e,tstart,tend
 
 class NoiseMC_PreOP():
     def __init__(self, measure_type:str, iter:int, evtid:str, run_opt:int):
@@ -189,9 +208,9 @@ class NoiseMC_PreOP():
             exit(1)
 
         # check adjsrc_type
-        if self.adjsrc_type not in ['5','7','exp_phase','cc_time']:
+        if self.adjsrc_type not in ['5','7','exp_phase','cc_time','cc_time_dd']:
             if self.myrank == 0:
-                print(f"only [5,7,'exp_phase','cc_time'] adjoint sources are supported!")
+                print(f"only [5,7,'exp_phase','cc_time','cc_time_dd'] adjoint sources are supported!")
                 print(f"adjsrc_type = {self.adjsrc_type}")
             exit(1)
 
@@ -215,8 +234,8 @@ class NoiseMC_PreOP():
             for ir in range(nsta):
                 name = netwk[ir] + '.' + stnm[ir]
                 if name not in self.stainfo:
-                    _,az,baz = cal_dist_az_baz(self.evla,self.evlo,stla[ir],stlo[ir])
-                    self.stainfo[name] = [stlo[ir],stla[ir],az,baz]
+                    dist,az,baz = cal_dist_az_baz(self.evla,self.evlo,stla[ir],stlo[ir])
+                    self.stainfo[name] = [stlo[ir],stla[ir],az,baz,dist/1000]
                 
                 # save names for this component
                 names.add(name)
@@ -267,7 +286,6 @@ class NoiseMC_PreOP():
 
     def _rotate_seismogram_to_RT(self,):
         from .utils import rotate_EN_to_RT
-        from .utils import alloc_mpi_jobs
 
         # get receiver components
         rcomp = [self.cc_comps[i][1] for i in range(self.ncomp)]
@@ -299,7 +317,7 @@ class NoiseMC_PreOP():
                 # rotate to R/T
                 ve = temp_syn[0,:]
                 vn = temp_syn[1,:]
-                bazd = self.stainfo[keys[i]][-1]
+                bazd = self.stainfo[keys[i]][3]
                 vr,vt = rotate_EN_to_RT(ve,vn,bazd)
                 temp_syn[0,:] = vr * 1.
                 temp_syn[1,:] = vt * 1.
@@ -337,7 +355,7 @@ class NoiseMC_PreOP():
     
     def _rotate_mc_adj(self,i:int,adj_src_all:np.ndarray):
         # rotate adjoint source to ENZ-ENZ
-        azd,bazd = self.stainfo[self.sta_names[i]][2:]
+        azd,bazd = self.stainfo[self.sta_names[i]][2:4]
         R_s,R_r = _get_rotate_matrix(azd,bazd)
         adj_src_all = np.einsum("ip,jq,pqk-> ijk",R_s.T,R_r.T,adj_src_all)
 
@@ -373,6 +391,19 @@ class NoiseMC_PreOP():
                         self.Tmin[ib]*0.99,
                         verbose,dat_inp,
                         syn_inp)
+    
+    def _cal_adj_by_name_dd(self,dat_inp_i,dat_inp_j,
+                            syn_inp_i,syn_inp_j,
+                            t0_inp,dt_inp,npt_cut,
+                            ib:int,tstart_i:float,tend_i:float,
+                            tstart_j:float,tend_j:float):
+        from fwat.adjoint.cc_misfit import measure_adj_cc_dd
+        return measure_adj_cc_dd(
+                    dat_inp_i,syn_inp_i,
+                    dat_inp_j,syn_inp_j,
+                    t0_inp,dt_inp,npt_cut,
+                    self.Tmin[ib],self.Tmax[ib],
+                    tstart_i,tend_i,tstart_j,tend_j)
         
     def save_forward(self):
         # get some vars
@@ -454,6 +485,8 @@ class NoiseMC_PreOP():
         # sync
         MPI.COMM_WORLD.Barrier()
 
+
+
     def cal_adj_source(self,ib:int):
         """ 
         Calculate adjoint source for noise cross-correlation measurement. 
@@ -463,7 +496,11 @@ class NoiseMC_PreOP():
         ib: int
             Index of frequency band.
         """
-        from fwat.measure.utils import interpolate_syn,bandpass
+
+        # check if double difference is enabled
+        if '_dd' in self.adjsrc_type:
+            self.cal_adj_source_dd(ib)
+            return 
 
         # get vars
         npt_syn = self.npt_syn
@@ -508,11 +545,7 @@ class NoiseMC_PreOP():
 
         # misfits
         ncomp = self.ncomp
-        tstart = np.zeros((nsta_loc))
-        tend = np.zeros((nsta_loc))
-        win_chi = np.zeros((nsta_loc,ncomp,20))
-        tr_chi = np.zeros((nsta_loc,ncomp))
-        am_chi = np.zeros((nsta_loc,ncomp))
+        stats_list = []
 
         # temp 
         RTZ = ['R','T','Z']
@@ -570,10 +603,7 @@ class NoiseMC_PreOP():
 
                 # find amplitude of the in the window to normalize
                 dist = obs_tr.dist
-                win_b = np.floor((dist / vmax_list[ib] - self.Tmax[ib] / 2. + t0_inp) / dt_inp)
-                win_e = np.floor((dist / vmin_list[ib] + self.Tmax[ib] / 2. - t0_inp) / dt_inp)
-                win_b = int(max(win_b,0))
-                win_e = int(min(win_e,len(dat_inp)-1))
+                win_b,win_e,tstart,tend = _get_window_by_group_vel(dist,vmin_list[ib],vmax_list[ib],self.Tmax[ib],npt_cut,t0_inp,dt_inp)
                 amp = np.max(np.abs(dat_inp[win_b:win_e]))
 
                 # check snr
@@ -583,18 +613,12 @@ class NoiseMC_PreOP():
                 if amp == 0.: amp = 1.
                 dat_inp *= np.max(np.abs(syn_inp[win_b:win_e])) / amp
 
-                # compute time window
-                tstart[ir] = dist / vmax_list[ib] - self.Tmax[ib] * 0.5 
-                tend[ir] = dist / vmin_list[ib] + self.Tmax[ib] * 0.5 
-                tstart[ir] = max(tstart[ir],t0_inp)
-                tend[ir] = min(tend[ir],t0_obs+(npt_obs-1)*dt_obs)
-
                 # compute misfits and adjoint source
-                tr_chi[ir,ic],am_chi[ir,ic],win_chi[ir,ic,:],adjsrc =  \
+                stats,adjsrc =  \
                     self._cal_adj_by_name(
                         self.sta_names[i],dat_inp,syn_inp,
                         t0_inp,dt_inp,npt_cut,
-                        ib,tstart[ir],tend[ir]
+                        ib,tstart,tend
                     )
                 adjsrc = interpolate_syn(adjsrc,t0_inp,dt_inp,npt_cut,
                                             t0_syn,dt_syn,npt_syn)
@@ -602,9 +626,14 @@ class NoiseMC_PreOP():
                 # make sure the snr > snr_threshold
                 if snr < snr_threshold:
                     adjsrc[:] = 0.
-                    tr_chi[ir,ic] = 0.
-                    am_chi[ir,ic] = 0.
-                    win_chi[ir,ic,6] *= 0.
+                    stats.misfit = 0.
+                    stats.tr_chi = 0.
+                    stats.am_chi = 0.
+                    stats.tshift = 0.
+                
+                # append stats
+                stats.code = f"{self.evtid}_{chs} {self.sta_names[i]}.{self.chcode}{chr}"
+                stats_list.append(stats)
 
                 # save adjoint source to adj_src_all
                 adj_src_all[i_s,i_r,:] = adjsrc.copy()
@@ -640,11 +669,317 @@ class NoiseMC_PreOP():
         # end for each station
 
         # print measure_adj information
-        self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,win_chi)
+        self._print_measure_info(bandname,stats_list)
 
-    def _print_measure_info(self,bandname:str,tstart:np.ndarray,tend:np.ndarray,
-                            tr_chi:np.ndarray,am_chi:np.ndarray,
-                            window_chi:np.ndarray):
+    def _alloc_shared_memory(self,npt_cut:int):
+        # allocate shared memory for syn/obs data 
+        nsta = len(self.sta_names)
+        ncomp = self.ncomp
+
+        # 1. Create a communicator for processes on the SAME physical node
+            # This segregates the world into groups based on shared memory availability.
+        comm = MPI.COMM_WORLD
+        comm_node = comm.Split_type(MPI.COMM_TYPE_SHARED)
+        node_rank = comm_node.Get_rank()
+
+        # Create Inter-node communicator (Leader group)
+        # Only Rank 0 of every node joins this communicator
+        leader_color = 0 if node_rank == 0 else MPI.UNDEFINED
+        lead_comm = comm.Split(leader_color, key=self.myrank)
+
+        # 2. Calculate memory size (Only Node-Rank 0 allocates the actual bytes)
+        itemsize = MPI.DOUBLE.Get_size()
+        if node_rank == 0:
+            nbytes = nsta * 9 * npt_cut * itemsize
+        else:
+            nbytes = 0
+        
+        # check if comm_node is intracomm 
+        if not isinstance(comm_node, MPI.Intracomm):
+            print("Error: comm_node is not an Intracomm. Shared memory may not be supported on this platform.")
+            exit(1)
+
+        # 3. Allocate the Shared Memory Window
+        sh_syn_win = MPI.Win.Allocate_shared(nbytes, itemsize, comm=comm_node)
+        sh_obs_win = MPI.Win.Allocate_shared(nbytes, itemsize, comm=comm_node)
+        
+        # Wait for initialization to finish
+        comm_node.Barrier()
+
+        return sh_syn_win, sh_obs_win,lead_comm, comm_node
+
+
+    def cal_adj_source_dd(self,ib:int):
+        """ 
+        Calculate adjoint source for noise cross-correlation measurement, double-difference version.
+
+        Parameters
+        -----------
+        ib: int
+            Index of frequency band.
+        """
+
+        # get vars
+        npt_syn = self.npt_syn
+        t0_syn = self.t0_syn
+        dt_syn = self.dt_syn
+
+        # new dt/nt for interpolate
+        dt_inp = 0.01
+        t0_inp = -10.
+        if dt_inp > dt_syn:
+            dt_inp = dt_syn * 1.
+            t0_inp = t0_syn * 1.
+        t1_inp = t0_syn + (npt_syn - 1) * dt_syn
+        npt_cut = int((t1_inp - t0_inp) / dt_inp) + 1
+
+        # get snr
+        snr_threshold:float = -1.
+        if 'SNR_THRESHOLD' in self.pdict:
+            snr_threshold = self.pdict['SNR_THRESHOLD'][ib]
+
+        # band name
+        bandname = self._get_bandname(ib)
+        freqmin = 1. / self.Tmax[ib]
+        freqmax = 1. / self.Tmin[ib]
+
+        # group velocity window
+        vmin_list = [x[0] for x in self.pdict['GROUPVEL_WIN']]
+        vmax_list = [x[1] for x in self.pdict['GROUPVEL_WIN']]
+
+        # log
+        if self.myrank == 0:
+            print(f"preprocessing for band {bandname} ...")
+            for ic in range(len(self.scomp_syn)):
+                outdir = f"{self.syndirs[ic]}/OUTPUT_FILES/{bandname}"
+                os.makedirs(outdir,exist_ok=True)
+        MPI.COMM_WORLD.Barrier()
+
+        # allocate jobs
+        nsta = len(self.sta_names)
+        istart,iend = alloc_mpi_jobs(nsta,self.nprocs,self.myrank)
+        nsta_loc = iend - istart + 1
+
+        # allocate shared memory for syn/obs data 
+        sh_syn_win, sh_obs_win, lead_comm, comm_node = self._alloc_shared_memory(npt_cut)
+        buf_syn,_ = sh_syn_win.Shared_query(0)
+        buf_obs,_ = sh_obs_win.Shared_query(0)
+        syn_data = np.ndarray((nsta,3,3,npt_cut), dtype=np.float64, buffer=buf_syn)
+        obs_data = np.ndarray((nsta,3,3,npt_cut), dtype=np.float64, buffer=buf_obs)
+        if comm_node.Get_rank() == 0:
+            syn_data.fill(0.)
+            obs_data.fill(0.)
+        comm_node.Barrier()
+        
+        # misfits
+        ncomp = self.ncomp
+        stats_list = []
+
+        # temp 
+        RTZ = ['R','T','Z']
+
+        # loop to fetch data
+        for ir in range(nsta_loc):
+            i = ir + istart 
+
+            # fetch RTZRTZ seismogram
+            data = self._get_RTZRTZ_seismogram(i)
+
+            # loop each CC-component
+            for ic in range(self.ncomp):
+                # check if this component exists
+                if self.sta_names[i] not in self.sta_names_comp[ic]:
+                    continue
+                
+                # get chs/chr
+                chs = self.cc_comps[ic][0]
+                chr = self.cc_comps[ic][1]
+                i_s = RTZ.index(chs)
+                i_r = RTZ.index(chr)
+
+                # load obs_data
+                code = f"{self.sta_names[i]}.{self.chcode}{chr}"
+                obs_tr = SACTrace.read(f"{self.DATA_DIR}/{self.evtid}_{chs}/{code}.sac")
+                t0_obs = obs_tr.b * 1.
+                dt_obs = obs_tr.delta * 1.
+                npt_obs = obs_tr.npts * 1
+                npt1_inp = int((npt_obs - 1) * dt_obs / dt_inp)
+
+                # filter obs/syn in the band
+                obs_tr.data = bandpass(obs_tr.data,dt_obs,freqmin,freqmax)
+                syn_inp = bandpass(data[i_s,i_r,:],dt_syn,freqmin,freqmax)
+
+                # now we will resample data to (t0_inp,dt_inp,npt_cut)
+                # interp obs/syn
+                dat_inp1 = interpolate_syn(obs_tr.data,t0_obs,dt_obs,npt_obs,
+                                        t0_obs + dt_inp,dt_inp,npt1_inp)
+                syn_inp = interpolate_syn(syn_inp,t0_syn,dt_syn,npt_syn,
+                                         t0_inp,dt_inp,npt_cut)
+                
+                # compute time derivative 
+                if self.pdict['USE_EGF'] == False:
+                    dat_inp1 = -dif1(dat_inp1,dt_inp)
+                    if self.myrank == 0: print("CCFs => EGFs ...")
+        
+                # cut 
+                dat_inp = interpolate_syn(dat_inp1,t0_obs + dt_inp,dt_inp,npt1_inp,
+                                         t0_inp,dt_inp,npt_cut)
+
+                # save to shared memory
+                syn_data[i,i_s,i_r,:] = syn_inp.copy()
+                obs_data[i,i_s,i_r,:] = dat_inp.copy()
+
+                # save obs and syn data as sac
+                outdir = f"{self.SOLVER}/{self.mod}/{self.evtid}_{chs}/OUTPUT_FILES/{bandname}"
+                obs_tr.delta = dt_inp 
+                obs_tr.b = t0_inp 
+                obs_tr.data = dat_inp * 1.
+                self.seismogram_sac[f"{outdir}/{code}.sac.obs"] = obs_tr.copy()
+                obs_tr.data = syn_inp * 1.
+                self.seismogram_sac[f"{outdir}/{code}.sac.syn"] = obs_tr.copy()
+
+        # sync to make sure all data are ready
+        MPI.COMM_WORLD.Barrier()
+        if comm_node.Get_rank() == 0:
+            lead_comm.Allreduce(MPI.IN_PLACE, syn_data, op=MPI.SUM)
+            lead_comm.Allreduce(MPI.IN_PLACE, obs_data, op=MPI.SUM)
+        comm_node.Barrier()
+
+        # adjoint sources 
+        adj_src_all = np.zeros((nsta,3,3,npt_syn),dtype=float)
+
+        # loop each (i,j) pair to compute adjoint source for double-difference measurement
+        njobs = nsta * (nsta - 1) // 2
+        kstart,kend = alloc_mpi_jobs(njobs,self.nprocs,self.myrank)
+        for k in range(kstart,kend+1):
+            # get (i,j) pair from k
+            i = int(nsta - 2 - np.floor(np.sqrt(-8*k + 4*nsta*(nsta-1) - 7) / 2.0 - 0.5))
+            row_start_k = i * nsta - (i * (i + 1)) // 2
+            j = int(k - row_start_k + i + 1)
+
+            if i >= nsta or j >= nsta:
+                print(f"Error in calculating (i,j) from k: i={i}, j={j}, k={k}")
+                exit(1)
+
+            # allocate space for adjoint source
+            adj_src_i = np.zeros((3,3,npt_syn))
+            adj_src_j = np.zeros((3,3,npt_syn)) 
+
+            # loop each CC-component
+            for ic in range(self.ncomp):
+                # check if this component exists
+                if self.sta_names[i] not in self.sta_names_comp[ic] or \
+                    self.sta_names[j] not in self.sta_names_comp[ic]:
+                    continue
+
+                # get chs/chr
+                chs = self.cc_comps[ic][0]
+                chr = self.cc_comps[ic][1]
+                i_s = RTZ.index(chs)
+                i_r = RTZ.index(chr)
+
+                # get distances
+                dist_i = self.stainfo[self.sta_names[i]][4]
+                dist_j = self.stainfo[self.sta_names[j]][4]
+
+                # get syn/obs data from shared memory
+                syn_inp_i = syn_data[i,i_s,i_r,:].copy()
+                dat_inp_i = obs_data[i,i_s,i_r,:].copy()
+                syn_inp_j = syn_data[j,i_s,i_r,:].copy()
+                dat_inp_j = obs_data[j,i_s,i_r,:].copy()
+
+                # normalize by amplitude in the window
+                # find amplitude of the in the window to normalize
+                win_b_i,win_e_i,tstart_i,tend_i = \
+                        _get_window_by_group_vel(
+                            dist_i,vmin_list[ib],vmax_list[ib],self.Tmax[ib],
+                            npt_cut,t0_inp,dt_inp)
+                amp_i = np.max(np.abs(dat_inp_i[win_b_i:win_e_i]))
+                if amp_i == 0.: amp_i = 1.
+                dat_inp_i *= np.max(np.abs(syn_inp_i[win_b_i:win_e_i])) / amp_i
+
+                win_b_j,win_e_j,tstart_j,tend_j = \
+                        _get_window_by_group_vel(
+                            dist_j,vmin_list[ib],vmax_list[ib],self.Tmax[ib],
+                            npt_cut,t0_inp,dt_inp)
+                amp_j = np.max(np.abs(dat_inp_j[win_b_j:win_e_j]))
+                if amp_j == 0.: amp_j = 1.
+                dat_inp_j *= np.max(np.abs(syn_inp_j[win_b_j:win_e_j])) / amp_j
+
+                # compute adjoint source for i and j
+                stats,adjsrc_i,adjsrc_j =  \
+                    self._cal_adj_by_name_dd(
+                        dat_inp_i,dat_inp_j,
+                        syn_inp_i,syn_inp_j,
+                        t0_inp,dt_inp,npt_cut,
+                        ib,tstart_i,tend_i,
+                        tstart_j,tend_j
+                    )
+                adjsrc_i = interpolate_syn(adjsrc_i,t0_inp,dt_inp,npt_cut,
+                                        t0_syn,dt_syn,npt_syn)
+                adjsrc_j = interpolate_syn(adjsrc_j,t0_inp,dt_inp,npt_cut,
+                                        t0_syn,dt_syn,npt_syn)
+
+                # check snr
+                snr_i = _get_snr(dat_inp_i,win_b_i,win_e_i)
+                snr_j = _get_snr(dat_inp_j,win_b_j,win_e_j)
+                if snr_i < snr_threshold or snr_j < snr_threshold:
+                    adjsrc_i[:] = 0.
+                    adjsrc_j[:] = 0.
+                    stats.misfit = 0.
+                    stats.tr_chi = 0.
+                    stats.am_chi = 0.
+                    stats.tshift = 0.
+                
+                # append stats
+                stats.code = f"{self.evtid}_{chs} {self.sta_names[i]}.{self.chcode}{chr}-{self.sta_names[j]}.{self.chcode}{chr}"
+                stats_list.append(stats)
+
+                # save adjoint source
+                adj_src_i[i_s,i_r,:] = adjsrc_i.copy()
+                adj_src_j[i_s,i_r,:] = adjsrc_j.copy()
+            
+            # end for loop cc_comps
+
+            # rotate adjoint source to ENZ-ENZ
+            adj_src_i = self._rotate_mc_adj(i,adj_src_i)
+            adj_src_j = self._rotate_mc_adj(j,adj_src_j)
+
+            # accumulate adjoint source
+            adj_src_all[i,:,:,:] += adj_src_i.copy()
+            adj_src_all[j,:,:,:] += adj_src_j.copy()
+
+        # sync to make sure all adjoint sources are ready
+        MPI.COMM_WORLD.Allreduce(MPI.IN_PLACE, adj_src_all, op=MPI.SUM)
+
+        # free space for shared memory
+        if lead_comm != MPI.COMM_NULL:
+            lead_comm.Free()
+        if comm_node != MPI.COMM_NULL:
+            comm_node.Free()
+        sh_syn_win.Free()
+        sh_obs_win.Free()
+
+        # now loop each station to save adjoint sources and obs/syn data
+        for ir in range(nsta_loc):
+            i = ir + istart
+
+            # save adjoint source
+            rcomp = ['E','N','Z']
+            data = np.zeros((npt_syn,2))
+            data[:,0] = t0_syn + np.arange(npt_syn) * dt_syn
+            for ic in range(len(self.scomp_syn)):
+                i_s = rcomp.index(self.scomp_syn[ic])
+                for i_r in range(3):
+                    code = f"{self.sta_names[i]}.{self.chcode}{rcomp[i_r]}"
+                    filename = f"{self.syndirs[ic]}/OUTPUT_FILES/{bandname}/{code}.adj.sem.npy"
+                    data[:,1] = adj_src_all[i,i_s,i_r,:]
+                    self.seismogram_adj[filename] = data.copy()
+
+        # print measure_adj information
+        self._print_measure_info(bandname,stats_list)
+
+    def _print_measure_info(self,bandname:str,stats_list:list[MeasureStats]):
         """ 
         print measure_adj info and save to file 
         
@@ -652,22 +987,11 @@ class NoiseMC_PreOP():
         ----------
         bandname: str
             band name
-        tstart: np.ndarray, shape(nsta_loc,)
-            start time of measurement window
-        tend: np.ndarray,shape(nsta_loc,)
-            end time of measurement window
-        tr_chi: np.ndarray,shape(nsta_loc,ncomp)
-            travel-time chi
-        am_chi: np.ndarray,shape(nsta_loc,ncomp)
-            amplitude chi
-        window_chi: np.ndarray,shape(nsta_loc,ncomp,20)
-            window chi and adjoint source info  (20 values)
+        stats_list: list[MeasureStats]
+            list of MeasureStats for each station and component
         """
         import os 
         from .utils import alloc_mpi_jobs 
-        
-        ncomp = tr_chi.shape[1]
-        nsta_loc = len(tstart)
 
         # create directory
         if self.myrank == 0:
@@ -693,39 +1017,33 @@ class NoiseMC_PreOP():
                     fio = open(outfile,"w")
                 else:
                     fio = open(outfile,"a")
+                
+                # loop each measure and print info
+                nmeasure = len(stats_list)
+                for im in range(nmeasure):
+                    stats = stats_list[im]
 
-                for ir in range(nsta_loc):
-                    i = ir + istart
-                    for ic in range(ncomp):
-                        chs = self.cc_comps[ic][0]
-                        chr = self.cc_comps[ic][1]
+                    # print info
+                    print(f"Measuring stats of {stats.code}")
+                    print("start and end time of window: %f %f" %(stats.tstart,stats.tend) )
+                    print(f"adjoint source and chi value for adjoint type = {self.adjsrc_type}")
+                    print("tshift = %e" %(stats.tshift))
+                    print("tr_chi = %e am_chi = %e" %(stats.tr_chi,stats.am_chi))
+                    print("")
 
-                        # check if this station exists in this source component
-                        if self.sta_names[i] not in self.sta_names_comp[ic]:
-                            continue
-
-                        name = self.sta_names[i]
-                        print(f'{name}.{self.chcode}{chr} CC comp = {self.cc_comps[ic]}')
-                        print("Measurement window No.  1")
-                        print("start and end time of window: %f %f" %(tstart[ir],tend[ir]) )
-                        print(f"adjoint source and chi value for type = {self.adjsrc_type}")
-                        print("%e" %(window_chi[ir,ic,6]))
-                        print("tr_chi = %e am_chi = %e" %(tr_chi[ir,ic],am_chi[ir,ic]))
-                        print("")
-
-                        net,stnm = name.split('.')
-                        fio.write(f"{self.evtid}_{chs} {net} {stnm} {self.chcode}{chr} 1 {self.adjsrc_type} ")
-                        fio.write("%g %g " %(tstart[ir],tend[ir]))
-                        for j in range(20):
-                            fio.write("%g " %(window_chi[ir,ic,j]))
-                        fio.write("%g %g 0. 0.\n" %(tr_chi[ir,ic],am_chi[ir,ic]))
+                    # write to file
+                    # format: evtid code adj_type tstart tend tshift tr_chi am_chi misfit
+                    code_split = stats.code.split()
+                    fio.write(f"{code_split[0]} {code_split[1]} {stats.adj_type} ")
+                    fio.write("%g %g " %(stats.tstart,stats.tend))
+                    fio.write("%g %g %g %g\n" %(stats.tshift,stats.tr_chi,stats.am_chi,stats.misfit))
                 
                 # close output file
                 fio.close()
 
             # barrier
             MPI.COMM_WORLD.Barrier()
-
+    
     def sum_adj_source(self):
         import os 
         import glob 

@@ -18,9 +18,9 @@ def main():
     tstart = 3.
     tend = 8.
 
-    tr,_,win,adj_i,adj_j = measure_adj_cc_dd(
+    stats,adj_i,adj_j = measure_adj_cc_dd(
         obs,syn,obs2,syn2,t[0],dt,len(t),Tmin,Tmax,
-        tstart,tend)
+        tstart,tend,tstart,tend)
 
     lpt,rpt,taper0 = taper_window(t[0],dt,len(t),tstart,tend,p=0.05)
     taper_i = adj_i * 0 
@@ -28,7 +28,7 @@ def main():
     taper_j = adj_j * 0
     taper_j[lpt:rpt] = taper0
 
-    print("misfit/deltat_dd from user cc: %g %g" %(tr,win[6]))
+    print("misfit/deltat_dd from user cc: %g %g" %(stats.misfit,stats.tshift))
 
     # plot 
     plt.figure(1)

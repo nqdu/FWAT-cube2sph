@@ -1,6 +1,11 @@
 from fwat.measure.FwatPreOP import FwatPreOP
+from ..adjoint.MeasureStats import MeasureStats
+from .utils import interpolate_syn,bandpass,alloc_mpi_jobs
 import numpy as np 
 from mpi4py import MPI
+import os 
+from obspy.io.sac import SACTrace
+from scipy.signal import convolve,correlate
 
 class Tele_PreOP(FwatPreOP):
     def __init__(self, measure_type, iter, evtid, run_opt):
@@ -38,10 +43,6 @@ class Tele_PreOP(FwatPreOP):
             exit(1)
 
     def save_forward(self):
-        import os 
-        from obspy.io.sac import SACTrace
-        from scipy.signal import convolve
-
         # get some vars
         evtid = self.evtid 
         ncomp = self.ncomp
@@ -54,7 +55,7 @@ class Tele_PreOP(FwatPreOP):
         tr = SACTrace(
             evla=self.evla,evlo=self.evlo,
             evdp=self.evdp,stla=0.,
-            stlo=0.,stel=0,lcalda=1,
+            stlo=0.,stel=0,lcalda=True,
             delta = dt_syn
         )
 
@@ -71,7 +72,7 @@ class Tele_PreOP(FwatPreOP):
             for ic in range(self.ncomp):
                 ch = self.components[ic]
                 tr = SACTrace.read(f'src_rec/stf_{ch}.sac.{bandname}_{evtid}')
-                stf[ic,:] += tr.data 
+                stf[ic,:] = stf[ic,:] + np.asarray(tr.data) 
         
         # loop every station to save sac
         for ir in range(self.nsta_loc):
@@ -114,9 +115,6 @@ class Tele_PreOP(FwatPreOP):
         glob_data: np.ndarray
             global data array with shape (nsta,ncomp,npt)
         """
-        from obspy.io.sac import SACTrace
-        from .utils import interpolate_syn,bandpass
-
         # sanity check
         if type_ not in ['syn','obs']:
             if self.myrank == 0:
@@ -185,12 +183,8 @@ class Tele_PreOP(FwatPreOP):
         return tmp
 
     def _cal_adj_source_l2(self,ib:int):
-        from obspy.io.sac import SACTrace
-        from .utils import interpolate_syn
         from fwat.adjoint.l2_misfit import measure_adj_l2
-        from scipy.signal import convolve,correlate
         from .tele.tele import compute_stf,get_average_amplitude
-        import os 
 
         # get frequency band
         bandname = self._get_bandname(ib)
@@ -216,11 +210,7 @@ class Tele_PreOP(FwatPreOP):
 
         # misfits
         ncomp = self.ncomp
-        tstart = np.zeros((nsta_loc))
-        tend = np.zeros((nsta_loc))
-        win_chi = np.zeros((nsta_loc,ncomp,20))
-        tr_chi = np.zeros((nsta_loc,ncomp))
-        am_chi = np.zeros((nsta_loc,ncomp))
+        stats_list = []
 
         # glob arrays
         ncomp = self.ncomp
@@ -269,16 +259,25 @@ class Tele_PreOP(FwatPreOP):
                 glob_syn[i,ic,:] = tmp
 
                 # time window
-                tstart[ir] = self.t_ref[i] - self.t_inj - win_tb
-                tend[ir] = self.t_ref[i] - self.t_inj + win_te
+                tstart = self.t_ref[i] - self.t_inj - win_tb
+                tend = self.t_ref[i] - self.t_inj + win_te
 
                 # measure
-                tr_chi[ir,ic],am_chi[ir,ic],win_chi[ir,ic,:],adjsrc =  \
+                stats,adjsrc =  \
                     measure_adj_l2(
                         glob_obs[i,ic,:],glob_syn[i,ic,:],
                         t0_syn,dt_syn,npt_syn,
-                        tstart[ir],tend[ir]
+                        tstart,tend
                     )
+                
+                # normalize misfit and adjoint source by average amplitude
+                stats.misfit *= 1. / avgamp**2
+                stats.tr_chi *= 1. / avgamp**2
+                stats.am_chi *= 1. / avgamp**2
+                stats.code = self._get_station_code(i,ic)
+
+                # save misfit stats
+                stats_list.append(stats)
 
                 # contributions on stf
                 adjsrc /= avgamp 
@@ -314,12 +313,8 @@ class Tele_PreOP(FwatPreOP):
                 self.seismo_sac[f"{out_dir}/{bandname}/{name}.sac.syn"] = tr.copy()
                 #tr.write(f"{out_dir}/{bandname}/{name}.sac.syn")   
         
-        # normalize misfit function 
-        tr_chi *= 1. / avgamp**2 
-        am_chi *= 1. / avgamp**2
-        win_chi[:,:,14] *= 1. / avgamp**2
 
-        self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,win_chi)
+        self._print_measure_info(bandname,stats_list=stats_list)
 
     def _cal_adj_source_cc_time_dd(self,ib:int):
         """
@@ -330,8 +325,6 @@ class Tele_PreOP(FwatPreOP):
         ib: int
             frequency band index
         """
-        import os 
-        from obspy.io.sac import SACTrace
         from fwat.adjoint.cc_misfit import measure_adj_cc_dd
 
         # get frequency band
@@ -354,12 +347,7 @@ class Tele_PreOP(FwatPreOP):
         nsta_loc = self.nsta_loc
 
         # misfits
-        ncomp = self.ncomp
-        tstart = np.zeros((nsta_loc))
-        tend = np.zeros((nsta_loc))
-        win_chi = np.zeros((nsta_loc,ncomp,20))
-        tr_chi = np.zeros((nsta_loc,ncomp))
-        am_chi = np.zeros((nsta_loc,ncomp))
+        stats_list: list = []
 
         # read time shift by user if existed
         if os.path.isfile(f"{self.DATA_DIR}/{self.evtid}/cc_time.txt"):
@@ -378,54 +366,66 @@ class Tele_PreOP(FwatPreOP):
             glob_obs = glob_syn * 1.
 
         # pre-allocate adjoint sources
-        adj = np.zeros((self.nsta,ncomp,npt_syn))
+        adj = np.zeros((self.nsta,self.ncomp,npt_syn))
 
         # measure
-        for ic in range(ncomp):
-            for ir in range(nsta_loc):
-                i = ir + self._istart
+        nsta = self.nsta
+        njobs = self.nsta * (self.nsta - 1) // 2
+        kstart,kend = alloc_mpi_jobs(njobs,self.nprocs,self.myrank)
+        for ic in range(self.ncomp):
+            for k in range(kstart,kend+1):
+                # get (i,j) pair from k
+                i = int(nsta - 2 - np.floor(np.sqrt(-8*k + 4*nsta*(nsta-1) - 7) / 2.0 - 0.5))
+                row_start_k = i * nsta - (i * (i + 1)) // 2
+                j = int(k - row_start_k + i + 1)
 
                 # syn and obs
                 syn_i = glob_syn[i, ic, :]
                 obs_i = glob_obs[i, ic,:]
 
                 # get  window info
-                tstart[ir] = self.t_ref[i] - self.t_inj - win_tb
-                tend[ir] = self.t_ref[i] - self.t_inj + win_te
+                tstart_i = self.t_ref[i] - self.t_inj - win_tb
+                tend_i = self.t_ref[i] - self.t_inj + win_te
         
                 # call cc time dd function
-                for j in range(i+1,self.nsta):
-                    # syn and obs
-                    syn_j = glob_syn[j, ic, :]
-                    obs_j = glob_obs[j, ic, :]  
+                # syn and obs
+                syn_j = glob_syn[j, ic, :]
+                obs_j = glob_obs[j, ic, :]  
 
-                    # get user time shift if existed
-                    if dd_shift is not None:
-                        name_i = self._get_station_code(i,ic)
-                        name_j = self._get_station_code(j,ic)
-                        idx = np.where( (dd_shift[:,0]==name_i) & (dd_shift[:,1]==name_j) )[0]
-                        if len(idx) == 1:
-                            dd_shift_ij = dd_shift[idx[0],2]
-                        else:
-                            # not found, print error 
-                            print(f"rank {self.myrank}: cannot find time shift for station pair {name_i} and {name_j} in cc_time.txt!")
-                            exit(1)
+                # get  window info
+                tstart_j = self.t_ref[j] - self.t_inj - win_tb
+                tend_j = self.t_ref[j] - self.t_inj + win_te
+
+                # get user time shift if existed
+                if dd_shift is not None:
+                    name_i = self._get_station_code(i,ic)
+                    name_j = self._get_station_code(j,ic)
+                    idx = np.where( (dd_shift[:,0]==name_i) & (dd_shift[:,1]==name_j) )[0]
+                    if len(idx) == 1:
+                        dd_shift_ij = dd_shift[idx[0],2]
                     else:
-                        dd_shift_ij = None 
+                        # not found, print error 
+                        print(f"rank {self.myrank}: cannot find time shift for station pair {name_i} and {name_j} in cc_time.txt!")
+                        exit(1)
+                else:
+                    dd_shift_ij = None 
 
-                    # measure adjoint source
-                    tr_chi[ir, ic],am_chi[ir, ic], \
-                    win_chi[ir, ic, :],adj_i,adj_j = \
-                    measure_adj_cc_dd(
-                        obs_i,syn_i,obs_j,syn_j,
-                        t_inj,dt_syn,npt_syn,
-                        self.Tmin[ib],self.Tmax[ib],
-                        tstart[ir],tend[ir],dd_shift_ij
-                    )
+                # measure adjoint source
+                stats,adj_i,adj_j = \
+                measure_adj_cc_dd(
+                    obs_i,syn_i,obs_j,syn_j,
+                    t_inj,dt_syn,npt_syn,
+                    self.Tmin[ib],self.Tmax[ib],
+                    tstart_i,tend_i,tstart_j,tend_j,dd_shift_ij
+                )
+                stats.code = f"{self._get_station_code(i,ic)}-{self._get_station_code(j,ic)}"
+                stats_list.append(stats)
 
-                    # accumulate adjoint sources
-                    adj[i, ic, :] += adj_i
-                    adj[j, ic, :] += adj_j
+                # accumulate adjoint sources 
+                adj[i, ic, :] += adj_i
+                adj[j, ic, :] += adj_j
+                
+                # set win_chi
         
         # mearge adjoint sources from all procs
         tmp = MPI.COMM_WORLD.allreduce(adj,op=MPI.SUM)
@@ -434,7 +434,7 @@ class Tele_PreOP(FwatPreOP):
         # save adjoint sources and sac files
         for ir in range(nsta_loc):
             i = ir + self._istart
-            for ic in range(ncomp):
+            for ic in range(self.ncomp):
                 # save adjoint source
                 data = np.zeros((npt_syn,2))
                 data[:,0] = t0_syn + np.arange(npt_syn) * dt_syn
@@ -461,7 +461,7 @@ class Tele_PreOP(FwatPreOP):
                 self.seismo_sac[f"{out_dir}/{bandname}/{name}.sac.syn"] = tr.copy()
 
         # print info
-        self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,win_chi)
+        self._print_measure_info(bandname,stats_list=stats_list)
 
     def _cal_adj_source_user(self,ib:int):
         """
@@ -497,11 +497,7 @@ class Tele_PreOP(FwatPreOP):
         nsta_loc = self.nsta_loc
 
         # misfits
-        tstart = np.zeros((nsta_loc))
-        tend = np.zeros((nsta_loc))
-        win_chi = np.zeros((nsta_loc,1,20))
-        tr_chi = np.zeros((nsta_loc,1))
-        am_chi = np.zeros((nsta_loc,1))
+        stats_list: list = []
 
         # glob arrays
         glob_obs = self._process_all_seismograms(ib, type_='obs')
@@ -522,14 +518,14 @@ class Tele_PreOP(FwatPreOP):
             i = ir + self._istart
 
             # get  window info
-            tstart[ir] = self.t_ref[i] - self.t_inj - win_tb
-            tend[ir] = self.t_ref[i] - self.t_inj + win_te
+            tstart = self.t_ref[i] - self.t_inj - win_tb
+            tend = self.t_ref[i] - self.t_inj + win_te
     
             # call exponentiated phase function
             ic_z = self.components.index('Z')
             ic_r = self.components.index('R')
-            tr_chi[ir, 0],am_chi[ir, 0],  \
-            win_chi[ir, 0, :],adj_r,adj_z,cc1,cc2 = \
+
+            stats,adj_r,adj_z,cc1,cc2 = \
                 measure_adj_cross_conv(
                     glob_obs[i, ic_z, :],
                     glob_syn[i, ic_z, :],
@@ -537,9 +533,12 @@ class Tele_PreOP(FwatPreOP):
                     glob_syn[i, ic_r, :],
                     t0_syn,
                     dt_syn,
-                    tstart[ir],
-                    tend[ir],
+                    tstart,
+                    tend,
                 )
+            stats.code = f"{self.netwk[i]}.{self.stnm[i]}.cross-conv"
+            stats_list.append(stats)
+        
 
             # filter adjoint source
             freqmin = 1. / self.Tmax[ib]
@@ -565,7 +564,7 @@ class Tele_PreOP(FwatPreOP):
                 tr = SACTrace(
                     evla=self.evla,evlo=self.evlo,
                     evdp=self.evdp,stla=self.stla[i],
-                    stlo=self.stlo[i],stel=0,lcalda=1,
+                    stlo=self.stlo[i],stel=0,lcalda=True,
                     delta = dt_syn,b=t0_syn,
                     t0 = self.t_ref[i] - t_inj,
                     knetwk=self.netwk[i],
@@ -580,7 +579,7 @@ class Tele_PreOP(FwatPreOP):
                 self.seismo_sac[f"{out_dir}/{bandname}/{name}.sac.syn"] = tr.copy()
                 #tr.write(f"{out_dir}/{bandname}/{name}.sac.syn")
 
-        self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,win_chi)
+        self._print_measure_info(bandname,stats_list=stats_list)
     
     def cal_adj_source(self,ib:int):
         import os 

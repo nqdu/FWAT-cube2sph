@@ -53,7 +53,7 @@ def main():
     tend += 1. / freqmax
 
     # compute adjoint source
-    chi,_,_,adj_z,adj_r,cc1,cc2 =  \
+    stats,adj_z,adj_r,cc1,cc2 =  \
         measure_adj_cross_conv(
             obs_z,syn_z,
             obs_r,syn_r,
@@ -77,20 +77,22 @@ def main():
         # bandpass amd interpolate
         syn_z_p = bandpass(syn_z_p,dt1, freqmin, freqmax)
         syn_z_m = bandpass(syn_z_m,dt1, freqmin, freqmax)
-        chi_p,_,_,_,_,_,_ =  \
+        stats0,_,_,_,_ =  \
             measure_adj_cross_conv(
                 obs_z,syn_z_p,
                 obs_r,syn_r,
                 t0,dt1,
                 tstart,tend
             )
-        chi_m,_,_,_,_,_,_ =  \
+        chi_p = stats0.misfit
+        stats1,_,_,_,_ =  \
             measure_adj_cross_conv(
                 obs_z,syn_z_m,
                 obs_r,syn_r,
                 t0,dt1,
                 tstart,tend
             )
+        chi_m = stats1.misfit
         adj_z_fd[i] = (chi_p - chi_m) / (2 * eps)
 
     print("Computing finite-difference adjoint sources R...")
@@ -103,20 +105,22 @@ def main():
         # bandpass
         syn_r_p = bandpass(syn_r_p,dt1, freqmin, freqmax)
         syn_r_m = bandpass(syn_r_m,dt1, freqmin, freqmax)
-        chi_p,_,_,_,_,_,_ =  \
+        stats0,_,_,_,_ =  \
             measure_adj_cross_conv(
                 obs_z,syn_z,
                 obs_r,syn_r_p,
                 t0,dt1,
                 1./freqmax,1./freqmin,
             )
-        chi_m,_,_,_,_,_,_ =  \
+        chi_p = stats0.misfit
+        stats1,_,_,_,_ =  \
             measure_adj_cross_conv(
                 obs_z,syn_z,
                 obs_r,syn_r_m,
                 t0,dt1,
                 tstart,tend
             )
+        chi_m = stats1.misfit
         adj_r_fd[i] = (chi_p - chi_m) / (2 * eps)  
 
     # bandpass adjoint sources for better visualization

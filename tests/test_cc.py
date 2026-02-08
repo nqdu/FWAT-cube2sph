@@ -16,7 +16,7 @@ def main():
     tstart = 3.
     tend = 8.
 
-    tr,_,_,adj = measure_adj_cc(
+    stats,adj = measure_adj_cc(
         obs,syn,t[0],dt,len(t),Tmin,Tmax,
         tstart,tend)
 
@@ -28,7 +28,7 @@ def main():
     tr_mt,_,_,adj_mt = measure_adj(0,dt,nt,0.,dt,nt,tstart,tend,5,
                          Tmax,Tmin,False,obs,syn)
 
-    print("misfit from user cc: ",tr)
+    print("misfit from user cc: ",stats.misfit)
     print("misfit from measure adj: ",tr_mt)
 
     # plot 
