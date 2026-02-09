@@ -25,12 +25,11 @@ def main():
     taper[lpt:rpt] = taper0 
 
     # adjoint source by measure_adj
-    tr_mt,_,_,adj_mt = measure_adj(0,dt,nt,0.,dt,nt,tstart,tend,5,
+    stats_mt,adj_mt = measure_adj(0,dt,nt,0.,dt,nt,tstart,tend,5,
                          Tmax,Tmin,False,obs,syn)
 
     print("misfit from user cc: ",stats.misfit)
-    print("misfit from measure adj: ",tr_mt)
-
+    print("misfit from measure adj: ",stats_mt.misfit)
     # plot 
     plt.figure(1)
     plt.plot(t,adj,label='adj')
