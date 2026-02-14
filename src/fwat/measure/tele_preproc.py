@@ -28,19 +28,20 @@ class Tele_PreOP(FwatPreOP):
     def _sanity_check(self):
         super()._sanity_check()
 
-        # make sure adjsrc_type in [2,'cross-conv']
+        # make sure adjsrc_type in [2,'cross-conv','cc_time_dd']
         if self.adjsrc_type not in ['cross-conv','2','cc_time_dd']:
             if self.myrank == 0:
-                print("only L2 norm (imeas = 2) and cross-conv adjoint source are supported!")
+                print("permitted adjsrc_type are '2', 'cross-conv', and 'cc_time_dd'!")
                 print(f"adjsrc_type = {self.adjsrc_type}")
             exit(1)
         
-        # make sure Z/R components are used
-        if self.components != ['R','Z']:
+        # make sure Z/R components are used if not using cc_time_dd
+        if self.adjsrc_type != 'cc_time_dd' and self.components != ['R','Z']:
             if self.myrank == 0:
                 print("R/Z components must be used!")
                 print(f"components = {self.components}")
             exit(1)
+        
 
     def save_forward(self):
         # get some vars
@@ -67,12 +68,15 @@ class Tele_PreOP(FwatPreOP):
         
         # load stf for tele seismic events
         stf = np.zeros((ncomp,npt_syn))
-        for ib in range(len(self.Tmax)):
-            bandname = self._get_bandname(ib)
-            for ic in range(self.ncomp):
-                ch = self.components[ic]
-                tr = SACTrace.read(f'src_rec/stf_{ch}.sac.{bandname}_{evtid}')
-                stf[ic,:] = stf[ic,:] + np.asarray(tr.data) 
+        if self.adjsrc_type != 'cc_time_dd': # only load stf for non-cc_time_dd case
+            for ib in range(len(self.Tmax)):
+                bandname = self._get_bandname(ib)
+                for ic in range(self.ncomp):
+                    ch = self.components[ic]
+                    tr = SACTrace.read(f'src_rec/stf_{ch}.sac.{bandname}_{evtid}')
+                    stf[ic,:] = stf[ic,:] + np.asarray(tr.data) 
+            # normalize stf by the number of frequency bands
+            stf /= len(self.Tmax)
         
         # loop every station to save sac
         for ir in range(self.nsta_loc):
@@ -85,7 +89,10 @@ class Tele_PreOP(FwatPreOP):
                 filename = f"{self.syndir}/OUTPUT_FILES/{code}.sem.npy"
                 data =  self.seismogram[filename]
 
-                tr.data = convolve(data[:,1],stf[ic,:],'same') * dt_syn   
+                if self.adjsrc_type != 'cc_time_dd': # only convolve stf for non-cc_time_dd case
+                    tr.data = convolve(data[:,1],stf[ic,:],'same') * dt_syn   
+                else:
+                    tr.data = data[:,1] * 1.
                 tr.b =  self.t_inj - self.t_ref[i]
 
                 # channel and others
@@ -353,7 +360,7 @@ class Tele_PreOP(FwatPreOP):
         if os.path.isfile(f"{self.DATA_DIR}/{self.evtid}/cc_time.txt"):
             if self.myrank == 0:
                 print("read time shifts by user ...")
-            dd_shift = np.loadtxt(f"{self.DATA_DIR}/{self.evtid}/cc_time.txt")
+            dd_shift = np.loadtxt(f"{self.DATA_DIR}/{self.evtid}/cc_time.txt",dtype =str)
         else:
             dd_shift = None
 
@@ -402,7 +409,7 @@ class Tele_PreOP(FwatPreOP):
                     name_j = self._get_station_code(j,ic)
                     idx = np.where( (dd_shift[:,0]==name_i) & (dd_shift[:,1]==name_j) )[0]
                     if len(idx) == 1:
-                        dd_shift_ij = dd_shift[idx[0],2]
+                        dd_shift_ij = float(dd_shift[idx[0],2])
                     else:
                         # not found, print error 
                         print(f"rank {self.myrank}: cannot find time shift for station pair {name_i} and {name_j} in cc_time.txt!")
