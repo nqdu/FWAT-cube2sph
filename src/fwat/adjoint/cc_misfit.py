@@ -197,8 +197,8 @@ def _cc_shift_dd(d1: np.ndarray, s1: np.ndarray, d2: np.ndarray, s2: np.ndarray,
     ishift_obs = int(np.argmax(cc1) - len(d1) + 1)
     tshift_obs = ishift_obs * dt
 
-    cc1 = correlate(s1,s2,'full')
-    ishift_syn = int(np.argmax(cc1) - len(s1) + 1)
+    cc2 = correlate(s1,s2,'full')
+    ishift_syn = int(np.argmax(cc2) - len(s1) + 1)
     tshift_syn = ishift_syn * dt
 
     # overall shift
@@ -346,6 +346,7 @@ def measure_adj_cc_dd(
         tstart1:float,tend1:float,
         tstart2:float,tend2:float,
         tshift_obs_user = None,
+        save_measurement = False,
         taper_ratio = 0.05,
         dt_sigma_min = 1.,
         dlna_sigma_min = 0.5):
@@ -415,6 +416,9 @@ def measure_adj_cc_dd(
         tshift_dd = tshift_syn - tshift_obs_user
     ishfit_dd = int(tshift_dd / dt)
 
+    if save_measurement:
+        np.savez("cc_dd_measurement.npz",obs1=obs1,obs2=obs2,syn1=syn1,syn2=syn2,dt=dt)
+
     # compute misfit 
     misfit_p = 0.5 * (tshift_dd / sigma_dt) **2 
     misfit_q = 0.5 * (dlna / sigma_dlna) ** 2  
@@ -430,7 +434,10 @@ def measure_adj_cc_dd(
     nnorm = trapezoid(ds1dt*dsdt_cc2,dx=dt)
     if nnorm == 0.:
         print(nnorm,tshift_dd,sigma_dt,tshift_syn,tshift_obs)
+        print("tstart1,tend1,tstart2,tend2",tstart1,tend1,tstart2,tend2)
         print(np.max(abs(ds1dt)),np.max(abs(dsdt_cc2)),np.max(abs(s1)),np.max(abs(s2)   ))
+
+        exit(1)
     fp_1 = -1 * dsdt_cc2 * tshift_dd / nnorm / sigma_dt ** 2  # -1
     fp_2 = +1 * dsdt_cc1 * tshift_dd / nnorm / sigma_dt ** 2  # +1
 

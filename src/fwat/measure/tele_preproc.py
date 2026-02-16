@@ -366,7 +366,7 @@ class Tele_PreOP(FwatPreOP):
 
         # glob arrays
         glob_syn = self._process_all_seismograms(ib, type_='syn')
-        if dd_shift is not None:
+        if dd_shift is None:
             glob_obs = self._process_all_seismograms(ib, type_='obs')
         else:
             # if no user time shift, we use dummy obs same as syn
@@ -421,7 +421,7 @@ class Tele_PreOP(FwatPreOP):
                 stats,adj_i,adj_j = \
                 measure_adj_cc_dd(
                     obs_i,syn_i,obs_j,syn_j,
-                    t_inj,dt_syn,npt_syn,
+                    0,dt_syn,npt_syn,
                     self.Tmin[ib],self.Tmax[ib],
                     tstart_i,tend_i,tstart_j,tend_j,dd_shift_ij
                 )

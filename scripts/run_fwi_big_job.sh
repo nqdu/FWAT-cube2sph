@@ -67,11 +67,11 @@ exit 1
 
 # submit job
 if [ "$PLATFORM"  == "local"  ]; then 
-  ./$fwd
+  ./$fwd $max_iter
 elif [ "$PLATFORM"  == "slurm"  ]; then 
-  sbatch $fwd
+  sbatch $fwd $max_iter
 elif [ "$PLATFORM"  == "pbs"  ]; then 
-  qsub $fwd
+  qsub $fwd $max_iter
 else 
   echo "not implemented!"
   exit 1
