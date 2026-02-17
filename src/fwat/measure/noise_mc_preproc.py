@@ -3,9 +3,11 @@ from mpi4py import MPI
 import os 
 from fwat.const import PARAM_FILE
 from obspy.io.sac import SACTrace
-from fwat.measure.utils import cumtrapz1,dif1,bandpass \
-                                ,interpolate_syn,alloc_mpi_jobs
+from fwat.measure.utils import cumtrapz1,dif1,bandpass,  \
+                                interpolate_syn,alloc_mpi_jobs
 from fwat.adjoint.MeasureStats import MeasureStats
+
+from .FwatPreOP import create_shared_array,create_shared_communicators
 
 def _get_snr(data:np.ndarray,win_b:int,win_e:int):
     """
@@ -760,16 +762,13 @@ class NoiseMC_PreOP():
         istart,iend = alloc_mpi_jobs(nsta,self.nprocs,self.myrank)
         nsta_loc = iend - istart + 1
 
+        # create shared memory comms
+        node_comm, lead_comm = create_shared_communicators(MPI.COMM_WORLD)
+
         # allocate shared memory for syn/obs data 
-        sh_syn_win, sh_obs_win, lead_comm, comm_node = self._alloc_shared_memory(npt_cut)
-        buf_syn,_ = sh_syn_win.Shared_query(0)
-        buf_obs,_ = sh_obs_win.Shared_query(0)
-        syn_data = np.ndarray((nsta,3,3,npt_cut), dtype=np.float64, buffer=buf_syn)
-        obs_data = np.ndarray((nsta,3,3,npt_cut), dtype=np.float64, buffer=buf_obs)
-        if comm_node.Get_rank() == 0:
-            syn_data.fill(0.)
-            obs_data.fill(0.)
-        comm_node.Barrier()
+        array_shape = (nsta,3,3,npt_cut)
+        sh_syn_win,syn_data = create_shared_array(node_comm,array_shape,dtype=np.float64)
+        sh_obs_win,obs_data = create_shared_array(node_comm,array_shape,dtype=np.float64)
         
         # misfits
         ncomp = self.ncomp
@@ -840,13 +839,16 @@ class NoiseMC_PreOP():
 
         # sync to make sure all data are ready
         MPI.COMM_WORLD.Barrier()
-        if comm_node.Get_rank() == 0:
+        if node_comm.Get_rank() == 0:
             lead_comm.Allreduce(MPI.IN_PLACE, syn_data, op=MPI.SUM)
             lead_comm.Allreduce(MPI.IN_PLACE, obs_data, op=MPI.SUM)
-        comm_node.Barrier()
+        node_comm.Barrier()
 
-        # adjoint sources 
-        adj_src_all = np.zeros((nsta,3,3,npt_syn),dtype=float)
+        # adjoint sources
+        sh_adj_win,adj_src_all = create_shared_array(node_comm,array_shape,dtype=np.float64) 
+
+        # atomic operation for adj_src_all
+        sh_adj_win.Lock_all(0)
 
         # loop each (i,j) pair to compute adjoint source for double-difference measurement
         njobs = nsta * (nsta - 1) // 2
@@ -862,8 +864,8 @@ class NoiseMC_PreOP():
                 exit(1)
 
             # allocate space for adjoint source
-            adj_src_i = np.zeros((3,3,npt_syn))
-            adj_src_j = np.zeros((3,3,npt_syn)) 
+            adj_src_i = np.zeros((3,3,npt_syn),dtype=float)
+            adj_src_j = np.zeros((3,3,npt_syn),dtype=float)
 
             # loop each CC-component
             for ic in range(self.ncomp):
@@ -935,7 +937,6 @@ class NoiseMC_PreOP():
                 stats.code = f"{self.evtid}_{chs} {self.sta_names[i]}.{self.chcode}{chr}-{self.sta_names[j]}.{self.chcode}{chr}"
                 stats_list.append(stats)
 
-                # save adjoint source
                 adj_src_i[i_s,i_r,:] = adjsrc_i.copy()
                 adj_src_j[i_s,i_r,:] = adjsrc_j.copy()
             
@@ -945,20 +946,21 @@ class NoiseMC_PreOP():
             adj_src_i = self._rotate_mc_adj(i,adj_src_i)
             adj_src_j = self._rotate_mc_adj(j,adj_src_j)
 
-            # accumulate adjoint source
-            adj_src_all[i,:,:,:] += adj_src_i.copy()
-            adj_src_all[j,:,:,:] += adj_src_j.copy()
+            # atomic accumulate adjoint source
+            stride_ = 3 * 3 * npt_syn
+            sh_adj_win.Accumulate(adj_src_i, target_rank=0,target=i*stride_,op=MPI.SUM)
+            sh_adj_win.Accumulate(adj_src_j, target_rank=0,target=j*stride_,op=MPI.SUM)
+            # adj_src_all[i,:,:,:] += adj_src_i.copy()
+            # adj_src_all[j,:,:,:] += adj_src_j.copy()
 
-        # sync to make sure all adjoint sources are ready
-        MPI.COMM_WORLD.Allreduce(MPI.IN_PLACE, adj_src_all, op=MPI.SUM)
+        # sync to make sure all atomic adjoint sources are ready
+        sh_adj_win.Flush_all()
+        sh_adj_win.Unlock_all()
+        node_comm.Barrier()
 
-        # free space for shared memory
-        if lead_comm != MPI.COMM_NULL:
-            lead_comm.Free()
-        if comm_node != MPI.COMM_NULL:
-            comm_node.Free()
-        sh_syn_win.Free()
-        sh_obs_win.Free()
+        # reduce adjoint sources across all nodes
+        if node_comm.Get_rank() == 0:
+            lead_comm.Allreduce(MPI.IN_PLACE, adj_src_all, op=MPI.SUM)
 
         # now loop each station to save adjoint sources and obs/syn data
         for ir in range(nsta_loc):
@@ -975,6 +977,18 @@ class NoiseMC_PreOP():
                     filename = f"{self.syndirs[ic]}/OUTPUT_FILES/{bandname}/{code}.adj.sem.npy"
                     data[:,1] = adj_src_all[i,i_s,i_r,:]
                     self.seismogram_adj[filename] = data.copy()
+
+        # sync to make sure all adjoint sources are saved
+        MPI.COMM_WORLD.Barrier()
+
+        # free space for shared memory
+        sh_syn_win.Free()
+        sh_obs_win.Free()
+        sh_adj_win.Free()
+        if lead_comm != MPI.COMM_NULL:
+            lead_comm.Free()
+        if node_comm != MPI.COMM_NULL:
+            node_comm.Free()
 
         # print measure_adj information
         self._print_measure_info(bandname,stats_list)

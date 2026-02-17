@@ -4,6 +4,58 @@ from mpi4py import MPI
 from fwat.adjoint.MeasureStats import MeasureStats
 from fwat.const import PARAM_FILE
 
+def create_shared_communicators(global_comm):
+    """
+    Splits the global communicator into:
+      1. node_comm: Processes on the same physical node (shared memory).
+      2. leader_comm: A communicator of only the 'Rank 0' from each node.
+    """
+    
+    # Create intra-node communicator (all processes on the same machine)
+    node_comm = global_comm.Split_type(MPI.COMM_TYPE_SHARED)
+    node_rank = node_comm.Get_rank()
+    
+    # Identify if this process is the 'leader' of its node
+    is_leader = (node_rank == 0)
+    
+    # Create inter-node communicator (only leaders talk to each other)
+    # color=0 for leaders, MPI.UNDEFINED for workers (who get None)
+    leader_comm = global_comm.Split(color=0 if is_leader else MPI.UNDEFINED, 
+                                    key=global_comm.Get_rank())
+    
+    return node_comm, leader_comm
+
+def create_shared_array(node_comm,shape, dtype = float):
+    """
+    Allocates a shared memory window and wraps it in a NumPy array.
+    """
+    
+    # Calculate bytes required for the array
+    # Only the leader actually asks for memory; others ask for 0.
+    is_leader = (node_comm.Get_rank() == 0)
+    itemsize = np.dtype(dtype).itemsize
+    nbytes = (np.prod(shape) * itemsize) if is_leader else 0
+    
+    # Allocate the shared window
+    win = MPI.Win.Allocate_shared(nbytes, itemsize, comm=node_comm)
+    
+    # Query the memory location. 
+    # rank=0 in Shared_query always points to the leader's allocated block.
+    buf, _ = win.Shared_query(0)
+    
+    # Create the NumPy wrapper
+    array = np.ndarray(buffer=buf, dtype=dtype, shape=shape)
+    
+    # Initialize memory to zero (Leader only)
+    if is_leader:
+        array.fill(0)
+    
+    # Ensure initialization is complete before any process returns
+    node_comm.Barrier()
+    
+    return win, array
+
+
 class FwatPreOP:
     def __init__(self,measure_type:str,iter:int,evtid:str,run_opt:int):
         # import packages
