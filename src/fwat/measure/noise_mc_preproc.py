@@ -673,44 +673,6 @@ class NoiseMC_PreOP():
         # print measure_adj information
         self._print_measure_info(bandname,stats_list)
 
-    def _alloc_shared_memory(self,npt_cut:int):
-        # allocate shared memory for syn/obs data 
-        nsta = len(self.sta_names)
-        ncomp = self.ncomp
-
-        # 1. Create a communicator for processes on the SAME physical node
-            # This segregates the world into groups based on shared memory availability.
-        comm = MPI.COMM_WORLD
-        comm_node = comm.Split_type(MPI.COMM_TYPE_SHARED)
-        node_rank = comm_node.Get_rank()
-
-        # Create Inter-node communicator (Leader group)
-        # Only Rank 0 of every node joins this communicator
-        leader_color = 0 if node_rank == 0 else MPI.UNDEFINED
-        lead_comm = comm.Split(leader_color, key=self.myrank)
-
-        # 2. Calculate memory size (Only Node-Rank 0 allocates the actual bytes)
-        itemsize = MPI.DOUBLE.Get_size()
-        if node_rank == 0:
-            nbytes = nsta * 9 * npt_cut * itemsize
-        else:
-            nbytes = 0
-        
-        # check if comm_node is intracomm 
-        if not isinstance(comm_node, MPI.Intracomm):
-            print("Error: comm_node is not an Intracomm. Shared memory may not be supported on this platform.")
-            exit(1)
-
-        # 3. Allocate the Shared Memory Window
-        sh_syn_win = MPI.Win.Allocate_shared(nbytes, itemsize, comm=comm_node)
-        sh_obs_win = MPI.Win.Allocate_shared(nbytes, itemsize, comm=comm_node)
-        
-        # Wait for initialization to finish
-        comm_node.Barrier()
-
-        return sh_syn_win, sh_obs_win,lead_comm, comm_node
-
-
     def cal_adj_source_dd(self,ib:int):
         """ 
         Calculate adjoint source for noise cross-correlation measurement, double-difference version.
@@ -769,7 +731,7 @@ class NoiseMC_PreOP():
         array_shape = (nsta,3,3,npt_cut)
         sh_syn_win,syn_data = create_shared_array(node_comm,array_shape,dtype=np.float64)
         sh_obs_win,obs_data = create_shared_array(node_comm,array_shape,dtype=np.float64)
-        
+
         # misfits
         ncomp = self.ncomp
         stats_list = []
@@ -838,14 +800,15 @@ class NoiseMC_PreOP():
                 self.seismogram_sac[f"{outdir}/{code}.sac.syn"] = obs_tr.copy()
 
         # sync to make sure all data are ready
-        MPI.COMM_WORLD.Barrier()
+        node_comm.Barrier()
         if node_comm.Get_rank() == 0:
             lead_comm.Allreduce(MPI.IN_PLACE, syn_data, op=MPI.SUM)
             lead_comm.Allreduce(MPI.IN_PLACE, obs_data, op=MPI.SUM)
         node_comm.Barrier()
 
         # adjoint sources
-        sh_adj_win,adj_src_all = create_shared_array(node_comm,array_shape,dtype=np.float64) 
+        array_shape_adj = (nsta,3,3,npt_syn)
+        sh_adj_win,adj_src_all = create_shared_array(node_comm,array_shape_adj,dtype=np.float64) 
 
         # atomic operation for adj_src_all
         sh_adj_win.Lock_all(0)
@@ -961,6 +924,7 @@ class NoiseMC_PreOP():
         # reduce adjoint sources across all nodes
         if node_comm.Get_rank() == 0:
             lead_comm.Allreduce(MPI.IN_PLACE, adj_src_all, op=MPI.SUM)
+        node_comm.Barrier()
 
         # now loop each station to save adjoint sources and obs/syn data
         for ir in range(nsta_loc):

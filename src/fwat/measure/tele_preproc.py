@@ -6,6 +6,7 @@ from mpi4py import MPI
 import os 
 from obspy.io.sac import SACTrace
 from scipy.signal import convolve,correlate
+from fwat.measure.FwatPreOP import create_shared_array,create_shared_communicators
 
 class Tele_PreOP(FwatPreOP):
     def __init__(self, measure_type, iter, evtid, run_opt):
@@ -142,11 +143,15 @@ class Tele_PreOP(FwatPreOP):
         if npt2 // 2 * 2 != npt2:
             npt2 += 1
         
-        # glob arrays
+        # glob arrays, in shared memory
         ncomp = self.ncomp
         nsta = self.nsta 
         npt_syn = self.npt_syn
-        glob_data = np.zeros((nsta,ncomp,npt_syn))
+        win,glob_data = create_shared_array(self._node_comm,(nsta,ncomp,npt_syn))
+        if type_ == 'syn':
+            self._sh_syn_win = win
+        else:
+            self._sh_obs_win = win
 
         # loop each station
         for ir in range(self.nsta_loc):
@@ -185,9 +190,12 @@ class Tele_PreOP(FwatPreOP):
                 glob_data[i,ic,:] = w
 
         # save everything in big arrays
-        tmp = MPI.COMM_WORLD.allreduce(glob_data,op=MPI.SUM)
+        self._node_comm.Barrier()
+        if self._node_comm.Get_rank() == 0:
+            self._leader_comm.Allreduce(MPI.IN_PLACE,glob_data,op=MPI.SUM)
+        self._node_comm.Barrier()
 
-        return tmp
+        return glob_data
 
     def _cal_adj_source_l2(self,ib:int):
         from fwat.adjoint.l2_misfit import measure_adj_l2
@@ -262,8 +270,7 @@ class Tele_PreOP(FwatPreOP):
                 # only keep data in the window
                 t0_inp = self.t_ref[i] - win_tb
                 tmp1 = interpolate_syn(tmp,t_inj,dt_syn,npt_syn,t0_inp,dt_syn,npt2)
-                tmp = interpolate_syn(tmp1,t0_inp,dt_syn,npt2,t_inj,dt_syn,npt_syn)
-                glob_syn[i,ic,:] = tmp
+                syn_onetrace = interpolate_syn(tmp1,t0_inp,dt_syn,npt2,t_inj,dt_syn,npt_syn)
 
                 # time window
                 tstart = self.t_ref[i] - self.t_inj - win_tb
@@ -272,7 +279,7 @@ class Tele_PreOP(FwatPreOP):
                 # measure
                 stats,adjsrc =  \
                     measure_adj_l2(
-                        glob_obs[i,ic,:],glob_syn[i,ic,:],
+                        glob_obs[i,ic,:],syn_onetrace,
                         t0_syn,dt_syn,npt_syn,
                         tstart,tend
                     )
@@ -313,10 +320,10 @@ class Tele_PreOP(FwatPreOP):
                     kcmpnm = self.chcode + self.components[ic]
                 )
                 name = self._get_station_code(i,ic)
-                tr.data = glob_obs[i,ic,:]
+                tr.data = glob_obs[i,ic,:] * 1.
                 self.seismo_sac[f"{out_dir}/{bandname}/{name}.sac.obs"] = tr.copy()
                 #tr.write(f"{out_dir}/{bandname}/{name}.sac.obs")
-                tr.data = glob_syn[i,ic,:]
+                tr.data = syn_onetrace * 1.
                 self.seismo_sac[f"{out_dir}/{bandname}/{name}.sac.syn"] = tr.copy()
                 #tr.write(f"{out_dir}/{bandname}/{name}.sac.syn")   
         
@@ -369,11 +376,17 @@ class Tele_PreOP(FwatPreOP):
         if dd_shift is None:
             glob_obs = self._process_all_seismograms(ib, type_='obs')
         else:
-            # if no user time shift, we use dummy obs same as syn
-            glob_obs = glob_syn * 1.
+            # if user time shift is given, we use dummy obs same as syn
+            self._sh_obs_win,glob_obs = create_shared_array(self._node_comm,(self.nsta,self.ncomp,npt_syn))
+            if self._node_comm.Get_rank() == 0:
+                glob_obs[:] = glob_syn * 1.
+        self._node_comm.Barrier()
 
         # pre-allocate adjoint sources
-        adj = np.zeros((self.nsta,self.ncomp,npt_syn))
+        self._sh_adj_win,adj = create_shared_array(self._node_comm,(self.nsta,self.ncomp,npt_syn))
+
+        # atomic operation
+        self._sh_adj_win.Lock_all(0)
 
         # measure
         nsta = self.nsta
@@ -429,14 +442,18 @@ class Tele_PreOP(FwatPreOP):
                 stats_list.append(stats)
 
                 # accumulate adjoint sources 
-                adj[i, ic, :] += adj_i
-                adj[j, ic, :] += adj_j
+                stride = self.ncomp * npt_syn
+                self._sh_adj_win.Accumulate(adj_i,target_rank=0,target=i*stride+ic*npt_syn,op=MPI.SUM)
+                self._sh_adj_win.Accumulate(adj_j,target_rank=0,target=j*stride+ic*npt_syn,op=MPI.SUM)
                 
-                # set win_chi
         
-        # mearge adjoint sources from all procs
-        tmp = MPI.COMM_WORLD.allreduce(adj,op=MPI.SUM)
-        adj = tmp * 1.
+        # merge adjoint sources from all procs
+        self._sh_adj_win.Flush_all()
+        self._sh_adj_win.Unlock_all()
+        self._node_comm.Barrier()
+        if self._node_comm.Get_rank() == 0:
+            self._leader_comm.Allreduce(MPI.IN_PLACE,adj,op=MPI.SUM)
+        self._node_comm.Barrier()
 
         # save adjoint sources and sac files
         for ir in range(nsta_loc):
@@ -517,8 +534,10 @@ class Tele_PreOP(FwatPreOP):
             print("average amplitude for data gather: %g\n" %(avgamp))
 
         # normalize 
-        glob_obs /= avgamp
-        glob_syn /= avgamp
+        if self._node_comm.Get_rank() == 0:
+            glob_obs /= avgamp
+            glob_syn /= avgamp
+        self._node_comm.Barrier()
 
         # measure
         for ir in range(nsta_loc):
@@ -596,6 +615,12 @@ class Tele_PreOP(FwatPreOP):
             os.makedirs(f"{self.syndir}/OUTPUT_FILES/{bandname}",exist_ok=True)
         MPI.COMM_WORLD.Barrier()
 
+        # create shared memory communicator for adjoint sources
+        self._node_comm,self._leader_comm = create_shared_communicators(MPI.COMM_WORLD)
+        self._sh_obs_win = None
+        self._sh_syn_win = None
+        self._sh_adj_win = None
+
         if self.adjsrc_type == '2':
             self._cal_adj_source_l2(ib)
         elif self.adjsrc_type == 'cross-conv':
@@ -607,3 +632,17 @@ class Tele_PreOP(FwatPreOP):
                 print("only L2 norm (imeas = 2), cross-conv, and cc_time_dd adjoint sources are supported!")
                 print(f"adjsrc_type = {self.adjsrc_type}")
             exit(1)
+
+        # free shared memory
+        if self._sh_obs_win is not None:
+            self._sh_obs_win.Free()
+        if self._sh_syn_win is not None:
+            self._sh_syn_win.Free()
+        if self._sh_adj_win is not None:
+            self._sh_adj_win.Free()
+
+        # free communicators
+        if self._leader_comm != MPI.COMM_NULL:
+            self._leader_comm.Free()
+        if self._node_comm != MPI.COMM_NULL:
+            self._node_comm.Free()
