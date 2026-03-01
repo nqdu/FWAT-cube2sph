@@ -16,7 +16,7 @@ def alloc_mpi_jobs(ntasks:int,nprocs:int,myrank:int) -> tuple[int,int]:
     
     endid = startid + sub_n - 1
 
-    return (startid,endid)
+    return startid, endid
 
 def read_params(paramfile:str) -> dict:
     import yaml
