@@ -1,11 +1,11 @@
-from fwat.measure.FwatPreOP import FwatPreOP
-from ..adjoint.MeasureStats import MeasureStats
-from .utils import interpolate_syn,bandpass,alloc_mpi_jobs
 import numpy as np 
 from mpi4py import MPI
 import os 
 from obspy.io.sac import SACTrace
 from scipy.signal import convolve,correlate
+from fwat.measure.FwatPreOP import FwatPreOP
+from ..adjoint.MeasureStats import MeasureStats
+from .utils import interpolate_syn,bandpass,alloc_mpi_jobs
 from fwat.measure.FwatPreOP import create_shared_array,create_shared_communicators
 
 class Tele_PreOP(FwatPreOP):
@@ -69,7 +69,7 @@ class Tele_PreOP(FwatPreOP):
         
         # load stf for tele seismic events
         stf = np.zeros((ncomp,npt_syn))
-        if self.adjsrc_type != 'cc_time_dd': # only load stf for non-cc_time_dd case
+        if self.adjsrc_type == 'l2': # only load stf for l2
             for ib in range(len(self.Tmax)):
                 bandname = self._get_bandname(ib)
                 for ic in range(self.ncomp):
@@ -90,7 +90,7 @@ class Tele_PreOP(FwatPreOP):
                 filename = f"{self.syndir}/OUTPUT_FILES/{code}.sem.npy"
                 data =  self.seismogram[filename]
 
-                if self.adjsrc_type != 'cc_time_dd': # only convolve stf for non-cc_time_dd case
+                if self.adjsrc_type == 'l2': # only convolve stf for l2 case
                     tr.data = convolve(data[:,1],stf[ic,:],'same') * dt_syn   
                 else:
                     tr.data = data[:,1] * 1.
@@ -487,7 +487,7 @@ class Tele_PreOP(FwatPreOP):
         # print info
         self._print_measure_info(bandname,stats_list=stats_list)
 
-    def _cal_adj_source_user(self,ib:int):
+    def _cal_adj_source_cross_conv(self,ib:int):
         """
         compute adjoint source by using cross-convolution for a given frequency band
 
@@ -577,11 +577,9 @@ class Tele_PreOP(FwatPreOP):
             data[:,0] = t0_syn + np.arange(npt_syn) * dt_syn
             data[:,1] = adj_z
             name = self._get_station_code(i,ic_z) + ".adj.sem.npy"
-            #np.save(f"{out_dir}/{bandname}/{name}",data)
             self.seismogram_adj[f"{out_dir}/{bandname}/{name}"] = data * 1.
             data[:,1] = adj_r
             name = self._get_station_code(i,ic_r) + ".adj.sem.npy"
-            #np.save(f"{out_dir}/{bandname}/{name}",data)
             self.seismogram_adj[f"{out_dir}/{bandname}/{name}"] = data * 1.
 
             # save obs and synthetic data
@@ -624,7 +622,7 @@ class Tele_PreOP(FwatPreOP):
         if self.adjsrc_type == '2':
             self._cal_adj_source_l2(ib)
         elif self.adjsrc_type == 'cross-conv':
-            self._cal_adj_source_user(ib)
+            self._cal_adj_source_cross_conv(ib)
         elif self.adjsrc_type == 'cc_time_dd':
             self._cal_adj_source_cc_time_dd(ib)
         else:

@@ -8,10 +8,10 @@ from scipy.integrate import trapezoid
 from fwat.adjoint.MeasureStats import MeasureStats
 
 def measure_adj_cross_conv(
-    obs_v,syn_v,obs_h,syn_h,
-    t0,dt,
-    tstart,tend,
-    taper_ratio = 0.05
+    obs_v:np.ndarray,syn_v:np.ndarray,obs_h:np.ndarray,syn_h:np.ndarray,
+    t0:float,dt:float,
+    tstart:float,tend:float,
+    taper_ratio:float = 0.05
 ):
 
     """
@@ -79,8 +79,8 @@ def measure_adj_cross_conv(
     
     # adjoint source
     dchi_adj = dchi * taper 
-    adj_z = -convolve(dchi_adj,h_rev,'valid') * dt
-    adj_r = convolve(dchi_adj,v_rev,'valid') * dt
+    adj_z:np.ndarray = -convolve(dchi_adj,h_rev,'valid') * dt
+    adj_r:np.ndarray = convolve(dchi_adj,v_rev,'valid') * dt
 
     # stats 
     stats = MeasureStats(
