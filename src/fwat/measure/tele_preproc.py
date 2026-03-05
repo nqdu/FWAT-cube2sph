@@ -29,13 +29,17 @@ class Tele_PreOP(FwatPreOP):
     def _sanity_check(self):
         super()._sanity_check()
 
+        # legacy check for adjsrc_type, if not exist, set to 2 (l2)
+        if str(self.adjsrc_type) == '2':
+            self.adjsrc_type = 'l2'
+
         # make sure adjsrc_type in [2,'cross-conv','cc_time_dd']
-        if self.adjsrc_type not in ['cross-conv','2','cc_time_dd']:
+        if self.adjsrc_type not in ['cross-conv','l2','cc_time_dd']:
             if self.myrank == 0:
-                print("permitted adjsrc_type are '2', 'cross-conv', and 'cc_time_dd'!")
+                print("permitted adjsrc_type are 'l2', 'cross-conv', and 'cc_time_dd'!")
                 print(f"adjsrc_type = {self.adjsrc_type}")
             exit(1)
-        
+
         # make sure Z/R components are used if not using cc_time_dd
         if self.adjsrc_type != 'cc_time_dd' and self.components != ['R','Z']:
             if self.myrank == 0:
@@ -619,7 +623,7 @@ class Tele_PreOP(FwatPreOP):
         self._sh_syn_win = None
         self._sh_adj_win = None
 
-        if self.adjsrc_type == '2':
+        if self.adjsrc_type == 'l2':
             self._cal_adj_source_l2(ib)
         elif self.adjsrc_type == 'cross-conv':
             self._cal_adj_source_cross_conv(ib)

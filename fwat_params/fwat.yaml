@@ -12,7 +12,7 @@ measure:
       - [5.,50.]
     TIME_WINDOW: [5.,45.] # before and after first arrival
     VERBOSE_MODE: True
-    ADJSRC_TYPE: 2 # 2,cross-conv,cc_time_dd
+    ADJSRC_TYPE: 2 # 2 (l2),cross-conv,cc_time_dd
 
   noise: # multichannel noise 
     CC_COMPS: ['ZZ','TT']  # {SOURCE-COMP}{RECEIVER-COMP}
