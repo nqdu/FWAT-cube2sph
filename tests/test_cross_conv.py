@@ -110,7 +110,7 @@ def main():
                 obs_z,syn_z,
                 obs_r,syn_r_p,
                 t0,dt1,
-                1./freqmax,1./freqmin,
+                tstart,tend
             )
         chi_p = stats0.misfit
         stats1,_,_,_,_ =  \
@@ -166,7 +166,7 @@ def main():
 
     # cc1   and cc2 for visualization
     plt.subplot(313)
-    t2 = t1[0] + np.arange(len(cc1)) * dt
+    t2 = t1[0] + np.arange(len(cc1)) * dt1
     plt.plot(t2, cc1, 'b-', linewidth=2, label='Cross-Conv Vobs * Hsyn')
     plt.plot(t2, cc2, 'g--', linewidth=2, label='Cross-Conv Vsyn * Hobs')
     plt.title("Cross-Convolutions for Visualization")
