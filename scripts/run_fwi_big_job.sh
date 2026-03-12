@@ -41,7 +41,7 @@ source module_env
 # submit and get job id
 if [ "$PLATFORM"  == "local"  ]; then 
   if [ "$#" -ne 2 ]; then
-    echo "Usage: $0 sbash_measure NPROCS_TOTAL max_iter"
+    echo "Usage: $0 NPROCS_TOTAL max_iter"
     exit 1
   fi
   NODES=1
@@ -49,7 +49,7 @@ if [ "$PLATFORM"  == "local"  ]; then
   max_iter=$2
 else 
   if [ "$#" -ne 3 ]; then
-    echo "Usage: $0 sbash_measure NODES NPROCS_PER_NODE max_iter"
+    echo "Usage: $0 NODES NPROCS_PER_NODE max_iter"
     exit 1
   fi
   NODES=$1
@@ -62,8 +62,6 @@ fwd=tmp.fwi.sh
 SHELL_HEADER_PRE $NODES $NPROCS_PER_NODE > $fwd
 cat sbash_or_local_fwi.sh >> $fwd
 chmod +x $fwd
-
-exit 1
 
 # submit job
 if [ "$PLATFORM"  == "local"  ]; then 

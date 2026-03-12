@@ -340,6 +340,11 @@ class RF_PreOP(FwatPreOP):
         # gauss filter
         gauss = gauss_filter(npt_syn,dt_syn,self._f0[ib])
 
+        # save seismo_win headers
+        self.seismo_win['dt'] = dt_syn
+        self.seismo_win['t0'] = -self._tshift
+        self.seismo_win['npts'] = npt_syn
+
         # loop each station
         for ir in range(nsta_loc):
             i = ir + self._istart
@@ -428,22 +433,9 @@ class RF_PreOP(FwatPreOP):
             #np.save(outname,data)
 
             # save obs and syn
-            name = f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}R.rf.sac"
-            tr = SACTrace(
-                evla=self.evla,evlo=self.evlo,
-                evdp=self.evdp,stla=self.stla[i],
-                stlo=self.stlo[i],stel=0,lcalda=1,
-                delta = dt_syn,b=-self._tshift,
-                knetwk = self.netwk[i],
-                kstnm = self.stnm[i],
-                kcmpnm = self.chcode + 'R'
-            )
-            tr.data = rf_obs
-            #tr.write()
-            self.seismo_sac[f"{out_dir}/{bandname}/{name}.obs"] = tr.copy()
-            tr.data = rf_syn
-            #tr.write(f"{out_dir}/{bandname}/{name}.syn")
-            self.seismo_sac[f"{out_dir}/{bandname}/{name}.syn"] = tr.copy()
+            name = f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}R.rf.dat"
+            self.seismo_win[f"{out_dir}/{bandname}/{name}.obs"] = rf_obs.copy()
+            self.seismo_win[f"{out_dir}/{bandname}/{name}.syn"] = rf_syn.copy()
         
         # save measurement files
         self._print_measure_info(bandname,stats_list)

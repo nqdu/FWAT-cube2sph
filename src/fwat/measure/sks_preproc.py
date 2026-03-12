@@ -199,6 +199,77 @@ class SKS_PreOP(FwatPreOP):
         # misfits
         stats_list = []
 
+        # save seismo_win headers
+        self.seismo_win['dt'] = dt_syn
+        self.seismo_win['t0'] = t0_syn
+
+        # get normalize amplitude for syn/obs data
+        amp_file = f"{self.SRC_REC}/sks.factor.{bandname}.{self.evtid}.txt"
+        if os.path.exists(amp_file):
+            if self.myrank == 0:
+                print("read average amplitude for syn/obs data from file ...")
+            
+            with open(amp_file,'r') as f:
+                avgamp,avgamp_syn = map(float,f.read().strip().split())
+        else:
+            # get average amplitude of obs data
+            ic_r = self.components.index("R")
+
+            maxamp_obs = np.zeros((self.nsta))
+            maxamp_syn = np.zeros((self.nsta))
+            for ir in range(nsta_loc):
+                i = ir + self._istart
+                # time window
+                tstart = self.t_ref[i] - t_inj - win_tb
+                tend = self.t_ref[i] - t_inj + win_te
+                name = self._get_station_code(i,ic_r)
+
+                # read syn data and preprocessing
+                #sdata = np.load(f"{out_dir}/{name}.sem.npy")[:,1]
+                sdata = self.seismogram[f"{out_dir}/{name}.sem.npy"][:,1] * 1.
+                sdata = bandpass(sdata,dt_syn,freqmin,freqmax)
+
+                # read obs data
+                obs_tr = SACTrace.read(f"{self.DATA_DIR}/{self.evtid}/{name}.sac")
+                # obs info
+                t0_obs = obs_tr.b 
+                dt_obs = obs_tr.delta 
+                npt_obs = obs_tr.npts 
+
+                # filter 
+                obs_tr.data = bandpass(obs_tr.data,dt_obs,freqmin,freqmax)
+                
+                # interpoate obs data to same series of synthetics
+                odata = interpolate_syn(obs_tr.data,t0_obs + self.t_ref[i],dt_obs,npt_obs,t_inj,dt_syn,npt_syn)
+
+                # save to local array
+                maxamp_obs[i] = np.max(np.abs(odata))
+                maxamp_syn[i] = np.max(np.abs(sdata))
+            
+            # gather max amplitude
+            maxamp_obs = MPI.COMM_WORLD.allreduce(maxamp_obs, op=MPI.SUM)
+            maxamp_syn = MPI.COMM_WORLD.allreduce(maxamp_syn, op=MPI.SUM)
+
+            # get average amplitude
+            avgamp = np.median(maxamp_obs)
+            avgamp_syn = np.median(maxamp_syn)
+            min_factor = 0.2
+            max_factor = 5.0
+            valid_mask = (maxamp_obs > min_factor * avgamp) & \
+                        (maxamp_obs < max_factor * avgamp)
+            valid_mask1 = (maxamp_syn > min_factor * avgamp_syn) & \
+                        (maxamp_syn < max_factor * avgamp_syn)
+            if np.sum(valid_mask) > 0:
+                avgamp = np.mean(maxamp_obs[valid_mask])
+            if np.sum(valid_mask1) > 0:
+                avgamp_syn = np.mean(maxamp_syn[valid_mask1])
+
+            # save to file
+            if self.myrank == 0:
+                with open(amp_file,'w') as f:
+                    f.write(f"{avgamp} {avgamp_syn}\n")
+        MPI.COMM_WORLD.Barrier()
+
         # loop each station
         for ir in range(nsta_loc):
             i = ir + self._istart
@@ -232,30 +303,14 @@ class SKS_PreOP(FwatPreOP):
 
                 # save to global array   
                 obs_data[ic,:] = odata
-
-                # save SAC
-                tr = SACTrace(
-                    evla=self.evla,evlo=self.evlo,
-                    evdp=self.evdp,stla=self.stla[i],
-                    stlo=self.stlo[i],stel=0,lcalda=1,
-                    delta = dt_syn,b=t0_syn,
-                    t0 = self.t_ref[i] - t_inj,
-                    knetwk = self.netwk[i],
-                    kstnm = self.stnm[i],
-                    kcmpnm = self.chcode + self.components[ic]
-                )
-                
-                # save syn
-                tr.data = syn_data[ic,:]
-                self.seismo_sac[f"{out_dir}/{bandname}/{name}.sac.syn"] = tr.copy()
-
-                # save obs
-                tr.data = obs_data[ic,:]
-                self.seismo_sac[f"{out_dir}/{bandname}/{name}.sac.obs"] = tr.copy()
-
+            
             # components
             ic_r = self.components.index("R")
             ic_t = self.components.index("T")
+
+            # normalize syn and obs data by average amplitude
+            obs_data *= 1. / avgamp
+            syn_data *= 1. / avgamp_syn
 
             # compute misfit and adjoint source
             stats,adj_r,adj_t,cc1,cc2 = \
@@ -271,8 +326,8 @@ class SKS_PreOP(FwatPreOP):
             stats_list.append(stats)
 
             # filter adjoint source
-            adj_r = bandpass(adj_r,dt_syn,freqmin,freqmax)
-            adj_t = bandpass(adj_t,dt_syn,freqmin,freqmax)
+            adj_r = bandpass(adj_r,dt_syn,freqmin,freqmax) / avgamp_syn
+            adj_t = bandpass(adj_t,dt_syn,freqmin,freqmax) / avgamp_syn
 
             data = np.zeros((npt_syn,2))
             data[:,0] = t0_syn + np.arange(npt_syn) * dt_syn
@@ -285,6 +340,14 @@ class SKS_PreOP(FwatPreOP):
             outname = f"{out_dir}/{bandname}/{self.netwk[i]}.{self.stnm[i]}.{self.chcode}R.adj.sem.npy"
             #np.save(outname,data)
             self.seismogram_adj[outname] = data * 1.
+
+            # save syn
+            name = self._get_station_code(i,ic_r)
+            self.seismo_win[f"{out_dir}/{bandname}/{name}.dat.syn"] = cc1.copy()
+            self.seismo_win[f"{out_dir}/{bandname}/{name}.dat.obs"] = cc2.copy()
+            if ir == 0:
+                self.seismo_win['npts'] = len(cc1)
+
     
         self._print_measure_info(bandname,stats_list=stats_list)
     
@@ -332,6 +395,11 @@ class SKS_PreOP(FwatPreOP):
             si_obs_evt = {}
             cal_obs_si = True
 
+        # save seismo_win headers
+        self.seismo_win['dt'] = dt_syn
+        self.seismo_win['t0'] = t0_syn
+        self.seismo_win['npts'] = npt_syn
+
         # loop each station
         for ir in range(nsta_loc):
             i = ir + self._istart
@@ -371,27 +439,12 @@ class SKS_PreOP(FwatPreOP):
                     # save to global array   
                     obs_data[ic,:] = odata * taper
                 
-                # save SAC
-                tr = SACTrace(
-                    evla=self.evla,evlo=self.evlo,
-                    evdp=self.evdp,stla=self.stla[i],
-                    stlo=self.stlo[i],stel=0,lcalda=1,
-                    delta = dt_syn,b=t0_syn,
-                    t0 = self.t_ref[i] - t_inj,
-                    knetwk = self.netwk[i],
-                    kstnm = self.stnm[i],
-                    kcmpnm = self.chcode + self.components[ic]
-                )
-                
                 # save syn
-                tr.data = syn_data[ic,:]
-                self.seismo_sac[f"{out_dir}/{bandname}/{name}.sac.syn"] = tr.copy()
-                #tr.write(f"{out_dir}/{bandname}/{name}.sac.syn")
+                self.seismo_win[f"{out_dir}/{bandname}/{name}.dat.syn"] = syn_data[ic,:].copy()
 
                 # save obs
                 if cal_obs_si:
-                    tr.data = obs_data[ic,:]
-                    self.seismo_sac[f"{out_dir}/{bandname}/{name}.sac.obs"] = tr.copy()
+                    self.seismo_win[f"{out_dir}/{bandname}/{name}.dat.obs"] = obs_data[ic,:].copy()
                     #tr.write(f"{out_dir}/{bandname}/{name}.sac.obs")
 
             # components

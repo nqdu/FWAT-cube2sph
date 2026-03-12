@@ -1,6 +1,20 @@
 import numpy as np 
 
 def get_injection_time(evtid:str):
+    """
+    get injection time for evtid from src_rec/injection_time
+    
+    Parameters
+    ---------
+    evtid: str
+        event id, e.g. 'ev000001'
+    
+    Returns
+    -------
+    t_inj: float
+        injection time for evtid
+
+    """
     temp = np.loadtxt('src_rec/injection_time',dtype=str,ndmin=2)
     find_src = False
     t_inj = 0.
@@ -17,6 +31,32 @@ def get_injection_time(evtid:str):
 
 def compute_ak135_time(evla:float,evlo:float,evdp:float,
                        stla:np.ndarray,stlo:np.ndarray,phase='P'):
+
+    """
+    compute ak135 travel time for given event and stations
+    
+    Parameters
+    ---------
+    evla: float
+        event latitude
+    evlo: float
+        event longitude
+    evdp: float
+        event depth, in km
+    stla: np.ndarray
+        station latitude, shape(nsta)
+    stlo: np.ndarray
+        station longitude, shape(nsta)
+    phase: str
+        phase name, default 'P'
+
+    Returns
+    -------
+    t_ref: np.ndarray
+        ak135 travel time for given event and stations, shape(nsta)
+
+    """    
+
     from obspy.taup import TauPyModel
     from mpi4py import MPI
 
@@ -26,7 +66,7 @@ def compute_ak135_time(evla:float,evlo:float,evdp:float,
     nprocs = comm.Get_size()
     
     nsta = len(stla)
-    t_ref = np.zeros((nsta))
+    t_ref = np.zeros((nsta),dtype=float)
 
     # create taup model
     model = TauPyModel("ak135")
@@ -43,29 +83,70 @@ def get_average_amplitude(glob_obs,icomp):
     """
     get the average amplitude for icomp-th component 
 
-    Parameters:
-        glob_obs: np.ndarray
-            observation data in global, shape(nsta,ncomp,nt)
-        icomp: int
-            icomp-th componnet
-    """
-    nsta = glob_obs.shape[0]
-    avgamp0 = 0.
-    for i in range(nsta):
-        avgamp0 += np.max(np.abs(glob_obs[i,icomp,:]))
-    avgamp0 /= nsta 
-    igood =0 
-    avgamp = 0. 
-    for i in range(nsta):
-        if np.max(np.abs(glob_obs[i,icomp,:])) - avgamp0 < 0.2 * avgamp0:
-            igood += 1 
-            avgamp += np.max(np.abs(glob_obs[i,icomp,:])) 
-    avgamp /= igood 
+    Parameters
+    ---------
+    glob_obs: np.ndarray
+        observation data in global, shape(nsta,ncomp,nt)
+    icomp: int
+        icomp-th componnet
 
-    return avgamp
+    Returns
+    -------
+    avgamp: float
+        average amplitude for icomp-th component
+    """
+    # nsta = glob_obs.shape[0]
+    # avgamp0 = 0.
+    # for i in range(nsta):
+    #     avgamp0 += np.max(np.abs(glob_obs[i,icomp,:]))
+    # avgamp0 /= nsta 
+    # igood =0 
+    # avgamp = 0. 
+    # for i in range(nsta):
+    #     if abs(np.max(np.abs(glob_obs[i,icomp,:])) - avgamp0) < 0.2 * avgamp0:
+    #         igood += 1 
+    #         avgamp += np.max(np.abs(glob_obs[i,icomp,:])) 
+    # avgamp /= igood 
+
+    max_amps = np.max(np.abs(glob_obs[:, icomp, :]), axis=1)
+
+    # 2. Get the robust network average using the median of those maximums
+    global_median_of_max = np.median(max_amps)
+    
+    # 3. Create a boolean mask of "good" stations (ignoring dead traces and spikes)
+    min_factor = 0.2
+    max_factor = 5.0
+    valid_mask = (max_amps > min_factor * global_median_of_max) & \
+                 (max_amps < max_factor * global_median_of_max)
+    
+    # 4. Calculate the final clean average (fallback to median if all fail)
+    if np.any(valid_mask):
+        robust_avg = np.mean(max_amps[valid_mask])
+    else:
+        robust_avg = global_median_of_max
+        
+    return robust_avg
 
 
 def shift_data(u,dt,t0):
+    """
+    shift data u by t0 in time domain by doing shift in freq domain
+
+    Parameters
+    ---------
+    u: np.ndarray
+        input data, shape(nt)
+    dt: float
+        sampling interval
+    t0: float
+        time shift to be applied, in seconds
+
+    Returns
+    -------
+    u_out: np.ndarray
+        output data after time shift, shape(nt)
+    """
+
     u_spec = np.fft.fft(u)
     freqs = np.fft.fftfreq(len(u),dt)
 
@@ -77,6 +158,22 @@ def shift_data(u,dt,t0):
     return u_out 
 
 def seis_pca(stf_collect:np.ndarray):
+    """
+    compute stf by PCA method, which is the first principle component of stf_collect
+    
+    Parameters
+    ---------
+    stf_collect: np.ndarray
+        stf collected from all stations, shape(nsta,nt)
+
+    Returns
+    -------
+    stf: np.ndarray
+        first principle component of stf_collect, shape(nt)
+    w: np.ndarray
+        eigenvalues, shape(nsta)
+    """
+
     _,nt = stf_collect.shape 
 
     # remove average
@@ -105,6 +202,30 @@ def seis_pca(stf_collect:np.ndarray):
     return stf,w
 
 def compute_stf(glob_syn,glob_obs,dt_syn,freqmin,freqmax,components):
+    """
+    compute stf by time deconvolution and PCA method
+    
+    Parameters
+    ---------
+    glob_syn: np.ndarray
+        synthetic data in global, shape(nsta,ncomp,nt)
+    glob_obs: np.ndarray
+        observation data in global, shape(nsta,ncomp,nt)
+    dt_syn: float
+        sampling interval of synthetic data
+    freqmin: float
+        minimum frequency for bandpass filter, in Hz
+    freqmax: float
+        maximum frequency for bandpass filter, in Hz
+    components: list of str
+        list of component names, e.g. ['Z','R']
+    
+    Returns
+    -------
+    stf: np.ndarray
+        estimated stf, shape(ncomp,nt)
+    """
+
     # load stf function
     from fwat.measure.tele.deconit import time_decon
     from mpi4py import MPI

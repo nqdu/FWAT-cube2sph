@@ -1,4 +1,3 @@
-from os import stat
 import numpy as np 
 from mpi4py import MPI
 from fwat.adjoint.MeasureStats import MeasureStats
@@ -140,9 +139,11 @@ class FwatPreOP:
         self._istart = istart 
 
         # seismograms here, only save seismograms for local stations
-        self.seismogram : dict[str,np.ndarray] = {}
+        self.seismogram : dict[str,np.ndarray] = {} # whole seismograms 
         self.seismogram_adj : dict[str,np.ndarray] = {}
-        self.seismo_sac = {}
+
+        # syn/obs seismograms 
+        self.seismo_win = {} #  windowed seismograms for measurement
 
         # sanity check 
         self._sanity_check()
@@ -323,17 +324,17 @@ class FwatPreOP:
         if self.myrank == 0:
             print("cleaning up ...")
 
-        # first pack all obs/syn sacs to hdf5 
+        # first pack all obs/syn data to hdf5 
         for ib in range(len(self.Tmax)):
             bandname = self._get_bandname(ib)
             for tag in ['obs','syn']:
 
-                # all sac files
-                pattern = re.compile(rf"^{self.syndir}/OUTPUT_FILES/{bandname}/.*\.sac\.{tag}")
-                sacfiles = [s for s in self.seismo_sac.keys() if pattern.match(s)]
+                # all data files
+                pattern = re.compile(rf"^{self.syndir}/OUTPUT_FILES/{bandname}/.*\.dat\.{tag}")
+                datfiles = [s for s in self.seismo_win.keys() if pattern.match(s)]
 
                 # check if we need to save data
-                nfiles = len(sacfiles)
+                nfiles = len(datfiles)
                 nfiles_tot = MPI.COMM_WORLD.allreduce(nfiles,op=MPI.SUM)
                 if nfiles_tot == 0:
                     continue
@@ -347,16 +348,16 @@ class FwatPreOP:
                             fio = h5py.File(f"{self.syndir}/OUTPUT_FILES/seismogram.{tag}.{bandname}.h5","w")
                         else:
                             fio = h5py.File(f"{self.syndir}/OUTPUT_FILES/seismogram.{tag}.{bandname}.h5","a")
-                        for i in range(len(sacfiles)):
-                            tr = self.seismo_sac[sacfiles[i]]
+                        for i in range(len(datfiles)):
+                            trace_win = self.seismo_win[datfiles[i]]
                             if i == 0 and irank == 0:
-                                fio.attrs['dt'] = tr.delta  
-                                fio.attrs['t0'] = tr.b 
-                                fio.attrs['npts'] = tr.npts
+                                fio.attrs['dt'] = self.seismo_win['dt']
+                                fio.attrs['t0'] = self.seismo_win['t0']
+                                fio.attrs['npts'] = self.seismo_win['npts']
                             
-                            dsetname = tr.knetwk + "." + tr.kstnm + "." + tr.kcmpnm
-                            fio.create_dataset(dsetname,shape=tr.data.shape,dtype='f4')
-                            fio[dsetname][:] = tr.data 
+                            dsetname = datfiles[i].split("/")[-1].replace(".dat."+tag,"")
+                            fio.create_dataset(dsetname,shape=trace_win.shape,dtype='f4')
+                            fio[dsetname][:] = trace_win[:]
                         
                         # close 
                         fio.close()

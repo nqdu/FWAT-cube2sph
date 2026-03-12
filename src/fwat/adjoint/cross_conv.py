@@ -34,12 +34,10 @@ def measure_adj_cross_conv(
 
     Returns
     ----------------
-    tr,am : float
-        misfit function (am = tr)
-    win: np.ndarray, shape(20)
-        measure_adj window
-    adj_r,adj_z: np.ndarray
-        adjoint source on R/Z component shape(nt)
+    stats: MeasureStats
+        misfit and other stats
+    adj_z/adj_r: np.ndarray
+        adjoint source on Z/R component shape(nt)
     cc_vohs: np.ndarray
         cross-correlation between observed vertical and synthetic horizontal data
     cc_hovs: np.ndarray

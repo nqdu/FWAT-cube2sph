@@ -157,8 +157,8 @@ class NoiseMC_PreOP():
         self.seismogram: dict[str, np.ndarray] = {}
         self.seismogram_adj: dict[str, np.ndarray] = {}
 
-        # save sac here 
-        self.seismogram_sac = {}
+        # save windowed seismograms here 
+        self.seismo_win = {}
     
     def _get_mc_channel(self):
         import os 
@@ -552,6 +552,11 @@ class NoiseMC_PreOP():
         # temp 
         RTZ = ['R','T','Z']
 
+        # save seismo_win headers
+        self.seismo_win['dt'] = dt_inp 
+        self.seismo_win['t0'] = t0_inp
+        self.seismo_win['npts'] = npt_cut
+
         # loop each station
         for ir in range(nsta_loc):
             i = ir + istart 
@@ -642,14 +647,8 @@ class NoiseMC_PreOP():
 
                 # save obs and syn data as sac
                 outdir = f"{self.SOLVER}/{self.mod}/{self.evtid}_{chs}/OUTPUT_FILES/{bandname}"
-                obs_tr.delta = dt_inp 
-                obs_tr.b = t0_inp 
-                obs_tr.data = dat_inp * 1.
-                self.seismogram_sac[f"{outdir}/{code}.sac.obs"] = obs_tr.copy()
-                #obs_tr.write(f"{outdir}/{code}.sac.obs")
-                obs_tr.data = syn_inp * 1.
-                self.seismogram_sac[f"{outdir}/{code}.sac.syn"] = obs_tr.copy()
-                #obs_tr.write(f"{outdir}/{code}.sac.syn")
+                self.seismo_win[f"{outdir}/{code}.dat.obs"] = dat_inp.copy()
+                self.seismo_win[f"{outdir}/{code}.dat.syn"] = syn_inp.copy()
             # end for loop cc_comps
 
             # rotate adjoint source to ENZ-ENZ
@@ -739,6 +738,11 @@ class NoiseMC_PreOP():
         # temp 
         RTZ = ['R','T','Z']
 
+        # save seismo_win headers
+        self.seismo_win['dt'] = dt_inp 
+        self.seismo_win['t0'] = t0_inp
+        self.seismo_win['npts'] = npt_cut
+
         # loop to fetch data
         for ir in range(nsta_loc):
             i = ir + istart 
@@ -792,12 +796,8 @@ class NoiseMC_PreOP():
 
                 # save obs and syn data as sac
                 outdir = f"{self.SOLVER}/{self.mod}/{self.evtid}_{chs}/OUTPUT_FILES/{bandname}"
-                obs_tr.delta = dt_inp 
-                obs_tr.b = t0_inp 
-                obs_tr.data = dat_inp * 1.
-                self.seismogram_sac[f"{outdir}/{code}.sac.obs"] = obs_tr.copy()
-                obs_tr.data = syn_inp * 1.
-                self.seismogram_sac[f"{outdir}/{code}.sac.syn"] = obs_tr.copy()
+                self.seismo_win[f"{outdir}/{code}.dat.obs"] = dat_inp.copy()
+                self.seismo_win[f"{outdir}/{code}.dat.syn"] = syn_inp.copy()
 
         # sync to make sure all data are ready
         node_comm.Barrier()
@@ -1098,16 +1098,16 @@ class NoiseMC_PreOP():
                 chs_enz = 'N'   
             syndir1 = f"{self.SOLVER}/{self.mod}/{self.evtid}" + f"_{chs_enz}"
 
-            # pack all obs/syn sacs to hdf5
+            # pack all obs/syn data to hdf5
             for ib in range(len(self.Tmax)):
                 bandname = self._get_bandname(ib)
                 for tag in ['obs','syn']:
-                    # all sac file
-                    pattern = re.compile(rf"^{syndir}/OUTPUT_FILES/{bandname}/.*\.sac\.{tag}")
-                    sacfiles = [s for s in self.seismogram_sac.keys() if pattern.match(s)]
+                    # all dat file
+                    pattern = re.compile(rf"^{syndir}/OUTPUT_FILES/{bandname}/.*\.dat\.{tag}")
+                    datfiles = [s for s in self.seismo_win.keys() if pattern.match(s)]
 
                     # check if we need to save data
-                    nfiles = len(sacfiles)
+                    nfiles = len(datfiles)
                     nfiles_tot = MPI.COMM_WORLD.allreduce(nfiles,op=MPI.SUM)
                     if nfiles_tot == 0:
                         continue
@@ -1122,17 +1122,17 @@ class NoiseMC_PreOP():
                             else:
                                 fio = h5py.File(f"{syndir1}/OUTPUT_FILES/seismogram_{chs}.{tag}.{bandname}.h5","a")
                             
-                            # loop each sac file
-                            for i in range(len(sacfiles)):
-                                tr = self.seismogram_sac[sacfiles[i]]
+                            # loop each data file
+                            for i in range(len(datfiles)):
+                                trace_win = self.seismo_win[datfiles[i]]
                                 if i == 0 and irank == 0:
-                                    fio.attrs['dt'] = tr.delta  
-                                    fio.attrs['t0'] = tr.b 
-                                    fio.attrs['npts'] = tr.npts
+                                    fio.attrs['dt'] = self.seismo_win['dt']
+                                    fio.attrs['t0'] = self.seismo_win['t0']
+                                    fio.attrs['npts'] = self.seismo_win['npts']
                                 
-                                dsetname = tr.knetwk + "." + tr.kstnm + "." + tr.kcmpnm
-                                dst = fio.create_dataset(dsetname,shape=tr.data.shape,dtype='f4')
-                                dst[:] = np.array(tr.data) 
+                                dsetname = datfiles[i].split("/")[-1].replace(".dat."+tag,"")
+                                dst = fio.create_dataset(dsetname,shape=trace_win.shape,dtype='f4')
+                                dst[:] = trace_win[:]
                         
                             # close 
                             fio.close()
@@ -1172,7 +1172,7 @@ class NoiseMC_PreOP():
         # sum adjoint source
         self.sum_adj_source()
 
-        # pack SACs to h5
+        # pack windowed data to h5
         self.cleanup()
 
         # sync

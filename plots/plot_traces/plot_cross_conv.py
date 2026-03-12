@@ -63,11 +63,12 @@ def plot_event(line:str,M1:str,solver:str,outdir:str,band:str,
 
     # open h5file
     f0syn = h5py.File(f"{path2init}/seismogram.syn.{band}.h5","r")
-    fobs = h5py.File(f"{path2init}/seismogram.obs.{band}.h5","r")
+    f0obs = h5py.File(f"{path2init}/seismogram.obs.{band}.h5","r")
+    f1obs = h5py.File(f"{path2last}/seismogram.obs.{band}.h5","r")
     f1syn = h5py.File(f"{path2last}/seismogram.syn.{band}.h5","r")
 
     # make sure station with same number
-    assert(len(f1syn.keys()) == len(fobs.keys())) 
+    assert(len(f1syn.keys()) == len(f0obs.keys())) 
 
     # find all station names
     names = []
@@ -77,22 +78,24 @@ def plot_event(line:str,M1:str,solver:str,outdir:str,band:str,
 
 
     # create figures
-    fig = plt.figure(1,figsize=(6.7,9.3))
+    fig = plt.figure(figsize=(6.7,9.3/2))
     ax1=fig.add_subplot(1,2,1)
     ax2=fig.add_subplot(1,2,2)
 
     # get scaling factor
-    sr = 1. / find_amp(names,'R',fobs)
+    sr0 = 1. / find_amp(names,'R',f0obs)
+    sr1 = 1. / find_amp(names,'R',f1obs)
 
     # time vector
-    t = np.arange(fobs.attrs['npts']) * fobs.attrs['dt']
+    t = np.arange(f0obs.attrs['npts']) * f0obs.attrs['dt']
 
     # z component
     for i,myname in enumerate(names):        
         name = myname + 'R'
         synr0 = f0syn[name][:]
         synr1 = f1syn[name][:]
-        obsr = fobs[name][:]
+        obs0 = f0obs[name][:]
+        obs1 = f1obs[name][:]
         
         # legend
         labelo = 'Observed'
@@ -101,17 +104,15 @@ def plot_event(line:str,M1:str,solver:str,outdir:str,band:str,
             labelo = None
             labels = None
 
-        tshift1 = tref[i]-twb
-        tshift2 = tref[i]+twe
-        ax1.plot(t,obsr * sr + i ,color='k',label=labelo)
-        ax1.plot(t,synr0 * sr + i,color='r',label=labels)
-        ax1.vlines(tref[i]-twb + tshift1,i-0.2,i+0.2,color='m')
-        ax1.vlines(tref[i]+twe + tshift2,i-0.2,i+0.2,color='m')
+        ax1.plot(t,obs0 * sr0 + i ,color='k',label=labelo)
+        ax1.plot(t,synr0 * sr0 + i,color='r',label=labels)
+        #ax1.vlines(-twb + tshift1,i-0.2,i+0.2,color='m')
+        #ax1.vlines(twe + tshift2,i-0.2,i+0.2,color='m')
 
-        ax2.plot(t,obsr * sr + i ,color='k',label=labelo)
-        ax2.plot(t,synr1 * sr + i,color='r',label=labels)
-        ax2.vlines(tref[i]-twb + tshift1,i-0.2,i+0.2,color='m')
-        ax2.vlines(tref[i]+twe + tshift2,i-0.2,i+0.2,color='m')
+        ax2.plot(t,obs1 * sr1 + i ,color='k',label=labelo)
+        ax2.plot(t,synr1 * sr1 + i,color='r',label=labels)
+        #ax2.vlines(-twb + tshift1,i-0.2,i+0.2,color='m')
+        #ax2.vlines(twe + tshift2,i-0.2,i+0.2,color='m')
     
     ax1.set_ylim(-1,len(names))
     ax2.set_ylim(-1,len(names))
@@ -126,8 +127,8 @@ def plot_event(line:str,M1:str,solver:str,outdir:str,band:str,
     # close h5file
     f0syn.close()
     f1syn.close()
-    fobs.close()
-
+    f0obs.close()
+    f1obs.close()
 
 def main():
     if len(sys.argv) != 2:
@@ -142,7 +143,7 @@ def main():
     twe=45
 
     # ploting band
-    band="T005_T050"
+    band="T010_T045"
 
     #### stop here 
     

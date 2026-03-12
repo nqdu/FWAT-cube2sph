@@ -3,6 +3,7 @@ from mpi4py import MPI
 import os 
 from obspy.io.sac import SACTrace
 from scipy.signal import convolve,correlate
+
 from fwat.measure.FwatPreOP import FwatPreOP
 from ..adjoint.MeasureStats import MeasureStats
 from .utils import interpolate_syn,bandpass,alloc_mpi_jobs
@@ -78,7 +79,7 @@ class Tele_PreOP(FwatPreOP):
                 bandname = self._get_bandname(ib)
                 for ic in range(self.ncomp):
                     ch = self.components[ic]
-                    tr = SACTrace.read(f'src_rec/stf_{ch}.sac.{bandname}_{evtid}')
+                    tr = SACTrace.read(f'{self.SRC_REC}/stf_{ch}.sac.{bandname}_{evtid}')
                     stf[ic,:] = stf[ic,:] + np.asarray(tr.data) 
             # normalize stf by the number of frequency bands
             stf /= len(self.Tmax)
@@ -263,6 +264,11 @@ class Tele_PreOP(FwatPreOP):
         avgamp = get_average_amplitude(glob_obs,ic)
         if self.myrank == 0: 
             print("average amplitude for data gather: %g\n" %(avgamp))
+
+        # save seismo_win headers
+        self.seismo_win['dt'] = dt_syn
+        self.seismo_win['t0'] = t0_syn
+        self.seismo_win['npts'] = npt_syn
     
         # call measure_adj for misfits
         for ir in range(nsta_loc):
@@ -311,25 +317,10 @@ class Tele_PreOP(FwatPreOP):
                 self.seismogram_adj[f"{out_dir}/{bandname}/{name}"] = data * 1.
                 # np.save(f"{out_dir}/{bandname}/{name}",data)
 
-                # save SAC obs and syn
-                # init a sac header
-                tr = SACTrace(
-                    evla=self.evla,evlo=self.evlo,
-                    evdp=self.evdp,stla=self.stla[i],
-                    stlo=self.stlo[i],stel=0,lcalda=1,
-                    delta = dt_syn,b=t0_syn,
-                    t0 = self.t_ref[i] - t_inj,
-                    knetwk=self.netwk[i],
-                    kstnm = self.stnm[i],
-                    kcmpnm = self.chcode + self.components[ic]
-                )
+                # save obs/syn
                 name = self._get_station_code(i,ic)
-                tr.data = glob_obs[i,ic,:] * 1.
-                self.seismo_sac[f"{out_dir}/{bandname}/{name}.sac.obs"] = tr.copy()
-                #tr.write(f"{out_dir}/{bandname}/{name}.sac.obs")
-                tr.data = syn_onetrace * 1.
-                self.seismo_sac[f"{out_dir}/{bandname}/{name}.sac.syn"] = tr.copy()
-                #tr.write(f"{out_dir}/{bandname}/{name}.sac.syn")   
+                self.seismo_win[f"{out_dir}/{bandname}/{name}.dat.obs"] = glob_obs[i,ic,:] * 1.
+                self.seismo_win[f"{out_dir}/{bandname}/{name}.dat.syn"] = syn_onetrace * 1. 
         
 
         self._print_measure_info(bandname,stats_list=stats_list)
@@ -391,6 +382,11 @@ class Tele_PreOP(FwatPreOP):
 
         # atomic operation
         self._sh_adj_win.Lock_all(0)
+
+        # save seismo_win headers
+        self.seismo_win['dt'] = dt_syn
+        self.seismo_win['t0'] = t0_syn
+        self.seismo_win['npts'] = npt_syn
 
         # measure
         nsta = self.nsta
@@ -471,22 +467,9 @@ class Tele_PreOP(FwatPreOP):
                 self.seismogram_adj[f"{out_dir}/{bandname}/{name}"] = data * 1.
 
                 # save obs and synthetic data
-                # init a sac header
-                tr = SACTrace(
-                    evla=self.evla,evlo=self.evlo,
-                    evdp=self.evdp,stla=self.stla[i],
-                    stlo=self.stlo[i],stel=0,lcalda=1,
-                    delta = dt_syn,b=t0_syn,
-                    t0 = self.t_ref[i] - t_inj,
-                    knetwk=self.netwk[i],
-                    kstnm = self.stnm[i],
-                    kcmpnm = self.chcode + self.components[ic]
-                )
                 name = self._get_station_code(i,ic)
-                tr.data = glob_obs[i,ic,:]
-                self.seismo_sac[f"{out_dir}/{bandname}/{name}.sac.obs"] = tr.copy()
-                tr.data = glob_syn[i,ic,:]
-                self.seismo_sac[f"{out_dir}/{bandname}/{name}.sac.syn"] = tr.copy()
+                self.seismo_win[f"{out_dir}/{bandname}/{name}.dat.obs"] = glob_obs[i,ic,:] * 1.
+                self.seismo_win[f"{out_dir}/{bandname}/{name}.dat.syn"] = glob_syn[i,ic,:] * 1.
 
         # print info
         self._print_measure_info(bandname,stats_list=stats_list)
@@ -531,17 +514,36 @@ class Tele_PreOP(FwatPreOP):
         glob_obs = self._process_all_seismograms(ib, type_='obs')
         glob_syn = self._process_all_seismograms(ib, type_='syn')
 
-        # get average amplitude of obs data
-        ic = self.components.index('Z')
-        avgamp = get_average_amplitude(glob_obs,ic)
-        if self.myrank == 0: 
-            print("average amplitude for data gather: %g\n" %(avgamp))
+        # get normalized factor for syn data
+        ic_z = self.components.index('Z')
+        amp_file = f"{self.SRC_REC}/tele_factor_{bandname}_{self.evtid}.txt"
+        if os.path.exists(amp_file):
+            if self.myrank == 0:
+                print("read average amplitude for syn/obs data from file ...")
+            
+            with open(amp_file,'r') as f:
+                avgamp,avgamp_syn = map(float,f.read().strip().split())
+        else:
+            avgamp = get_average_amplitude(glob_obs,ic_z)
+            avgamp_syn = get_average_amplitude(glob_syn,ic_z)
+            if self.myrank == 0:
+                with open(amp_file,'w') as f:
+                    f.write(f"{avgamp} {avgamp_syn}\n")
+        
+        if self.myrank == 0:
+            print("average amplitude for obs/syn data gather: %g %g\n" %(avgamp,avgamp_syn))
+        # sync
+        MPI.COMM_WORLD.Barrier()
 
         # normalize 
         if self._node_comm.Get_rank() == 0:
-            glob_obs /= avgamp
-            glob_syn /= avgamp
+            glob_obs[:] /= avgamp
+            glob_syn[:] /= avgamp_syn
         self._node_comm.Barrier()
+
+        # save seismo_win headers
+        self.seismo_win['dt'] = dt_syn
+        self.seismo_win['t0'] = t0_syn
 
         # measure
         for ir in range(nsta_loc):
@@ -555,7 +557,7 @@ class Tele_PreOP(FwatPreOP):
             ic_z = self.components.index('Z')
             ic_r = self.components.index('R')
 
-            stats,adj_r,adj_z,cc1,cc2 = \
+            stats,adj_z,adj_r,cc1,cc2 = \
                 measure_adj_cross_conv(
                     glob_obs[i, ic_z, :],
                     glob_syn[i, ic_z, :],
@@ -575,6 +577,12 @@ class Tele_PreOP(FwatPreOP):
             freqmax = 1. / self.Tmin[ib]
             adj_r = bandpass(adj_r,dt_syn,freqmin, freqmax)
             adj_z = bandpass(adj_z,dt_syn,freqmin, freqmax)
+
+            # scale adjoint source by average amplitude
+            # s' = s / c, where c is the average amplitude, then dL / ds = dL / ds' * ds' / ds ~ dL / ds * 1 / c, 
+            # where s is the synthetic data, s' is the normalized synthetic data, and L is the misfit function
+            adj_r /= avgamp_syn
+            adj_z /= avgamp_syn
         
             # save adjoint source
             data = np.zeros((npt_syn,2))
@@ -588,24 +596,13 @@ class Tele_PreOP(FwatPreOP):
 
             # save obs and synthetic data
             for ic in range(1): # only one component
-                # init a sac header
-                tr = SACTrace(
-                    evla=self.evla,evlo=self.evlo,
-                    evdp=self.evdp,stla=self.stla[i],
-                    stlo=self.stlo[i],stel=0,lcalda=True,
-                    delta = dt_syn,b=t0_syn,
-                    t0 = self.t_ref[i] - t_inj,
-                    knetwk=self.netwk[i],
-                    kstnm = self.stnm[i],
-                    kcmpnm = self.chcode + self.components[ic]
-                )
                 name = self._get_station_code(i,ic)
-                tr.data = cc1
-                self.seismo_sac[f"{out_dir}/{bandname}/{name}.sac.obs"] = tr.copy()
-                #tr.write(f"{out_dir}/{bandname}/{name}.sac.obs")
-                tr.data = cc2
-                self.seismo_sac[f"{out_dir}/{bandname}/{name}.sac.syn"] = tr.copy()
-                #tr.write(f"{out_dir}/{bandname}/{name}.sac.syn")
+                self.seismo_win[f"{out_dir}/{bandname}/{name}.dat.obs"] = cc1 * 1.
+                self.seismo_win[f"{out_dir}/{bandname}/{name}.dat.syn"] = cc2 * 1.
+
+                # save length
+                if ir == 0 and ic == 0:
+                    self.seismo_win['npts'] = len(cc1)
 
         self._print_measure_info(bandname,stats_list=stats_list)
     

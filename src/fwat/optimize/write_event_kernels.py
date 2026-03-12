@@ -11,6 +11,11 @@ def run(argv):
     myrank = MPI.COMM_WORLD.Get_rank()
     nprocs = MPI.COMM_WORLD.Get_size()
 
+    if len(argv) != 4:
+        print("need 4 parameters: MODEL_DIR KERNEL_DIR model_type kernel_type")
+        print("example: python write_user_model.py M06 GRADIENT mdtype kltype")
+        exit(1)
+
     # get params
     MODEL_DIR = argv[0]
     KERNEL_DIR = argv[1]

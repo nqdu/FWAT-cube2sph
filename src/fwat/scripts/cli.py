@@ -106,7 +106,7 @@ def main():
                 fio.write(' '.join(evtlist))
     elif cmd == "rotate_seismogram":
         from fwat.measure.rotate_seismogram import rotate_seismogram
-        rotate_seismogram()
+        rotate_seismogram(args)
     else:
         print(f"{cmd} is not a function in fwat!")
         sys.exit(1)

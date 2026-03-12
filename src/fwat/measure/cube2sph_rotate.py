@@ -254,6 +254,9 @@ def rotate_seismo_adj(
             arr[:,1] = seis[:,i_comp]
             #print(f"writing to ${fn}")
             #arr.tofile(fn)
-            np.savetxt(fname=fn, X=arr, fmt='%11.6f%19.7E')
+            #np.savetxt(fname=fn, X=arr, fmt='%11.6f%19.7E')
+            with open(fn, 'w') as fio:
+                fio.write('\n'.join([f"{row[0]:11.6f} {row[1]:19.7E}" for row in arr]))
+
 
     comm.barrier()

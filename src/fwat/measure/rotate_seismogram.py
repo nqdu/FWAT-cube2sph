@@ -48,7 +48,7 @@ import subprocess
 from mpi4py import MPI
 import h5py
 
-def rotate_seismogram():
+def rotate_seismogram(argv=None):
     example_test = "python rotate_seismogram.py --fn_matrix=\"rotation_nu\" --rotate=\"XYZ->NEZ\" --from_dir=\"OUTPUT_FILES\" --to_dir=\"OUTPUT_FILES_sph\" --from_template='${nt}.${sta}.BX${comp}.semd' --to_template='${nt}.${sta}.BX${comp}.sem.ascii'"
 
     parser = argparse.ArgumentParser(epilog=example_test)
@@ -59,7 +59,7 @@ def rotate_seismogram():
     parser.add_argument('--to_dir', dest='to_dir', type=str, metavar='TO_DIR')
     parser.add_argument('--to_template', dest='to_template', type=str, metavar='TO_TEMPLATE')
     #parser.add_argument('--nsteps', dest='nsteps', type=int, metavar='NSTEPS')
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     #print(args)
 
     #--MPI-
