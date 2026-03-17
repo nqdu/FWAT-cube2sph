@@ -6,7 +6,8 @@ from scipy.signal import convolve,correlate
 
 from fwat.measure.FwatPreOP import FwatPreOP
 from ..adjoint.MeasureStats import MeasureStats
-from .utils import interpolate_syn,bandpass,alloc_mpi_jobs
+from .utils import alloc_mpi_jobs, interpolate_syn,bandpass,  \
+                   taper_window
 from fwat.measure.FwatPreOP import create_shared_array,create_shared_communicators
 
 class Tele_PreOP(FwatPreOP):
@@ -128,6 +129,7 @@ class Tele_PreOP(FwatPreOP):
         glob_data: np.ndarray
             global data array with shape (nsta,ncomp,npt)
         """
+
         # sanity check
         if type_ not in ['syn','obs']:
             if self.myrank == 0:
@@ -144,9 +146,9 @@ class Tele_PreOP(FwatPreOP):
         # get time window 
         dt_syn = self.dt_syn
         win_tb,win_te = self.pdict['TIME_WINDOW']
-        npt2 = int((win_te + win_tb) / dt_syn)
-        if npt2 // 2 * 2 != npt2:
-            npt2 += 1
+        # npt2 = int((win_te + win_tb) / dt_syn)
+        # if npt2 // 2 * 2 != npt2:
+        #     npt2 += 1
         
         # glob arrays, in shared memory
         ncomp = self.ncomp
@@ -161,9 +163,16 @@ class Tele_PreOP(FwatPreOP):
         # loop each station
         for ir in range(self.nsta_loc):
             i = ir + self._istart
+
+            # get time window
+            tstart = self.t_ref[i] - self.t_inj - win_tb
+            tend = self.t_ref[i] - self.t_inj + win_te
+            lpt,rpt,taper0 = taper_window(0,dt_syn,npt_syn,tstart,tend)
+            taper = np.zeros((npt_syn))
+            taper[lpt:rpt] = taper0
+
             for ic in range(ncomp):
                 name = self._get_station_code(i,ic)
-                t0_inp = self.t_ref[i] - win_tb
 
                 if type_ == 'syn':
                     # read data
@@ -173,9 +182,12 @@ class Tele_PreOP(FwatPreOP):
                     # filter 
                     syn_data = bandpass(syn_data,dt_syn,freqmin,freqmax)
 
-                    # interpolate the syn data to the same sampling of syn data
-                    w1 = interpolate_syn(syn_data,self.t_inj,dt_syn,npt_syn,t0_inp,dt_syn,npt2)
-                    w = interpolate_syn(w1,t0_inp,dt_syn,npt2,self.t_inj,dt_syn,npt_syn)
+                    # taper data
+                    w = syn_data * taper
+
+                    # # interpolate the syn data to the same sampling of syn data
+                    # w1 = interpolate_syn(syn_data,self.t_inj,dt_syn,npt_syn,t0_inp,dt_syn,npt2)
+                    # w = interpolate_syn(w1,t0_inp,dt_syn,npt2,self.t_inj,dt_syn,npt_syn)
 
                 else: 
                     obs_tr = SACTrace.read(f"{self.DATA_DIR}/{self.evtid}/{name}.sac")
@@ -183,13 +195,19 @@ class Tele_PreOP(FwatPreOP):
                     dt_obs = obs_tr.delta 
                     npt_obs = obs_tr.npts 
                     obs_data = obs_tr.data
+                    if t0_obs < 0:
+                        t0_obs = t0_obs + self.t_ref[i]
 
                     # filter 
                     obs_data = bandpass(obs_data,dt_obs,freqmin,freqmax)
 
+                    # interpolate 
+                    u1 = interpolate_syn(obs_data,t0_obs,dt_obs,npt_obs,self.t_inj,dt_syn,npt_syn)
+                    w = u1 * taper 
+
                     # interpolate the obs/syn data to the same sampling of syn data
-                    u1 = interpolate_syn(obs_data,t0_obs + self.t_ref[i],dt_obs,npt_obs,t0_inp,dt_syn,npt2)
-                    w = interpolate_syn(u1,t0_inp,dt_syn,npt2,self.t_inj,dt_syn,npt_syn)
+                    # u1 = interpolate_syn(obs_data,t0_obs + self.t_ref[i],dt_obs,npt_obs,t0_inp,dt_syn,npt2)
+                    # w = interpolate_syn(u1,t0_inp,dt_syn,npt2,self.t_inj,dt_syn,npt_syn)
 
                 # save to  global array
                 glob_data[i,ic,:] = w
@@ -540,6 +558,13 @@ class Tele_PreOP(FwatPreOP):
             glob_obs[:] /= avgamp
             glob_syn[:] /= avgamp_syn
         self._node_comm.Barrier()
+
+        # save if required
+        if self.pdict['VERBOSE_MODE']:
+            if self.myrank == 0:
+                print("save preprocessed seismograms ...")
+                np.save(f"{out_dir}/{bandname}/glob_obs.npy",glob_obs)
+                np.save(f"{out_dir}/{bandname}/glob_syn.npy",glob_syn)
 
         # save seismo_win headers
         self.seismo_win['dt'] = dt_syn
