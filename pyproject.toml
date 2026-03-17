@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fwat"
-version = "0.10.0"
+version = "0.12.0"
 description = "A CLI for fwat program"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -17,7 +17,8 @@ dependencies = [
     "h5py",
     "obspy >=1.4.2",
     "numba",
-    "pybind11-global"
+    "pybind11-global",
+    "pyyaml"
 ]
 
 [project.optional-dependencies]

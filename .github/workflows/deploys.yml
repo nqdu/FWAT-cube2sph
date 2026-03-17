@@ -22,7 +22,16 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake build-essential gfortran liblapack-dev liblapacke-dev libopenmpi-dev
-          
+      - name: C++ libraries
+        run: |
+          pip install pybind11-global
+          mkdir -p build
+          cd build
+          cmake .. -DCXX=g++ -DFC=gfortran -DPYTHON_EXECUTABLE=`which python`
+          make install -j4 
+          cd ..
+          rm -rf build 
+        
       - name: Install Python package
         run: pip install -e ".[test]"
 
