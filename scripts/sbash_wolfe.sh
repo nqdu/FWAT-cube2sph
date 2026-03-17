@@ -31,7 +31,7 @@ else
   # get first model
   iter_start=`fwat-utils getparam iter_start ${LBFGS_FILE}`
   MSTART=M`echo "$iter_start" |awk '{printf "%02d",$1}'`
-  MSTART=M00
+  MSTART=M`echo "0" |awk '{printf "%02d",$1}'`
 
   # for all simulation types, compute weighted misfits
   for((i=0;i<$nsimtypes;i++)); 

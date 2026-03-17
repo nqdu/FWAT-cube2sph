@@ -50,6 +50,9 @@ def help_function():
     print("\texample: mpirun -np 4 fwat sum_kernel src_rec/sources.dat 0 M00.ls")
 
     print()
+    print("fwat-main rot_seismogram --fn_matrix FN_MATRIX --rotate ROTATE --from_dir FROM_DIR --from_template FROM_TEMPLATE --to_dir TO_DIR --to_template TO_TEMPLATE")
+
+    print()
     print("fwat-main prepare forward/adjoint meatype iter evtid run_opt")
     print("\tprepare forward/adjoint files, return events list")
     print("\texample: fwat-main prepare forward tele 0 XZ.FAF 3")
@@ -101,6 +104,9 @@ def main():
             name = "-".join(args[1:])
             with open(f"LOG/.{name}","w") as fio:
                 fio.write(' '.join(evtlist))
+    elif cmd == "rotate_seismogram":
+        from fwat.measure.rotate_seismogram import rotate_seismogram
+        rotate_seismogram(args)
     else:
         print(f"{cmd} is not a function in fwat!")
         sys.exit(1)

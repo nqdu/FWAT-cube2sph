@@ -1,6 +1,7 @@
 
 import  numpy as np 
 from scipy.signal import hilbert
+from .MeasureStats import MeasureStats
 from fwat.measure.utils import bandpass,taper_window
 from scipy.integrate import trapezoid
 
@@ -28,10 +29,8 @@ def measure_adj_exphase(obs,syn,t0,dt,nt,
 
     Returns
     ----------------
-    tr,am : float
-        misfit function (am = tr)
-    win: np.ndarray, shape(20)
-        measure_adj window
+    stats: MeasureStats
+        misfit and other measurement info
     adj: np.ndarray
         adjoint source, shape(nt)
     """
@@ -85,14 +84,14 @@ def measure_adj_exphase(obs,syn,t0,dt,nt,
     adjsrc = bandpass(adjsrc,dt,1./max_period,1./min_period) * taper
 
     # measure_adj arrays
-    tr_chi = misfit 
-    am_chi = misfit 
-    win_chi = np.zeros((20))
-    win_chi[13-1] = 0.5 * np.sum( obs**2 )
-    win_chi[14-1] = 0.5 * np.sum( syn**2 )
-    win_chi[15-1] = tr_chi 
-    win_chi[20-1] = nt * dt
+    stats = MeasureStats(
+        adj_type = "exp_phase",
+        misfit=misfit,
+        tstart=tstart,
+        tend=tend,
+        tr_chi=misfit,
+        am_chi=misfit,
+        tshift = 0.
+    )
 
-    # reinterpolate adjoint source
-
-    return tr_chi,am_chi,win_chi,adjsrc
+    return stats, adjsrc

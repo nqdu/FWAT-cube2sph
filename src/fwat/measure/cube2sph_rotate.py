@@ -31,34 +31,6 @@ def _get_first_dim_npy(filename):
 
     return out[0][0]
 
-
-def _count_lines(filename):
-    """
-    Count the number of lines in a file, handling the case where the last line may not end with a newline character.
-    
-    Parameters
-    ----------
-    filename : str
-        The path to the file.
-
-    Returns
-    -------
-    int
-        The number of lines in the file.
-    
-    """
-    with open(filename, 'rb') as f:
-        count = 0
-        while True:
-            buf = f.read(1024 * 1024)
-            if not buf:
-                break
-            count += buf.count(b'\n')
-            last_buf = buf
-        # Check if the last line is missing a newline
-        if last_buf and not last_buf.endswith(b'\n'):
-            count += 1
-        return count
     
 def _read_rotation_file(filename):
     """
@@ -282,6 +254,9 @@ def rotate_seismo_adj(
             arr[:,1] = seis[:,i_comp]
             #print(f"writing to ${fn}")
             #arr.tofile(fn)
-            np.savetxt(fname=fn, X=arr, fmt='%11.6f%19.7E')
+            #np.savetxt(fname=fn, X=arr, fmt='%11.6f%19.7E')
+            with open(fn, 'w') as fio:
+                fio.write('\n'.join([f"{row[0]:11.6f} {row[1]:19.7E}" for row in arr]))
+
 
     comm.barrier()

@@ -1,7 +1,8 @@
-from fwat.measure.FwatPreOP import FwatPreOP
 import numpy as np 
 from mpi4py import MPI
 
+from fwat.measure.FwatPreOP import FwatPreOP
+from ..adjoint.MeasureStats import MeasureStats
 from .tele.deconit import deconit,myconvolve,nextpow2
 from .tele.deconit import gauss_filter,apply_gaussian
 
@@ -331,17 +332,18 @@ class RF_PreOP(FwatPreOP):
         # allocate global arrays 
         nsta_loc = self.nsta_loc
 
-        # pre-allocate misfits
-        tstart = np.zeros((nsta_loc))
-        tend = np.zeros((nsta_loc))
-        win_chi = np.zeros((nsta_loc,1,20))
-        tr_chi = np.zeros((nsta_loc,1))
-        am_chi = np.zeros((nsta_loc,1))
-        tstart[:] = max(- win_tb,t0_syn)
-        tend[:] = min(win_te,t0_syn + dt_syn * npt_syn)
+        # tstart/tend for each station
+        stats_list = [MeasureStats(adj_type=self.adjsrc_type) for _ in range(nsta_loc)]
+        tstart =  max(- win_tb,t0_syn)
+        tend = min(win_te,t0_syn + dt_syn * npt_syn)
 
         # gauss filter
         gauss = gauss_filter(npt_syn,dt_syn,self._f0[ib])
+
+        # save seismo_win headers
+        self.seismo_win['dt'] = dt_syn
+        self.seismo_win['t0'] = -self._tshift
+        self.seismo_win['npts'] = npt_syn
 
         # loop each station
         for ir in range(nsta_loc):
@@ -407,12 +409,16 @@ class RF_PreOP(FwatPreOP):
 
             # misfit 
             chi = 0.5 * trapezoid((rf_obs - rf_syn)**2, dx=dt_syn)
-            tr_chi[ir] = chi 
-            am_chi[ir] = chi
-            win_chi[ir,0,13-1] = 0.5 * sum( rf_obs**2 )
-            win_chi[ir,0,14-1] = 0.5 * sum( rf_syn**2 )
-            win_chi[ir,0,15-1] = chi
-            win_chi[ir,0,20-1] = npt_syn * dt_syn
+            stats = MeasureStats(
+                adj_type=self.adjsrc_type,
+                misfit=chi,
+                tstart=tstart,
+                tend=tend,
+                code=f"{self.netwk[i]}.{self.stnm[i]}.BXR",
+                tr_chi=chi,
+                am_chi=chi
+            )
+            stats_list[ir] = stats
 
             # save adjoint source
             data = np.zeros((npt_syn,2))
@@ -427,22 +433,9 @@ class RF_PreOP(FwatPreOP):
             #np.save(outname,data)
 
             # save obs and syn
-            name = f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}R.rf.sac"
-            tr = SACTrace(
-                evla=self.evla,evlo=self.evlo,
-                evdp=self.evdp,stla=self.stla[i],
-                stlo=self.stlo[i],stel=0,lcalda=1,
-                delta = dt_syn,b=-self._tshift,
-                knetwk = self.netwk[i],
-                kstnm = self.stnm[i],
-                kcmpnm = self.chcode + 'R'
-            )
-            tr.data = rf_obs
-            #tr.write()
-            self.seismo_sac[f"{out_dir}/{bandname}/{name}.obs"] = tr.copy()
-            tr.data = rf_syn
-            #tr.write(f"{out_dir}/{bandname}/{name}.syn")
-            self.seismo_sac[f"{out_dir}/{bandname}/{name}.syn"] = tr.copy()
+            name = f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}R.rf.dat"
+            self.seismo_win[f"{out_dir}/{bandname}/{name}.obs"] = rf_obs.copy()
+            self.seismo_win[f"{out_dir}/{bandname}/{name}.syn"] = rf_syn.copy()
         
         # save measurement files
-        self._print_measure_info(bandname,tstart,tend,tr_chi,am_chi,win_chi)
+        self._print_measure_info(bandname,stats_list)

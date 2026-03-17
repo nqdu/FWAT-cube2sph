@@ -131,19 +131,21 @@ def run(argv: List[str]) -> None:
         sys.exit(1)
     
     # Create and execute operator
-    try:
-        operator = create_operator(mtype, iter0, evtid, run_opt)
-        operator.execute()
-    except PreprocessError as e:
-        print(f"Error: {e}")
-        sys.exit(1)
-    except Exception as e:
-        print(f"Unexpected error during preprocessing: {e}")
-        raise
-    finally:
-        # Ensure MPI is finalized
-        if MPI.Is_initialized() and not MPI.Is_finalized():
-            MPI.Finalize()
+    op = create_operator(mtype, iter0, evtid, run_opt)
+    op.execute()
+    # try:
+    #     operator = create_operator(mtype, iter0, evtid, run_opt)
+    #     operator.execute()
+    # except PreprocessError as e:
+    #     print(f"Error: {e}")
+    #     sys.exit(1)
+    # except Exception as e:
+    #     print(f"Unexpected error during preprocessing: {e}")
+    #     raise
+    # finally:
+    #     # Ensure MPI is finalized
+    #     if MPI.Is_initialized() and not MPI.Is_finalized():
+    #         MPI.Finalize()
 
 
 def main() -> None:

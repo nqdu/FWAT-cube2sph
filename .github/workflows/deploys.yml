@@ -1,45 +1,61 @@
-name: Build and Deploy Docs
+name: CI
 
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
-  deploy:
+  test:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential gfortran liblapack-dev liblapacke-dev libopenmpi-dev
+
+      - name: Build C++ libraries
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. -DCXX=g++ -DFC=gfortran -DPYTHON_EXECUTABLE=$(which python)
+          make install -j4
+          cd ..
+          rm -rf build
+
+      - name: Install Python package
+        run: pip install -e ".[test]"
+
+      - name: Run tests
+        run: python -m pytest
+
+  deploy-docs:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
       - name: Install doc tools
-        run: |
-          pip install sphinx myst-parser sphinx_rtd_theme 
+        run: pip install sphinx myst-parser sphinx_rtd_theme
 
-    #   - name: Build libaries
-    #     run: |
-    #       sudo apt install cmake build-essential gfortran liblapack-dev liblapacke-dev 
-    #       wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz
-    #       tar -xvf eigen-3.4.0.tar.gz
-    #       pip install pybind11-global
-    #       mkdir -p build
-    #       cd build 
-    #       cmake .. -DCXX=g++ -DFC=gfortran -DEIGEN_INC=./eigen-3.4.0/  -DBUILD_LIBS=ON  -DPython3_EXECUTABLE=`which python`
-    #       make -j4 
-    #       make install
-    #       cd ..
-          
-          
-    #   - name: Build Doxygen C++ API Docs
-    #     run: doxygen misc/doxygen/doxygen.cfg 
-
-    #   - name: Build Python docs (Sphinx)
-    #     run: |
-    #       sphinx-apidoc -o misc/source/python ./specd
-          
-      - name: Build master docs (Sphinx)
-        run: |
-          sphinx-build -b html misc/source docs
+      - name: Build docs (Sphinx)
+        run: sphinx-build -b html misc/source docs
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3

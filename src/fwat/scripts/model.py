@@ -50,6 +50,10 @@ def main():
         from fwat.scripts import reslice_model
         reslice_model.run(args)
         pass
+    elif cmd == "kernel":
+        from fwat.optimize import write_event_kernels
+        write_event_kernels.run(args)
+        pass
     else:
         print(f"{cmd} is not a function in fwat!")
         sys.exit(1)

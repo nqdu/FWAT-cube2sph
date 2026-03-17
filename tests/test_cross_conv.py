@@ -1,149 +1,181 @@
 import numpy as np
-import matplotlib.pyplot as plt 
+import matplotlib.pyplot as plt
 
-from scipy.signal import convolve
-
+import yaml 
 from fwat.adjoint.cross_conv import measure_adj_cross_conv
-from fwat.measure.utils import taper_window,bandpass
-
-def shift_data(a,dt,t0):
-    a1 = np.fft.rfft(a)
-    om = 2 * np.pi * np.fft.rfftfreq(len(a),dt)
-    a1 = a1 * np.exp(-1j * om * t0)
-
-    return np.fft.irfft(a1).real
-
-def measure_adj_cross_conv_mis(
-    obs_v,syn_v,obs_h,syn_h,
-    t0,dt,min_period,max_period,
-    tstart,tend,maxit:int):
-
-    from fwat.measure.utils import bandpass,taper_window
-    from fwat.measure.tele.deconit import time_decon
-    from scipy.signal import convolve 
-    from scipy.integrate import trapezoid
-
-    # make sure len(obs) == len(syn)
-    nt = len(obs_v)
-    assert len(obs_v) == len(syn_v), "Observed and synthetic data must have the same length"
-    assert len(obs_h) == len(obs_v), "Observed_h and observed_r must have the same length"
-
-    # get window info
-    lpt, rpt, taper0 = taper_window(t0, dt, nt, tstart, tend, p=0.05)
-    taper = obs_v * 0 
-    taper[lpt:rpt] = taper0 
-
-    # get windowed data
-    vsyn = syn_v * taper 
-    hsyn = syn_h * taper 
-    vobs = obs_v * taper
-    hobs = obs_h * taper 
-
-    # compute convolution of h/v
-    chi1 = convolve(vobs,hsyn,'same') * dt
-    chi2 = convolve(vsyn,hobs,'same') * dt
-    dchi = chi1 - chi2 
-
-    # misfit function
-    mis = 0.5 * trapezoid(dchi**2,dx=dt)
-
-    return mis
+from fwat.measure.utils import bandpass,interpolate_syn
+from pathlib import Path
 
 def main():
-    # source time function  
-    nt = 1024
-    t = np.linspace(0,10,nt)
-    dt = t[1]-t[0]
-    src = np.exp(-((t-5)/0.5)**2)
-    src_t = np.exp(-((t-5.5)/0.5)**2) + 0.2 * np.exp(-((t-4)/0.3)**2) - 0.2 * np.exp(-((t-6)/0.3)**2)
+    # load seismograms
 
-    # h/v components
-    t0 = 4.5
-    h = (t > t0) * (t-t0) * np.exp(-(t -t0) / 0.2 )
-    v = src * 0.5
+    # get path 
+    bin_path = Path(__file__).parent / "data"
+    syn_r0 = np.load(bin_path / 'syn_r.npy')
+    syn_z0 = np.load(bin_path / 'syn_z.npy')
+    obs_r0 = np.load(bin_path / 'obs_r.npy')
+    obs_z0 = np.load(bin_path / 'obs_z.npy')
 
-    # observed data
-    hobs = convolve(h,src_t,'same') * dt
-    vobs = convolve(v,src_t,'same') * dt
+    # get yaml info
+    dt = 0.02
+    win_tb = 5.
+    win_te = 30.
+    t0_fk = 35.815201
+    t0 = -0.200000003
+    freqmin = 0.02
+    freqmax = 0.4
+    tstart = -win_tb + t0_fk
+    tend = win_te + t0_fk
 
-    # syn data 
-    # hsyn = convolve(shift_data(h,dt,-0.5),src,'same') * dt
-    # vsyn = convolve(shift_data(v,dt,-0.5),src,'same') * dt
-    t0 = 5.5
-    hsyn = (t > t0) * (t-t0) * np.exp(-(t -t0) / 0.2 )
-    vsyn = np.exp(-((t-5.2)/0.5)**2)
+    t = np.arange(len(syn_r0)) * dt + t0
+    nt = len(t)
+    dt1 = 0.1 # original dt for finite-difference seismograms
+    nt1 = int((nt -1) * dt / dt1) + 1
+    t1 = np.arange(nt1) * dt1 + t0
 
-    # compute adjoint source 
-    Tmin = 1.
-    Tmax = 50.
-    tstart = 3.
-    tend = 8.
-    chi,_,_,adj_r,adj_z,cc1,cc2 = measure_adj_cross_conv(vobs,vsyn,hobs,hsyn,0,dt,Tmin,Tmax,tstart,tend,120)
-        # obs_v,syn_v,obs_h,syn_h,
-        # t0,dt,min_period,max_period,
-        # tstart,tend,maxit:int
+    # reset freqmax if beyond Nyquist
+    nyq = 0.5 / dt1
+    if freqmax > nyq:
+        freqmax = nyq - 0.01
+        print(f"Reset freqmax to {freqmax} Hz due to Nyquist limit.")
 
-    taper = np.zeros((nt))
-    lpt,rpt,taper0 = taper_window(0,dt,len(t),tstart,tend,0.05)
-    taper[lpt:rpt] = taper0 * 1.
+    # band pass 
+    syn_z0 = interpolate_syn(syn_z0, t0, dt, nt, t0, dt1, nt1)
+    syn_r0 = interpolate_syn(syn_r0, t0, dt, nt, t0, dt1, nt1)
+    obs_z0 = interpolate_syn(obs_z0, t0, dt, nt, t0, dt1, nt1)
+    obs_r0 = interpolate_syn(obs_r0, t0, dt, nt, t0, dt1, nt1)
+    syn_z = bandpass(syn_z0, dt1, freqmin, freqmax)
+    syn_r = bandpass(syn_r0, dt1, freqmin, freqmax)
+    obs_z = bandpass(obs_z0, dt1, freqmin, freqmax)
+    obs_r = bandpass(obs_r0, dt1, freqmin, freqmax)
 
-    # fd approx
-    adj_z_fd = adj_r * 0 
-    adj_r_fd = adj_r * 0 
-    zsyn1 = vsyn * 1.
-    hsyn1 = hsyn * 1. 
+    # add min_period to tend to avoid edge effect
+    tend += 1. / freqmax
 
-    for it in range(nt):
-        # if t[it] < 3  or t[it] > 8:
-        #     continue 
-        dv = 1.0e-8
-        syn0 = vsyn[it] * 1. 
-        zsyn1[it] = syn0 + dv
-        chi1 = measure_adj_cross_conv_mis(vobs,zsyn1,hobs,hsyn1,0,dt,Tmin,Tmax,tstart,tend,120)
+    # compute adjoint source
+    stats,adj_z,adj_r,cc1,cc2 =  \
+        measure_adj_cross_conv(
+            obs_z,syn_z,
+            obs_r,syn_r,
+            t0,dt1,
+            tstart,tend
+        )
+    adj_r = bandpass(adj_r,dt1,freqmin,freqmax)
+    adj_z = bandpass(adj_z,dt1,freqmin,freqmax)
 
-        zsyn1[it] = syn0 - dv
-        chi2 = measure_adj_cross_conv_mis(vobs,zsyn1,hobs,hsyn1,0,dt,Tmin,Tmax,tstart,tend,120)
+    # compute FD adjoint source for validation
+    eps = 1e-6
+    adj_r_fd = np.zeros_like(adj_r)
+    adj_z_fd = np.zeros_like(adj_z)
+    print("Computing finite-difference adjoint sources Z...")
+    for i in range(len(syn_z)):
+        syn_z_p = syn_z0.copy()
+        syn_z_m = syn_z0.copy()
+        syn_z_p[i] += eps
+        syn_z_m[i] -= eps
 
-        adj_z_fd[it] = (chi1 - chi2) / (2. * dv)
-        zsyn1[it] = syn0 * 1.
+        # bandpass amd interpolate
+        syn_z_p = bandpass(syn_z_p,dt1, freqmin, freqmax)
+        syn_z_m = bandpass(syn_z_m,dt1, freqmin, freqmax)
+        stats0,_,_,_,_ =  \
+            measure_adj_cross_conv(
+                obs_z,syn_z_p,
+                obs_r,syn_r,
+                t0,dt1,
+                tstart,tend
+            )
+        chi_p = stats0.misfit
+        stats1,_,_,_,_ =  \
+            measure_adj_cross_conv(
+                obs_z,syn_z_m,
+                obs_r,syn_r,
+                t0,dt1,
+                tstart,tend
+            )
+        chi_m = stats1.misfit
+        adj_z_fd[i] = (chi_p - chi_m) / (2 * eps)
 
-        syn0 = hsyn[it] * 1. 
-        hsyn1[it] = syn0 + dv
-        chi1 = measure_adj_cross_conv_mis(vobs,zsyn1,hobs,hsyn1,0,dt,Tmin,Tmax,tstart,tend,120)
+    print("Computing finite-difference adjoint sources R...")
+    for i in range(len(syn_r)):
+        syn_r_p = syn_r0.copy()
+        syn_r_m = syn_r0.copy()
+        syn_r_p[i] += eps
+        syn_r_m[i] -= eps
 
-        hsyn1[it] = syn0 - dv
-        chi2 = measure_adj_cross_conv_mis(vobs,zsyn1,hobs,hsyn1,0,dt,Tmin,Tmax,tstart,tend,120)
+        # bandpass
+        syn_r_p = bandpass(syn_r_p,dt1, freqmin, freqmax)
+        syn_r_m = bandpass(syn_r_m,dt1, freqmin, freqmax)
+        stats0,_,_,_,_ =  \
+            measure_adj_cross_conv(
+                obs_z,syn_z,
+                obs_r,syn_r_p,
+                t0,dt1,
+                tstart,tend
+            )
+        chi_p = stats0.misfit
+        stats1,_,_,_,_ =  \
+            measure_adj_cross_conv(
+                obs_z,syn_z,
+                obs_r,syn_r_m,
+                t0,dt1,
+                tstart,tend
+            )
+        chi_m = stats1.misfit
+        adj_r_fd[i] = (chi_p - chi_m) / (2 * eps)  
 
-        adj_r_fd[it] = (chi1 - chi2) / (2. * dv)
-        hsyn1[it] = syn0 * 1.
+    # bandpass adjoint sources for better visualization
+    adj_z_fd = bandpass(adj_z_fd,dt1,freqmin,freqmax) / dt1
+    adj_r_fd = bandpass(adj_r_fd,dt1,freqmin,freqmax) / dt1
 
-
-    # taper 
-    freqmin = 1. / Tmax 
-    freqmax = 1. / Tmin
-    adj_z_fd = bandpass(adj_z_fd,dt,freqmin,freqmax)
-    adj_r_fd = bandpass(adj_r_fd,dt,freqmin,freqmax)
-    adj_z_fd *= taper
-    adj_r_fd *= taper
-
-    plt.figure(1,figsize=(14,10))
+    plt.figure(figsize=(12, 10))
+    
+    # Plot Z
     plt.subplot(211)
-    plt.plot(t,adj_z,label='adj_z')
-    plt.plot(t,adj_z_fd / dt,label='adj_z_fd')
+    plt.plot(t1, adj_z, 'k', linewidth=3, label='Analytical (Code)')
+    plt.plot(t1, adj_z_fd, 'r--', linewidth=2, label='Finite Difference (Truth)')
+    plt.title(f"Vertical Adjoint Source)")
+    plt.ylabel("Amplitude")
     plt.legend()
+    plt.grid(True, alpha=0.3)
 
+    # Plot R
     plt.subplot(212)
-    plt.plot(t,adj_r,label='adj_r')
-    plt.plot(t,adj_r_fd / dt,label='adj_r_fd')
+    plt.plot(t1, adj_r, 'k', linewidth=3, label='Analytical (Code)')
+    plt.plot(t1, adj_r_fd, 'r--', linewidth=2, label='Finite Difference (Truth)')
+    plt.title(f"Radial Adjoint Source (Max Error: %)")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Amplitude")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig("cc-adj.png", dpi=150)
+
+    # plot vsyn vobs hsyn hobs and cc1 
+    plt.figure(figsize=(12, 8))
+    plt.subplot(311)
+    plt.plot(t1, obs_z, 'b-', linewidth=2, label='Vobs')
+    plt.plot(t1, syn_z, 'r--', linewidth=2, label='Vsyn')
+    plt.axvline(x=tstart, color='k', linestyle='--', linewidth=1)
+    plt.axvline(x=tend, color='k', linestyle='--', linewidth=1)
     plt.legend()
 
-    plt.savefig("cross-conv.jpg",dpi=300)
-
-    plt.figure(2,figsize=(14,6))
-    plt.plot(t,cc1,label='vobs * hsyn')
-    plt.plot(t,cc2,label='vsyn * hobs',ls='--')
+    plt.subplot(312)
+    plt .plot(t1, syn_r, 'g--', linewidth=2, label='HSyn')
+    plt.plot(t1, obs_r, 'g-', linewidth=2, label='Hobs')
     plt.legend()
-    plt.savefig("cross-conv-cc.jpg",dpi=300)
+
+    # cc1   and cc2 for visualization
+    plt.subplot(313)
+    t2 = t1[0] + np.arange(len(cc1)) * dt1
+    plt.plot(t2, cc1, 'b-', linewidth=2, label='Cross-Conv Vobs * Hsyn')
+    plt.plot(t2, cc2, 'g--', linewidth=2, label='Cross-Conv Vsyn * Hobs')
+    plt.title("Cross-Convolutions for Visualization")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Amplitude")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig("cc-vs.png", dpi=150)
 
 if __name__ == "__main__":
     main()

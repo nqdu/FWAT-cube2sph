@@ -82,7 +82,7 @@ def main():
     tstart = 3.
     tend = 8.
 
-    _,_,_,adj = measure_adj_exphase(
+    _,adj = measure_adj_exphase(
         obs,syn,t[0],dt,len(t),Tmin,Tmax,
         tstart,tend)
 

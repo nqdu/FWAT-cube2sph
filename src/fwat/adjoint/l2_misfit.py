@@ -1,4 +1,7 @@
 import numpy as np 
+from .MeasureStats import MeasureStats
+from fwat.measure.utils import taper_window
+from scipy.integrate import trapezoid
 
 def measure_adj_l2(
         obs,syn,t0,dt,nt,
@@ -29,15 +32,11 @@ def measure_adj_l2(
 
     Returns
     -------
-    tr,am : float
-        misfit function (am = tr if return_type = dt)
-    win: np.ndarray, shape(20)
-        measure_adj window
+    stats: MeasureStats
+        stats class containing measurement info
     adj: np.ndarray
         adjoint source, shape(nt)
     """
-    from fwat.measure.utils import taper_window
-    from scipy.integrate import trapezoid
 
     # get window info
     lpt, rpt, taper0 = taper_window(t0, dt, nt, tstart, tend, p=taper_ratio)
@@ -56,13 +55,15 @@ def measure_adj_l2(
     adjsrc = obs * 0. 
     adjsrc[lpt:rpt] = ydiff 
 
-    # measure_adj arrays
-    tr_chi = misfit 
-    am_chi = misfit 
-    win_chi = np.zeros((20))
-    win_chi[13-1] = 0.5 * np.sum( obs**2 )
-    win_chi[14-1] = 0.5 * np.sum( syn**2 )
-    win_chi[15-1] = tr_chi 
-    win_chi[20-1] = nt * dt
+    stats = MeasureStats(
+        adj_type='l2',
+        misfit=misfit,
+        tstart=tstart,
+        tend=tend,
+        code='',
+        tr_chi=misfit,
+        am_chi=misfit,
+        tshift=0.
+    )
 
-    return tr_chi,am_chi,win_chi,adjsrc
+    return stats, adjsrc

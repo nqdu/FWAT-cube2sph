@@ -19,7 +19,7 @@ def main():
     syn = bandpass(syn,dt,1./Tmax,1./Tmin)
     obs = bandpass(obs,dt,1./Tmax,1./Tmin)
 
-    tr,_,_,adj = measure_adj_l2(
+    stats,adj = measure_adj_l2(
         obs,syn,t[0],dt,len(t),tstart,tend) 
     # adj = bandpass(adj,dt,1./Tmax,1./Tmin)
 
@@ -28,12 +28,11 @@ def main():
     taper[lpt:rpt] = taper0 
 
     # adjoint source by measure_adj
-    tr_mt,_,_,adj_mt = measure_adj(0,dt,nt,0.,dt,nt,tstart,tend,2,
+    stats_mt,adj_mt = measure_adj(0,dt,nt,0.,dt,nt,tstart,tend,2,
                          Tmax,Tmin,False,obs,syn)
 
-    print("misfit from user l2: ",tr)
-    print("misfit from measure adj: ",tr_mt)
-
+    print("misfit from user l2: ",stats.misfit)
+    print("misfit from measure adj: ",stats_mt.misfit)
     # plot 
     plt.figure(1)
     plt.plot(t,adj,label='adj')

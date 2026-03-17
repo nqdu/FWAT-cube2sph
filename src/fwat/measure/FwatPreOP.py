@@ -1,6 +1,59 @@
 import numpy as np 
 from mpi4py import MPI
+from fwat.adjoint.MeasureStats import MeasureStats
 from fwat.const import PARAM_FILE
+
+def create_shared_communicators(global_comm):
+    """
+    Splits the global communicator into:
+      1. node_comm: Processes on the same physical node (shared memory).
+      2. leader_comm: A communicator of only the 'Rank 0' from each node.
+    """
+    
+    # Create intra-node communicator (all processes on the same machine)
+    node_comm = global_comm.Split_type(MPI.COMM_TYPE_SHARED)
+    node_rank = node_comm.Get_rank()
+    
+    # Identify if this process is the 'leader' of its node
+    is_leader = (node_rank == 0)
+    
+    # Create inter-node communicator (only leaders talk to each other)
+    # color=0 for leaders, MPI.UNDEFINED for workers (who get None)
+    leader_comm = global_comm.Split(color=0 if is_leader else MPI.UNDEFINED, 
+                                    key=global_comm.Get_rank())
+    
+    return node_comm, leader_comm
+
+def create_shared_array(node_comm,shape, dtype = float):
+    """
+    Allocates a shared memory window and wraps it in a NumPy array.
+    """
+    
+    # Calculate bytes required for the array
+    # Only the leader actually asks for memory; others ask for 0.
+    is_leader = (node_comm.Get_rank() == 0)
+    itemsize = np.dtype(dtype).itemsize
+    nbytes = (np.prod(shape) * itemsize) if is_leader else 0
+    
+    # Allocate the shared window
+    win = MPI.Win.Allocate_shared(nbytes, itemsize, comm=node_comm)
+    
+    # Query the memory location. 
+    # rank=0 in Shared_query always points to the leader's allocated block.
+    buf, _ = win.Shared_query(0)
+    
+    # Create the NumPy wrapper
+    array = np.ndarray(buffer=buf, dtype=dtype, shape=shape)
+    
+    # Initialize memory to zero (Leader only)
+    if is_leader:
+        array.fill(0)
+    
+    # Ensure initialization is complete before any process returns
+    node_comm.Barrier()
+    
+    return win, array
+
 
 class FwatPreOP:
     def __init__(self,measure_type:str,iter:int,evtid:str,run_opt:int):
@@ -86,9 +139,11 @@ class FwatPreOP:
         self._istart = istart 
 
         # seismograms here, only save seismograms for local stations
-        self.seismogram = {}
-        self.seismogram_adj = {}
-        self.seismo_sac = {}
+        self.seismogram : dict[str,np.ndarray] = {} # whole seismograms 
+        self.seismogram_adj : dict[str,np.ndarray] = {}
+
+        # syn/obs seismograms 
+        self.seismo_win = {} #  windowed seismograms for measurement
 
         # sanity check 
         self._sanity_check()
@@ -150,7 +205,7 @@ class FwatPreOP:
         # rotate seismograms from XYZ to ZNE
         rotate_seismo_adj(rot_list,fn_matrix,from_dir,to_dir,from_template,to_template)
 
-    def _print_measure_info(self,bandname,tstart,tend,tr_chi,am_chi,window_chi):
+    def _print_measure_info(self,bandname:str,stats_list:list[MeasureStats]):
         """ 
         print measure_adj info and save to file 
         
@@ -158,21 +213,11 @@ class FwatPreOP:
         ----------
         bandname: str
             band name
-        tstart: np.ndarray, shape(nsta_loc,)
-            start time of measurement window
-        tend: np.ndarray,shape(nsta_loc,)
-            end time of measurement window
-        tr_chi: np.ndarray,shape(nsta_loc,ncomp)
-            travel-time chi
-        am_chi: np.ndarray,shape(nsta_loc,ncomp)
-            amplitude chi
-        window_chi: np.ndarray,shape(nsta_loc,ncomp,20)
-            window chi and adjoint source info  (20 values)
+        stats_list: list[MeasureStats]
+            list of MeasureStats for each station and component
         """
         import os 
         import sys 
-        ncomp = tr_chi.shape[1]
-        nsta_loc = self.nsta_loc
 
         # create directory
         if self.myrank == 0:
@@ -194,24 +239,23 @@ class FwatPreOP:
                 else:
                     fio = open(outfile,"a")
 
-                for ir in range(nsta_loc):
-                    i = ir + self._istart 
-                    for ic in range(ncomp):
-                        name = self._get_station_code(i,ic)
-                        print(f'{name}')
-                        print("Measurement window No.  1")
-                        print("start and end time of window: %f %f" %(tstart[ir],tend[ir]) )
-                        print(f"adjoint source and chi value for adjoint type = {self.adjsrc_type}")
-                        print("%e" %(window_chi[ir,ic,6]))
-                        print("tr_chi = %e am_chi = %e" %(tr_chi[ir,ic],am_chi[ir,ic]))
-                        print("")
+                nmeasure = len(stats_list)
+                for im in range(nmeasure):
+                    stats = stats_list[im]
+                    
+                    # print info
+                    print(f"Measuring stats of {stats.code}")
+                    print("start and end time of window: %f %f" %(stats.tstart,stats.tend) )
+                    print(f"adjoint source and chi value for adjoint type = {self.adjsrc_type}")
+                    print("tshift = %e" %(stats.tshift))
+                    print("tr_chi = %e am_chi = %e" %(stats.tr_chi,stats.am_chi))
+                    print("")
 
-                        ch = self.components[ic]
-                        fio.write(f"{self.evtid} {self.stnm[i]} {self.netwk[i]} {self.chcode}{ch} 1 {self.adjsrc_type} ")
-                        fio.write("%g %g " %(tstart[ir],tend[ir]))
-                        for j in range(20):
-                            fio.write("%g " %(window_chi[ir,ic,j]))
-                        fio.write("%g %g 0. 0.\n" %(tr_chi[ir,ic],am_chi[ir,ic]))
+                    # write to file
+                    # format: evtid code adj_type tstart tend tshift tr_chi am_chi misfit
+                    fio.write(f"{self.evtid} {stats.code} {stats.adj_type} ")
+                    fio.write("%g %g " %(stats.tstart,stats.tend))
+                    fio.write("%g %g %g %g\n" %(stats.tshift,stats.tr_chi,stats.am_chi,stats.misfit))
                 
                 # close output file
                 fio.close()
@@ -280,17 +324,17 @@ class FwatPreOP:
         if self.myrank == 0:
             print("cleaning up ...")
 
-        # first pack all obs/syn sacs to hdf5 
+        # first pack all obs/syn data to hdf5 
         for ib in range(len(self.Tmax)):
             bandname = self._get_bandname(ib)
             for tag in ['obs','syn']:
 
-                # all sac files
-                pattern = re.compile(rf"^{self.syndir}/OUTPUT_FILES/{bandname}/.*\.sac\.{tag}")
-                sacfiles = [s for s in self.seismo_sac.keys() if pattern.match(s)]
+                # all data files
+                pattern = re.compile(rf"^{self.syndir}/OUTPUT_FILES/{bandname}/.*\.dat\.{tag}")
+                datfiles = [s for s in self.seismo_win.keys() if pattern.match(s)]
 
                 # check if we need to save data
-                nfiles = len(sacfiles)
+                nfiles = len(datfiles)
                 nfiles_tot = MPI.COMM_WORLD.allreduce(nfiles,op=MPI.SUM)
                 if nfiles_tot == 0:
                     continue
@@ -304,16 +348,16 @@ class FwatPreOP:
                             fio = h5py.File(f"{self.syndir}/OUTPUT_FILES/seismogram.{tag}.{bandname}.h5","w")
                         else:
                             fio = h5py.File(f"{self.syndir}/OUTPUT_FILES/seismogram.{tag}.{bandname}.h5","a")
-                        for i in range(len(sacfiles)):
-                            tr = self.seismo_sac[sacfiles[i]]
+                        for i in range(len(datfiles)):
+                            trace_win = self.seismo_win[datfiles[i]]
                             if i == 0 and irank == 0:
-                                fio.attrs['dt'] = tr.delta  
-                                fio.attrs['t0'] = tr.b 
-                                fio.attrs['npts'] = tr.npts
+                                fio.attrs['dt'] = self.seismo_win['dt']
+                                fio.attrs['t0'] = self.seismo_win['t0']
+                                fio.attrs['npts'] = self.seismo_win['npts']
                             
-                            dsetname = tr.knetwk + "." + tr.kstnm + "." + tr.kcmpnm
-                            fio.create_dataset(dsetname,shape=tr.data.shape,dtype='f4')
-                            fio[dsetname][:] = tr.data 
+                            dsetname = datfiles[i].split("/")[-1].replace(".dat."+tag,"")
+                            fio.create_dataset(dsetname,shape=trace_win.shape,dtype='f4')
+                            fio[dsetname][:] = trace_win[:]
                         
                         # close 
                         fio.close()

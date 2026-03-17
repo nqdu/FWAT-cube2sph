@@ -48,110 +48,113 @@ import subprocess
 from mpi4py import MPI
 import h5py
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--fn_matrix', dest='fn_matrix', type=str, metavar='FN_MATRIX')
-parser.add_argument('--rotate', dest='rotate', type=str, metavar='ROTATE')
-parser.add_argument('--from_dir', dest='from_dir', type=str, metavar='FROM_DIR')
-parser.add_argument('--from_template', dest='from_template', type=str, metavar='FROM_TEMPLATE')
-parser.add_argument('--to_dir', dest='to_dir', type=str, metavar='TO_DIR')
-parser.add_argument('--to_template', dest='to_template', type=str, metavar='TO_TEMPLATE')
-#parser.add_argument('--nsteps', dest='nsteps', type=int, metavar='NSTEPS')
-args = parser.parse_args()
-#print(args)
+def rotate_seismogram(argv=None):
+    example_test = "python rotate_seismogram.py --fn_matrix=\"rotation_nu\" --rotate=\"XYZ->NEZ\" --from_dir=\"OUTPUT_FILES\" --to_dir=\"OUTPUT_FILES_sph\" --from_template='${nt}.${sta}.BX${comp}.semd' --to_template='${nt}.${sta}.BX${comp}.sem.ascii'"
 
-#--MPI-
-comm = MPI.COMM_WORLD
-myrank = comm.Get_rank()
-nproc = comm.Get_size()
+    parser = argparse.ArgumentParser(epilog=example_test)
+    parser.add_argument('--fn_matrix', dest='fn_matrix', type=str, metavar='FN_MATRIX')
+    parser.add_argument('--rotate', dest='rotate', type=str, metavar='ROTATE')
+    parser.add_argument('--from_dir', dest='from_dir', type=str, metavar='FROM_DIR')
+    parser.add_argument('--from_template', dest='from_template', type=str, metavar='FROM_TEMPLATE')
+    parser.add_argument('--to_dir', dest='to_dir', type=str, metavar='TO_DIR')
+    parser.add_argument('--to_template', dest='to_template', type=str, metavar='TO_TEMPLATE')
+    #parser.add_argument('--nsteps', dest='nsteps', type=int, metavar='NSTEPS')
+    args = parser.parse_args(argv)
+    #print(args)
 
-fn_matrix = args.fn_matrix
-rotate = args.rotate
-from_dir = args.from_dir
-from_template = Template(args.from_template)
-to_dir = args.to_dir
-to_template = Template(args.to_template)
+    #--MPI-
+    comm = MPI.COMM_WORLD
+    myrank = comm.Get_rank()
+    nproc = comm.Get_size()
 
-comp_left = rotate[0:3]
-comp_right = rotate[5:8]
-if (rotate[3:5] == '->'):
-    forward = True
-    from_comp, to_comp = comp_left, comp_right
-elif (rotate[3:5] == '<-'):
-    forward = False
-    from_comp, to_comp = comp_right, comp_left
-else:
-    raise ValueError('invalid rotate parameter')
+    fn_matrix = args.fn_matrix
+    rotate = args.rotate
+    from_dir = args.from_dir
+    from_template = Template(args.from_template)
+    to_dir = args.to_dir
+    to_template = Template(args.to_template)
 
-# open h5py
-fio = h5py.File(from_dir + "/seismograms.h5","r")
-
-#arr = np.zeros(shape(nsteps, 2), dtype=float)
-nu = np.zeros(shape=(3,3), dtype=float)
-with open(fn_matrix, 'r') as rot_sta:
-    lines = rot_sta.readlines()
-
-
-nrec = len(lines)//4
-nrec_local = nrec // nproc
-if (myrank < (nrec % nproc)): nrec_local = nrec_local + 1
-for i_sta_local in range(0, nrec_local):
-    i_sta = i_sta_local * nproc + myrank
-    line_segs = lines[i_sta*4].strip().split(' ')
-    line_segs = [_ for _ in line_segs if _ != '']
-    nt = line_segs[0]
-    sta = line_segs[1]
-    for i_comp in range(0, 3):
-        line_segs = lines[i_sta*4+i_comp+1].strip().split(' ')
-        line_segs = [_ for _ in line_segs if _ != '']
-        nu[i_comp,0] = float(line_segs[0])
-        nu[i_comp,1] = float(line_segs[1])
-        nu[i_comp,2] = float(line_segs[2])
-    missing_file = False
-    nstep = -1
-    for i_comp in range(0, 3):
-        if (from_comp[i_comp] == '0'):
-            continue 
-        dname = from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp])
-        if dname not in fio.keys():
-        # fn = os.path.join(from_dir, 
-        #         from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp]))
-        # if (not os.path.isfile(fn)):
-        #     #print(fn)
-            print(f"{dname} does not exist but required by rotation, skipping this station")
-            #os.system(f"wc -l {fn}")
-            missing_file = True
-            break
-        if (nstep < 0):
-            nstep = fio[dname].shape[0]
-    if (missing_file):
-        continue
-    seis = np.zeros(shape=(nstep, 3), dtype=float)
-    for i_comp in range(0, 3):
-        if (from_comp[i_comp] == '0'):
-            continue
-        dname = from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp])
-        #print(f"reading from {fn}")
-        arr = fio[dname][:]
-        seis[:,i_comp] = arr[:,1]
-
-    if (forward):
-        seis = np.matmul(seis, np.transpose(nu))
+    comp_left = rotate[0:3]
+    comp_right = rotate[5:8]
+    if (rotate[3:5] == '->'):
+        forward = True
+        from_comp, to_comp = comp_left, comp_right
+    elif (rotate[3:5] == '<-'):
+        forward = False
+        from_comp, to_comp = comp_right, comp_left
     else:
-        seis = np.matmul(seis, nu)
-  
-  #print(seis.shape)
+        raise ValueError('invalid rotate parameter')
 
-    for i_comp in range(0, 3):
-        if (to_comp[i_comp] == '0'):
+    # open h5py
+    fio = h5py.File(from_dir + "/seismograms.h5","r")
+
+    #arr = np.zeros(shape(nsteps, 2), dtype=float)
+    nu = np.zeros(shape=(3,3), dtype=float)
+    with open(fn_matrix, 'r') as rot_sta:
+        lines = rot_sta.readlines()
+
+
+    nrec = len(lines)//4
+    nrec_local = nrec // nproc
+    if (myrank < (nrec % nproc)): nrec_local = nrec_local + 1
+    for i_sta_local in range(0, nrec_local):
+        i_sta = i_sta_local * nproc + myrank
+        line_segs = lines[i_sta*4].strip().split(' ')
+        line_segs = [_ for _ in line_segs if _ != '']
+        nt = line_segs[0]
+        sta = line_segs[1]
+        for i_comp in range(0, 3):
+            line_segs = lines[i_sta*4+i_comp+1].strip().split(' ')
+            line_segs = [_ for _ in line_segs if _ != '']
+            nu[i_comp,0] = float(line_segs[0])
+            nu[i_comp,1] = float(line_segs[1])
+            nu[i_comp,2] = float(line_segs[2])
+        missing_file = False
+        nstep = -1
+        for i_comp in range(0, 3):
+            if (from_comp[i_comp] == '0'):
+                continue 
+            dname = from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp])
+            if dname not in fio.keys():
+            # fn = os.path.join(from_dir, 
+            #         from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp]))
+            # if (not os.path.isfile(fn)):
+            #     #print(fn)
+                print(f"{dname} does not exist but required by rotation, skipping this station")
+                #os.system(f"wc -l {fn}")
+                missing_file = True
+                break
+            if (nstep < 0):
+                nstep = fio[dname].shape[0]
+        if (missing_file):
             continue
-        fn = os.path.join(to_dir, 
-                to_template.substitute(nt=nt, sta=sta, comp=to_comp[i_comp]))
-        #print(fn)
-        arr[:,1] = seis[:,i_comp]
-        #print(f"writing to ${fn}")
-        np.savetxt(fname=fn, X=arr, fmt='%11.6f%19.7E')
+        seis = np.zeros(shape=(nstep, 3), dtype=float)
+        for i_comp in range(0, 3):
+            if (from_comp[i_comp] == '0'):
+                continue
+            dname = from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp])
+            #print(f"reading from {fn}")
+            arr = fio[dname][:]
+            seis[:,i_comp] = arr[:,1]
 
-comm.barrier()
-fio.close()
-         
-      
+        if (forward):
+            seis = np.matmul(seis, np.transpose(nu))
+        else:
+            seis = np.matmul(seis, nu)
+    
+    #print(seis.shape)
+
+        for i_comp in range(0, 3):
+            if (to_comp[i_comp] == '0'):
+                continue
+            fn = os.path.join(to_dir, 
+                    to_template.substitute(nt=nt, sta=sta, comp=to_comp[i_comp]))
+            #print(fn)
+            arr[:,1] = seis[:,i_comp]
+            #print(f"writing to ${fn}")
+            np.savetxt(fname=fn, X=arr, fmt='%11.6f%19.7E')
+
+    comm.barrier()
+    fio.close()
+            
+        

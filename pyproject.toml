@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fwat"
-version = "0.9.0"
+version = "0.10.0"
 description = "A CLI for fwat program"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -20,6 +20,9 @@ dependencies = [
     "pybind11-global"
 ]
 
+[project.optional-dependencies]
+test = ["pytest"]
+
 [project.scripts]
 fwat-main = "fwat.scripts.cli:main"
 fwat-model = "fwat.scripts.model:main"
@@ -27,3 +30,6 @@ fwat-utils = "fwat.scripts.utils:main"
 
 [tool.setuptools.packages.find]
 where = ["src/"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/test_utils.py"]

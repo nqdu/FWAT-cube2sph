@@ -358,11 +358,16 @@ class FwatModel:
             if self._kltype == 1: # vp,vs,rho,gcp,gsp
                 gcp = model_user[3,...]
                 gsp = model_user[4,...]
-                phi = 0.5 * np.arctan2(gsp,gcp)
                 g0p = np.hypot(gsp,gcp)
+
+                # phi are only in [-pi/2,pi/2]
+                phi = 0.5 * np.arctan2(gsp,gcp)
+                phi_deg = np.rad2deg(phi)
+                phi_deg = (phi_deg + 90.) % 180. - 90.
+                phi = np.deg2rad(phi_deg)
                 
                 # zero out phi when g0p < 1.0e-2
-                idx = g0p < 1.0e-2
+                idx = g0p < 1.0e-3
                 phi[idx] = 0.
 
                 # copy back to model_new
@@ -374,8 +379,13 @@ class FwatModel:
             elif self._kltype == 2: # vph,vpv,vsh,vsv,rho,eta,gcp,gsp
                 gcp = model_user[6,...]
                 gsp = model_user[7,...]
-                phi = 0.5 * np.arctan2(gsp,gcp)
                 g0p = np.hypot(gsp,gcp)
+
+                # phi are only in [-pi/2,pi/2]
+                phi = 0.5 * np.arctan2(gsp,gcp)
+                phi_deg = np.rad2deg(phi)
+                phi_deg = (phi_deg + 90.) % 180. - 90.
+                phi = np.deg2rad(phi_deg)
 
                 # zero out phi when g0p < 1.0e-2
                 idx = g0p < 1.0e-2
@@ -390,11 +400,16 @@ class FwatModel:
             elif self._kltype == 3: # vp,vs,rho,(vph-vpv)/vpv,(vsh-vsv)/vsv, eta,gcp,gsp
                 gcp = model_user[6,...]
                 gsp = model_user[7,...]
-                phi = 0.5 * np.arctan2(gsp,gcp)
                 g0p = np.hypot(gsp,gcp)
 
+                # phi are only in [-pi/2,pi/2]
+                phi = 0.5 * np.arctan2(gsp,gcp)
+                phi_deg = np.rad2deg(phi)
+                phi_deg = (phi_deg + 90.) % 180. - 90.
+                phi = np.deg2rad(phi_deg)
+
                 # zero out phi when g0p < 1.0e-2
-                idx = g0p < 1.0e-2
+                idx = g0p < 1.0e-3
                 phi[idx] = 0.
                 
                 # copy back to model_user
@@ -671,7 +686,26 @@ class FwatModel:
             exit(1)
 
         # mask part of the kernels
-        kl_usr[self._mask_vars,...] = 0.
+        kl_usr = self.mask_vector(kl_usr)
 
 
         return md_usr,kl_usr
+    
+    def mask_vector(self,kl:np.ndarray):
+        """
+        mask part of the kernels
+
+        Parameters
+        -------------
+        kl: np.ndarray
+            kernels for user defined model
+
+        Returns
+        -------------
+        kl_masked: np.ndarray
+            masked kernels for user defined model
+        """
+        kl_masked = kl * 1.
+        kl_masked[self._mask_vars,...] = 0.
+
+        return kl_masked

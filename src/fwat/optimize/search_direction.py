@@ -31,7 +31,7 @@ def get_model_grad(iter:int,nspec:int,M:FwatModel):
         # read kernel 
         filename = KERNEL_DIR + grad_list[i] + ".h5"
         fio = h5py.File(filename,"r")
-        ker_vec[i,:,:] = fio[str(myrank)][:].reshape(nspec,NGLL3)
+        ker_vec[i,:,:] = np.array(fio[str(myrank)]).reshape(nspec,NGLL3)
         fio.close()
 
         # read model
@@ -71,6 +71,23 @@ def compute_inner_dot(a,b,weights,jaco):
     return q_sum * c1 * c2 
 
 def get_lbfgs_direc(iter:int,paramfile:str,M:FwatModel):
+    """
+    get l-bfgs search direction
+
+    Parameters
+    ----------
+    iter : int
+        current iteration number
+    paramfile : str
+        lbfgs parameter file
+    M : FwatModel
+        FwatModel object
+
+    Returns
+    -------
+    direc : np.ndarray
+        search direction
+    """
 
     from fwat.optimize.libgll import get_gll_weights
 
@@ -115,7 +132,7 @@ def get_lbfgs_direc(iter:int,paramfile:str,M:FwatModel):
     with open(paramfile,"r") as f:
         pdict = yaml.safe_load(f)
 
-    # current search direction is -grad
+    # current get gradient descent search direction is -grad
     iter_start:int = pdict['iter_start']
 
     # get istore
@@ -155,7 +172,7 @@ def get_lbfgs_direc(iter:int,paramfile:str,M:FwatModel):
     filename += "/hess_kernel.h5"
     if myrank == 0: print(f"reading hess from {filename}")
     fio = h5py.File(filename,"r")
-    hess = fio[str(myrank)][:].reshape(nspec,NGLL3)
+    hess = np.array(fio[str(myrank)]).reshape(nspec,NGLL3)
     fio.close()
 
     # get hessian max
@@ -180,6 +197,7 @@ def get_lbfgs_direc(iter:int,paramfile:str,M:FwatModel):
         model0,grad0 = get_model_grad(istore,nspec,M)
         grad_diff = grad1 - grad0 
         model_diff = model1 - model0
+        model_diff = M.mask_vector(model_diff)
         b_sum = compute_inner_dot(grad_diff,r_vec,weights,jaco)
         b = p[istore] * b_sum 
 
@@ -219,6 +237,24 @@ def get_lbfgs_direc(iter:int,paramfile:str,M:FwatModel):
     return direc
 
 def get_sd_direction(iter:int,paramfile:str,M:FwatModel):
+    """
+    get steepest descent search direction
+
+    Parameters
+    ----------
+    iter : int
+        current iteration number
+    paramfile : str
+        lbfgs parameter file
+    M : FwatModel
+        FwatModel object
+
+    Returns
+    -------
+    direc : np.ndarray
+        search direction
+    """
+
     comm = MPI.COMM_WORLD
     myrank = comm.Get_rank()
 
@@ -233,7 +269,7 @@ def get_sd_direction(iter:int,paramfile:str,M:FwatModel):
     filename += "/hess_kernel.h5"
     if myrank == 0: print(f"reading hess from {filename}")
     fio = h5py.File(filename,"r")
-    hess = fio[str(myrank)][:].reshape(nspec,NGLL3)
+    hess = np.array(fio[str(myrank)]).reshape(nspec,NGLL3)
     fio.close()
 
     # get gradient
@@ -246,6 +282,16 @@ def get_sd_direction(iter:int,paramfile:str,M:FwatModel):
 
 
 def get_search_direction(iter:int,paramfile:str):
+    """
+    get search direction and save to disk
+
+    Parameters
+    ----------
+    iter : int
+        current iteration number
+    paramfile : str
+        lbfgs parameter file
+    """
 
     comm = MPI.COMM_WORLD
     myrank = comm.Get_rank()
