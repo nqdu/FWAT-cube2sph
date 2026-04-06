@@ -10,7 +10,7 @@ simulation:
   iter_wts: 0 
 
   # Normalization by gradient norm or misfit at iter_wts, if iter_wts >= 0
-  norm_type: 'misfit' # gradient or misfit
+  norm_type: 'gradient' # gradient or misfit
 
 
 # Measurements block, for computing adjoint source

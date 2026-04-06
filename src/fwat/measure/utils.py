@@ -183,6 +183,9 @@ def bandpass(
     from scipy import signal 
     assert type_ in ['hann','cos'], "type_ should be one of hann/cos"
 
+    # demean 
+    u = u - np.mean(u)
+
     # taper 
     func = _TAPER_ENTRY_POINT[type_]
     win = func(len(u),max_percentage)
@@ -216,7 +219,7 @@ def bandpass(
 
     return u1
 
-# diff function,central difference 1-st order 
+# diff function,central difference 2-nd order 
 def dif1(data,dt):
     n = len(data)
     data1 = np.zeros((n))

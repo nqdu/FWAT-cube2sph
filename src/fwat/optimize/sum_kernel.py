@@ -97,7 +97,7 @@ def get_summed_kernel(MODEL:str,simu_type:str) -> np.ndarray:
     nevts = srctxt.shape[0]
 
     for i in range(nkers):
-        if myrank == 0: print(f'sum {simu_type} kernel {grad_list_base[i]} for {MODEL}')
+        if myrank == 0: print(f'sum {simu_type}: {grad_list_base[i]} for {MODEL}')
         for ievt in range(nevts):
             # check if it's noise source
             if simu_type == 'noise':
@@ -123,9 +123,79 @@ def get_summed_kernel(MODEL:str,simu_type:str) -> np.ndarray:
 
     return grad_user
 
+def _get_grad_norm(MODEL:str,SIMU_TYPES:list[str],grad_user:np.ndarray) -> np.ndarray:
+    """
+    Compute the norm of the gradient for each simulation type.
+
+    Parameters
+    ----------
+    MODEL : str
+        current model name, e.g., M00.ls/M00
+    SIMU_TYPES : list[str]
+        List of simulation types, shape (nsims,).
+    grad_user : np.ndarray
+        User-defined gradient for this iteration, shape (nsims,nkers,ksize).
+
+    Returns
+    -------
+    gnorm : np.ndarray
+        Norm of the gradient for each simulation type, shape (nsims,)
+    """
+    # mpi rank
+    comm = MPI.COMM_WORLD
+    myrank = comm.Get_rank()
+
+    # get 3-D GLL weights
+    w = get_gll_weights()
+    NGLL3 = NGLL**3
+    wgll3d = np.zeros((NGLL3),dtype='f4')
+    for k in range(NGLL):
+        for j in range(NGLL):
+            for i in range(NGLL):
+                wgll3d[k*NGLL*NGLL+j*NGLL+i] = w[i] * w[j] * w[k]
+    
+    # read jacobian
+    # read nspec/nglob/ibool
+    iter_cur = int(MODEL.split('.')[0][1:])
+    filename = f'{OPT_DIR}/MODEL_M%02d'%(iter_cur) + '/proc%06d'%(myrank) + '_external_mesh.bin'
+    f = FortranIO(filename,"r")
+    nspec = f.read_record('i4')[0]
+    _ = f.read_record('i4')[0]
+    f.read_record('i4')
+    _= f.read_record('i4')
+    for _ in range(3):
+        f.read_record('f4')
+    f.read_record('i4') # irregular_element_number
+    f.read_record('f4')
+    f.read_record('f4')
+    for _ in range(9):
+        f.read_record('f4')
+    jaco = f.read_record('f4').reshape(nspec,NGLL3)
+    f.close()
+
+    # compute norm of the gradient for each simulation type, shape (nsims,)
+    nsims = grad_user.shape[0]
+    gnorm = np.zeros(nsims)
+    for i in range(nsims):
+        # compute |g|
+        nkers = grad_user.shape[1]
+        g0 = 0.
+        for j in range(nkers):
+            grad = grad_user[i,j,:].reshape(nspec,NGLL3)
+            g0 += compute_inner_dot(grad,grad,jaco,wgll3d)
+        g0_all = comm.allreduce(g0,MPI.SUM)
+        gnorm[i] = np.sqrt(g0_all)
+
+        # read events for this simu type
+        if myrank == 0:
+            s = SIMU_TYPES[i]
+            print(f"MODEL {MODEL}: Original |g| for simu type {s} = {gnorm[i]}")
+    
+    return gnorm
+
 def _get_normalized_weights(param:dict,MODEL:str, 
                         SIMU_TYPES:list[str], iter_cur:int,
-                        grad_user:np.ndarray) -> tuple[np.ndarray,bool]:
+                        gnorm:np.ndarray) -> tuple[np.ndarray,bool]:
     """
     compute adaptive weights for each simulation type based on the misfit of this iteration, only for multiple simu types, e.g., ["noise","tele"]
     chi = sum_i L_i(x) / L_i(x0) / |g_i(x0)| * w_i, and weights will be re-written as (w_i / L_i(x0) / |g_i(x0)|)
@@ -151,59 +221,45 @@ def _get_normalized_weights(param:dict,MODEL:str,
         whether the adaptive weights were successfully computed, if False, the caller should use the original weights from fwat.yaml
       
     """
-    nsim = len(SIMU_TYPES)
-    weights_usr = np.asarray(param['simulation']['weights'])
-    weights_type = np.ones(nsim)
-
+    # mpi info 
     comm = MPI.COMM_WORLD
     myrank = comm.Get_rank()
 
-    # check if we need to compute adaptive weights
-    iter_wts = param['simulation']['iter_wts']
-
     # sanity check
+    nsim = len(SIMU_TYPES)
+    iter_wts = param['simulation']['iter_wts']
     if iter_wts > iter_cur:
         if myrank == 0:
             print(f"ERROR! iter_wts = {iter_wts} > iter_cur = {iter_cur}, STOP PROGRAM!!!!")
         exit(1)
-    
     if nsim == 1:
-        weights_usr[:] = 1.
+        weights_usr = np.ones((nsim))
         return weights_usr, False
+    
+    # read weights in parameter file
+    weights_bak = np.array(param['simulation']['weights'])
 
+    # find if we have weights.txt in OPT_DIR
+    if os.path.exists(f'{OPT_DIR}/weights.txt'):
+        weights_usr = np.loadtxt(f'{OPT_DIR}/weights.txt')
+        # check if weights_usr has the same length as nsim
+        if len(weights_usr) != nsim:
+            if myrank == 0:
+                print(f"ERROR! weights.txt found but length {len(weights_usr)} != nsim {nsim}, \
+                     ignore weights.txt and use original weights from fwat.yaml")
+    else:
+        # not found
+        weights_usr = weights_bak.copy()
+
+
+    # return current weights_usr
     is_ls_model = 'ls' in MODEL
     if iter_wts < 0 or nsim == 1 or iter_wts < iter_cur or is_ls_model :
         return weights_usr, False
 
     # in this case iter_wts == iter_cur, we need to compute adaptive weights based on misfit of this iteration
-
-    # read things
-    # get weights
-    w = get_gll_weights()
-    NGLL3 = NGLL**3
-    wgll3d = np.zeros((NGLL3),dtype='f4')
-    for k in range(NGLL):
-        for j in range(NGLL):
-            for i in range(NGLL):
-                wgll3d[k*NGLL*NGLL+j*NGLL+i] = w[i] * w[j] * w[k]
-    
-    # read jacobian
-    # read nspec/nglob/ibool
-    filename = f'{OPT_DIR}/MODEL_M%02d'%(iter_wts) + '/proc%06d'%(myrank) + '_external_mesh.bin'
-    f = FortranIO(filename,"r")
-    nspec = f.read_record('i4')[0]
-    _ = f.read_record('i4')[0]
-    f.read_record('i4')
-    _= f.read_record('i4')
-    for _ in range(3):
-        f.read_record('f4')
-    f.read_record('i4') # irregular_element_number
-    f.read_record('f4')
-    f.read_record('f4')
-    for _ in range(9):
-        f.read_record('f4')
-    jaco = f.read_record('f4').reshape(nspec,NGLL3)
-    f.close()
+    # reset weights_usr to that in parameter file, weights will be re-computed based on misfit of this iteration
+    weights_usr = weights_bak.copy()
 
     # normalize type 
     norm_type = param['simulation']['norm_type']
@@ -211,40 +267,25 @@ def _get_normalized_weights(param:dict,MODEL:str,
     if myrank == 0:
         print(f"\ncompute adaptive weights based on norm_type = {norm_type}")
 
-    chi = np.zeros(nsim)
-    gnorm = np.zeros(nsim) 
-    for i,s in enumerate(SIMU_TYPES):
-        chi[i],_ = compute_misfit(MODEL,simu_type=s)
-        
-        # compute |g|
-        nkers = grad_user.shape[1]
-        g0 = 0.
-        for j in range(nkers):
-            grad = grad_user[i,j,:].reshape(nspec,NGLL3)
-            g0 += compute_inner_dot(grad,grad,jaco,wgll3d)
-        g0_all = comm.allreduce(g0,MPI.SUM)
-        gnorm[i] = np.sqrt(g0_all)
+    # init
+    chi = np.ones(nsim)
+    gnorminv = np.ones(nsim)
 
-        # read events for this simu type
-        if myrank == 0:
-            print(f"|g| for simu type {s} = {gnorm[i]}")
-
-    # normalize gnorm
-    gnorm_max = np.max(gnorm)
-    gnorminv = 1. / (gnorm / gnorm_max)
-    gnorminv = gnorminv / np.sum(gnorminv)
-
-    # compute weights
-    if norm_type == 'gradient':
-        chi[:] = 1.
+    if norm_type == 'misfit':
+        # compute misfit for each simulation type
+        for i,s in enumerate(SIMU_TYPES):
+            chi[i],_ = compute_misfit(MODEL,simu_type=s)
     else:
-        gnorminv[:] = 1.
+        # normalize gnorm
+        gnorm_max = np.max(gnorm)
+        gnorminv = 1. / (gnorm / gnorm_max)
+        gnorminv = gnorminv / np.sum(gnorminv)
 
     # update weights
     weights_type = weights_usr * gnorminv / chi 
     success = True
-    return weights_type, success
 
+    return weights_type, success
 
 def compute_hessian_kernel(iter_cur:int, SIMU_TYPES:list[str], weights_type:np.ndarray) -> np.ndarray:
     """
@@ -385,14 +426,23 @@ def run(argv):
     for i,s in enumerate(SIMU_TYPES):
         grad_user[i,...] = get_summed_kernel(MODEL,s)
 
+    # compute norm of the gradient for each simulation type
+    gnorm = _get_grad_norm(MODEL,SIMU_TYPES,grad_user)
+
     # open weights_file
-    weights_type, success = _get_normalized_weights(param,MODEL,SIMU_TYPES,iter_cur,grad_user)
+    weights_type, success = _get_normalized_weights(param,MODEL,SIMU_TYPES,iter_cur,gnorm)
     if success and myrank == 0:
         print(f"adaptive weights computed based on misfit of this iteration: {weights_type}")
-        param['simulation']['weights'] = weights_type.tolist()
-        with open(f"{PARAM_FILE}","w") as fio:
-            yaml.safe_dump(param,fio)
-    MPI.COMM_WORLD.Barrier()
+
+        # save it to FWAT_OPT_DIR
+        np.savetxt(f'{OPT_DIR}/weights.txt', weights_type)
+    comm.Barrier()
+
+    # print info about normalized grad
+    if myrank == 0:
+        for i,s in enumerate(SIMU_TYPES):
+            print(f"MODEL {MODEL}: Weighted |g| for simu type {s} = {gnorm[i] * weights_type[i]}")
+    comm.Barrier()
 
     # get weighted summed kernel
     grad_user_weighted = np.zeros((nkers,ksize),dtype=float)

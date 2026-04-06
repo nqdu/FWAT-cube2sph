@@ -13,6 +13,9 @@ run_wolfe () { # run wolfe line search
     chi=0.
     chi1=0.
 
+    # get weights
+    SIMU_WEIGHTS=(`cat ${FWAT_OPT_DIR}/weights.txt`)
+
     # for all simulation types, compute weighted misfits
     for((i=0;i<$nsimtypes;i++)); 
     do 
@@ -334,7 +337,6 @@ FLAG=`fwat-utils getparam flag ${LBFGS_FILE}`
 MODEL=M`echo "$iter" |awk '{printf "%02d",$1}'`
 PRECOND=`fwat-utils getparam ${FWAT_OPT_DIR}/PRECOND_TYPE`
 SIMU_TYPES=(`fwat-utils getparam simulation/types| tr -d '[]",'\'`)
-SIMU_WEIGHTS=(`fwat-utils getparam simulation/weights| tr -d '[]",'\'`)
 
 # create a hostfile to run mpi job if required
 GLOBAL_SLOTS="all_slots.txt"
