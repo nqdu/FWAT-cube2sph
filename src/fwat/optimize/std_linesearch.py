@@ -6,7 +6,7 @@ import h5py
 from typing import Final
 
 from fwat.optimize.libgll import get_gll_weights
-from fwat.optimize.model import FwatModel
+from fwat import FwatModel
 from fwat.optimize.search_direction import compute_inner_dot
 from fwat.const import PARAM_FILE,LBFGS_FILE,OPT_DIR,NGLL
 from fwat.FortranIO import FortranIO
@@ -65,55 +65,39 @@ def run(argv):
     f.close()
 
     # read search direction, grad, grad for linesearch
-    grad_list_base = M.get_grad_names()
+    grad_list_user = M.get_grad_names(base=False)
     direc_list = M.get_direc_names()
-    mod_list = M.get_model_names()
-    nker_base = len(grad_list_base)
-    nker = len(direc_list)
-    direc = np.zeros((nker,nspec,NGLL3),'f4')
-    grad_sub_base = np.zeros((nker_base,nspec,NGLL3),'f4')
-    grad_sub1_base = np.zeros((nker_base,nspec,NGLL3),'f4')
-    mod_sub_base = np.zeros((nker_base,nspec,NGLL3),'f4')
-    mod_sub1_base = np.zeros((nker_base,nspec,NGLL3),'f4')
+    nkers = len(grad_list_user)
+    assert nkers == len(direc_list), "number of kernels for gradient and search direction should be the same"
+
+    # allocate memory for gradient and search direction
+    grad_sub = np.zeros((nkers,nspec,NGLL3),'f4')
+    grad_sub1 = np.zeros((nkers,nspec,NGLL3),'f4')
+    direc = np.zeros((nkers,nspec,NGLL3),'f4')
 
     # read gradient and model
-    for i in range(nker_base):
+    for i in range(nkers):
         # read forward kernel 
-        filename = f"{KERNEL_DIR}/{grad_list_base[i]}.h5"
+        filename = f"{KERNEL_DIR}/{grad_list_user[i]}.h5"
         f = h5py.File(filename,"r")
         dset = f[str(myrank)]
-        grad_sub_base[i,...] = np.array(dset).reshape(nspec,NGLL3)
+        grad_sub[i,...] = np.array(dset).reshape(nspec,NGLL3)
         f.close()
-
-        # read model
-        filename = f"{MODEL_DIR}/proc%06d_{mod_list[i]}.bin" %(myrank)
-        fio = FortranIO(filename,"r")
-        mod_sub_base[i,...] = fio.read_record('f4').reshape(nspec,NGLL3)
-        fio.close()
 
         # kernel for line search
-        filename = f"{KERNEL_DIR}.ls/{grad_list_base[i]}.h5"
+        filename = f"{KERNEL_DIR}.ls/{grad_list_user[i]}.h5"
         f = h5py.File(filename,"r")
-        grad_sub1_base[i,...] = np.array(f[str(myrank)][:]).reshape(nspec,NGLL3)
+        dset = f[str(myrank)]
+        grad_sub1[i,...] = np.array(dset).reshape(nspec,NGLL3)
         f.close()
 
-        # read model for line search
-        filename = f"{MODEL_DIR}.ls/proc%06d_{mod_list[i]}.bin" %(myrank)
-        fio = FortranIO(filename,"r")
-        mod_sub1_base[i,...] = fio.read_record('f4').reshape(nspec,NGLL3)
-        fio.close()
-    
-    # convert to user defined model
-    _,grad_sub = M.convert_kl(mod_sub_base,grad_sub_base)
-    _,grad_sub1 = M.convert_kl(mod_sub1_base,grad_sub1_base)
-
     # read search direction
-    for i in range(nker):
+    for i in range(nkers):
         # search direction
         filename = f"{KERNEL_DIR}/{direc_list[i]}.h5"
         f = h5py.File(filename,"r")
         dset = f[str(myrank)]
-        direc[i,:] = np.array(dset).reshape(nspec,NGLL3)
+        direc[i,...] = np.array(dset).reshape(nspec,NGLL3)
         f.close()
 
     # initialize alpha_L/R if required
@@ -129,7 +113,7 @@ def run(argv):
     m2 = opt['M2']
     q = 0. 
     q1 = 0.
-    for i in range(nker):
+    for i in range(nkers):
         q += compute_inner_dot(grad_sub[i,:,:],direc[i,:,:],weights,jaco)
         q1 += compute_inner_dot(grad_sub1[i,:,:],direc[i,:,:],weights,jaco)
 

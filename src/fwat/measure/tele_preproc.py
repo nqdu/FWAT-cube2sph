@@ -64,7 +64,7 @@ class Tele_PreOP(FwatPreOP):
             evla=self.evla,evlo=self.evlo,
             evdp=self.evdp,stla=0.,
             stlo=0.,stel=0,lcalda=True,
-            delta = dt_syn
+            delta = dt_syn,isynth = 'irldta',
         )
 
         outdir = f"{self.DATA_DIR}/{evtid}"
@@ -248,7 +248,7 @@ class Tele_PreOP(FwatPreOP):
 
         # misfits
         ncomp = self.ncomp
-        stats_list = []
+        stats_list = [MeasureStats(adj_type='l2') for _ in range(nsta_loc*ncomp)]
 
         # glob arrays
         ncomp = self.ncomp
@@ -319,7 +319,7 @@ class Tele_PreOP(FwatPreOP):
                 stats.code = self._get_station_code(i,ic)
 
                 # save misfit stats
-                stats_list.append(stats)
+                stats_list[ir*ncomp+ic] = stats
 
                 # contributions on stf
                 adjsrc /= avgamp 
@@ -373,9 +373,6 @@ class Tele_PreOP(FwatPreOP):
         # allocate global arrays 
         nsta_loc = self.nsta_loc
 
-        # misfits
-        stats_list: list = []
-
         # read time shift by user if existed
         if os.path.isfile(f"{self.DATA_DIR}/{self.evtid}/cc_time.txt"):
             if self.myrank == 0:
@@ -410,6 +407,8 @@ class Tele_PreOP(FwatPreOP):
         nsta = self.nsta
         njobs = self.nsta * (self.nsta - 1) // 2
         kstart,kend = alloc_mpi_jobs(njobs,self.nprocs,self.myrank)
+        stats_list = [MeasureStats(adj_type='cc_time_dd') for _ in range(self.ncomp * (kend-kstart+1))]
+        icount = 0
         for ic in range(self.ncomp):
             for k in range(kstart,kend+1):
                 # get (i,j) pair from k
@@ -457,7 +456,9 @@ class Tele_PreOP(FwatPreOP):
                     tstart_i,tend_i,tstart_j,tend_j,dd_shift_ij
                 )
                 stats.code = f"{self._get_station_code(i,ic)}-{self._get_station_code(j,ic)}"
-                stats_list.append(stats)
+                # stats_list.append(stats)
+                stats_list[icount] = stats
+                icount += 1
 
                 # accumulate adjoint sources 
                 stride = self.ncomp * npt_syn
@@ -526,7 +527,7 @@ class Tele_PreOP(FwatPreOP):
         nsta_loc = self.nsta_loc
 
         # misfits
-        stats_list: list = []
+        stats_list: list = [MeasureStats(adj_type='cross-conv') for _ in range(nsta_loc)]
 
         # glob arrays
         glob_obs = self._process_all_seismograms(ib, type_='obs')
@@ -594,7 +595,7 @@ class Tele_PreOP(FwatPreOP):
                     tend,
                 )
             stats.code = f"{self.netwk[i]}.{self.stnm[i]}.cross-conv"
-            stats_list.append(stats)
+            stats_list[ir] = stats
         
 
             # filter adjoint source

@@ -291,6 +291,8 @@ class FwatPreOP:
 
             for ib in range(nb):
                 bandname = self._get_bandname(ib)
+                if self.myrank == 0 and ir == 0:
+                    print(f"processing band {bandname}, {ib+1} of {nb} ...")
                 input_dir = f"{self.syndir}/OUTPUT_FILES/{bandname}"
 
                 for ic,ch in enumerate(comps_read):

@@ -6,7 +6,7 @@ import yaml
 
 from fwat.const import OPT_DIR,NGLL
 from fwat.FortranIO import FortranIO
-from fwat.optimize.model import FwatModel
+from fwat import FwatModel
 
 NGLL3 = NGLL**3
 
@@ -15,39 +15,40 @@ def get_model_grad(iter:int,nspec:int,M:FwatModel):
     myrank = comm.Get_rank()
 
     # initialize
-    grad_list = M.get_grad_names(base=True)
+    grad_list = M.get_grad_names(base=False)
     mod_list = M.get_model_names()
-    nmod = len(grad_list)
+    nmod = len(mod_list)
+    nkers = len(grad_list)
     mod_vec = np.zeros((nmod,nspec,NGLL3),'f4')
-    ker_vec = np.zeros((nmod,nspec,NGLL3),'f4')
+    ker_vec = np.zeros((nkers,nspec,NGLL3),'f4')
 
     # print log info
     KERNEL_DIR = f'{OPT_DIR}/SUM_KERNELS_M%02d/'%(iter)
     MODEL_DIR = f'{OPT_DIR}/MODEL_M%02d/'%(iter)
     if myrank == 0: print('reading ',KERNEL_DIR,MODEL_DIR)
 
-    # reading model/kernels
+    # reading model
     for i in range(nmod):
-        # read kernel 
-        filename = KERNEL_DIR + grad_list[i] + ".h5"
-        fio = h5py.File(filename,"r")
-        ker_vec[i,:,:] = np.array(fio[str(myrank)]).reshape(nspec,NGLL3)
-        fio.close()
-
-        # read model
         filename = MODEL_DIR + "/proc%06d"%myrank + '_' + mod_list[i] + ".bin"
         f = FortranIO(filename,"r")
         mod_vec[i,:,:] = f.read_record('f4').reshape(nspec,NGLL3)
         f.close()
 
-    # convert kernel and model to required type
-    mod_vec1,ker_vec1 = M.convert_kl(mod_vec,ker_vec)
-    ker_vec1 = np.asarray(ker_vec1,dtype='f4')
+    # reading gradient
+    for i in range(nkers):
+        # read kernel 
+        filename = KERNEL_DIR + grad_list[i] + ".h5"
+        fio = h5py.File(filename,"r")
+        ker_vec[i,:,:] = np.array(fio[str(myrank)]).reshape(nspec,NGLL3)
+        fio.close()
+    
+    # convert model to user defined model
+    mod_vec1 = M.convert_model(mod_vec,False)
 
     # convert model to required optimzed type
     mod_vec1 = np.asarray(M.get_opt_model(mod_vec1),dtype='f4')
 
-    return mod_vec1,ker_vec1
+    return mod_vec1,ker_vec
 
 def compute_inner_dot(a,b,weights,jaco):
     """

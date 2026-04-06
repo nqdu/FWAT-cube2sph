@@ -4,6 +4,7 @@ from matplotlib.ticker import MaxNLocator
 import sys 
 import os
 from multiprocessing import Pool
+import argparse
 
 from fwat.const import PARAM_FILE
 
@@ -86,7 +87,7 @@ def plot_event(line:str,M1:str,solver:str,
             print(f"Plotting {evtid}, no. of stations = {len(names)} ...")
 
         # create figures
-        fig = plt.figure(1,figsize=(6,4))
+        fig = plt.figure(figsize=(6,4))
         ax1=fig.add_subplot(1,1,1)
 
         # time vector
@@ -133,7 +134,7 @@ def plot_event(line:str,M1:str,solver:str,
         ax1.legend(loc='upper left')
         fig.savefig(f"{outdir}/{evtid}_{comp}.{band}.jpg",dpi=300)
         fig.clear()
-        plt.close(1)
+        plt.close(fig)
 
         # close h5file
         fsyn.close()
@@ -142,13 +143,15 @@ def plot_event(line:str,M1:str,solver:str,
 
 
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: ./compare_tele.py model(M03)")
-        exit(1)
+    parser = argparse.ArgumentParser(description='Plot teleseismic traces for all events and stations.')
+    parser.add_argument('--model', type=str, required=True,help='Model name (e.g., M03)')
+    parser.add_argument("--comp", type=list, default=["ZZ"], help='Component(s) to plot (default: ["ZZ"])')
+    parser.add_argument("--path", type=str, default="../../", help='Path to the working directory (default: ../../)')
+    args = parser.parse_args()
     
     # set directory
-    path = "../../"
-    comp = ['ZZ','TT']
+    path = args.path
+    comp = args.comp
 
     #### stop here
 
@@ -158,7 +161,7 @@ def main():
     paramfile = f"{path}/{PARAM_FILE}"
 
     # read model name
-    M1 = sys.argv[1]
+    M1 = args.model
 
     # create directory
     seisdir = seisdir + "/" + M1

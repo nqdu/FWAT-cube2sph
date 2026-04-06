@@ -27,6 +27,7 @@ def nextpow2(n):
 def measure_adj_mt(obs, syn, t0, dt, npts, 
                    tstart, tend,
                    min_period, max_period,
+                   measure_type='cc',
                     return_type = 'dt',
                    tshift_min=-4.5, tshift_max=4.5,
                    dlna_min=-1.5, dlna_max=1.5,
@@ -54,6 +55,8 @@ def measure_adj_mt(obs, syn, t0, dt, npts,
         Start and end time of measurement window
     min_period, max_period : float
         Period band for measurements (seconds)
+    measure_type : str
+        Type of measurement to compute ('cc' for cross-correlation, 'mt' for multitaper)
     return_type : str
         Type of measurement to return ('dt' for time shift, 'am' for amplitude)
     tshift_min, tshift_max : float
@@ -93,8 +96,9 @@ def measure_adj_mt(obs, syn, t0, dt, npts,
     assert len(obs) == npts and len(syn) == npts, "Data length mismatch"
     assert tstart >= t0 and tend <= t0 + (npts-1)*dt, "Window out of bounds"
     
-    # Set imeas based on return_type if not specified
-    if return_type == 'dt':
+    # Set imeas based on measure_type if not specified
+    assert measure_type in ['cc', 'mt'], "Unsupported measure_type"
+    if measure_type == 'cc':
         imeas = 5  # Cross-correlation for traveltime
     else:
         imeas = 7  # Multitaper for amplitude
@@ -125,7 +129,8 @@ def measure_adj_mt(obs, syn, t0, dt, npts,
     )
     
     # Check CC quality
-    if cc_max < cc_min:
+    if cc_max < cc_min or dlna < dlna_min or dlna > dlna_max  \
+        or tshift < tshift_min or tshift > tshift_max:
         # Return zero adjoint if CC is too low
         window_chi = np.zeros(NCHI)
         window_chi[10] = sigma_dt_cc
@@ -133,16 +138,10 @@ def measure_adj_mt(obs, syn, t0, dt, npts,
         adj_src = np.zeros(npts)
         
         stats = MeasureStats(
-            adj_type='CC',
+            adj_type='cc',
             tshift=tshift
         )
         return stats, adj_src
-    
-    # Check if measurements are within bounds
-    if not (tshift_min <= tshift <= tshift_max):
-        print(f"Warning: tshift {tshift:.3f} outside [{tshift_min}, {tshift_max}]")
-    if not (dlna_min <= dlna <= dlna_max):
-        print(f"Warning: dlna {dlna:.3f} outside [{dlna_min}, {dlna_max}]")
     
     # Deconstruct data using CC measurements
     ishift = int(tshift / dt)
@@ -220,7 +219,7 @@ def measure_adj_mt(obs, syn, t0, dt, npts,
     adj_src = taper_all * adj_src_bp
 
     # CREATE MeasureStats object for output
-    adj_type = 'CC' if imeas == 5 else 'MT'
+    adj_type = 'cc' if imeas == 5 else 'mt'
     stats = MeasureStats(
         adj_type=adj_type,
         misfit=misfit,

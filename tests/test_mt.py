@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt 
 from fwat.measure.utils import bandpass,taper_window
 from fwat.adjoint.multitaper import measure_adj_mt
+#from fwat.adjoint.measure import measure_adj_my
 from fwat.measure.measure import measure_adj
 import time 
 
@@ -51,14 +52,18 @@ def main():
     tic = time.time()
     stats,adj = measure_adj_mt(
         obs,syn,t[0],dt,len(t),
-        tstart,tend,Tmin,Tmax)
+        tstart,tend,Tmin,Tmax,'cc')
+    # stats,adj = measure_adj_my(
+    #     obs,syn,t[0],dt,len(t),
+    #     tstart,tend,Tmin,Tmax,'cc')
     toc = time.time()
+    print(stats)
 
     print("elapsed time: ",toc-tic)
 
     # adjoint source by measure_adj
     tic = time.time()
-    stats_mt,adj_mt = measure_adj(0,dt,nt,0.,dt,nt,tstart,tend,5,
+    stats_mt,adj_mt = measure_adj(0,dt,nt,0.,dt,nt,tstart,tend,7,
                          Tmax,Tmin,False,obs,syn)
     toc = time.time()
     print("elapsed time: ",toc-tic)

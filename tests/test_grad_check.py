@@ -1,5 +1,5 @@
 import numpy as np
-from fwat.optimize.model import FwatModel
+from fwat import FwatModel
 
 
 

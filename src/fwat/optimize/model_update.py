@@ -5,7 +5,7 @@ from mpi4py import MPI
 
 from typing import Final
 
-from fwat.optimize.model import FwatModel
+from fwat import FwatModel
 from fwat.const import OPT_DIR,PARAM_FILE,LBFGS_FILE
 from fwat.FortranIO import FortranIO
 

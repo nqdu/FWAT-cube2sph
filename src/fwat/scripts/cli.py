@@ -44,10 +44,10 @@ def help_function():
     print("\texample: mpirun -np 4  fwat linesearch M06 10. 9.")
 
     print()
-    print("fwat-main sum_kernel evtfile iter_cur MODEL ")
+    print("fwat-main sum_kernel MODEL ")
     print("\tsum all kernels from current iteration write to MODEL")
     print("\tmpi should be enabled")
-    print("\texample: mpirun -np 4 fwat sum_kernel src_rec/sources.dat 0 M00.ls")
+    print("\texample: mpirun -np 4 fwat sum_kernel M00.ls")
 
     print()
     print("fwat-main rot_seismogram --fn_matrix FN_MATRIX --rotate ROTATE --from_dir FROM_DIR --from_template FROM_TEMPLATE --to_dir TO_DIR --to_template TO_TEMPLATE")

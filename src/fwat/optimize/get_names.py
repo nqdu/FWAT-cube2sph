@@ -1,4 +1,4 @@
-from fwat.optimize.model import FwatModel
+from fwat import FwatModel
 from fwat.const import PARAM_FILE
 
 

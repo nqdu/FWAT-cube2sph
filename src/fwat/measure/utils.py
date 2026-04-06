@@ -1,5 +1,6 @@
 import numpy as np 
 from fwat.const import PARAM_FILE
+from scipy.interpolate import CubicSpline
 
 def alloc_mpi_jobs(ntasks:int,nprocs:int,myrank:int) -> tuple[int,int]:
     sub_n = ntasks // nprocs
@@ -98,34 +99,60 @@ def interpolate_syn(
     
     """
     # taper input data if required
-    data1 = data * 1.
-    if max_percentage > 0.:
-        func = _TAPER_ENTRY_POINT[type_]
-        cos_tp = func(npt1,max_percentage)
-        data1 = data1 * cos_tp
+    #data1 = data * 1.
+    # if max_percentage > 0.:
+    #     func = _TAPER_ENTRY_POINT[type_]
+    #     cos_tp = func(npt1,max_percentage)
+    #     data1 = data1 * cos_tp
 
-    temp = np.zeros((npt2))
-    time = t2 + np.arange(npt2) * dt2 
-    idx = np.logical_and(time > t1,time < t1 + (npt1-2) * dt1)
-    ii = np.int64((time[idx] - t1) / dt1)
-    tt = time[idx] - (ii * dt1 + t1) 
-    temp[idx] = (data1[ii+1] - data1[ii]) * tt / dt1 + data1[ii]
+    # temp = np.zeros((npt2))
+    # time = t2 + np.arange(npt2) * dt2 
+    # idx = np.logical_and(time > t1,time < t1 + (npt1-2) * dt1)
+    # ii = np.int64((time[idx] - t1) / dt1)
+    # tt = time[idx] - (ii * dt1 + t1) 
+    # temp[idx] = (data1[ii+1] - data1[ii]) * tt / dt1 + data1[ii]
+
+    time1 = t1 + np.arange(npt1) * dt1
+    time2 = t2 + np.arange(npt2) * dt2
+    cs = CubicSpline(time1,data,extrapolate=False)
+    temp = cs(time2)
+
+    # remove NaN values at the beginning and end, if any, by tapering
+    np.nan_to_num(temp, copy=False, nan=0.0)
+
     
     return temp
 
+def detrend_sac(data: np.ndarray) -> np.ndarray:
+    """
+    SAC-like detrending adn demeaning of a 1D signal.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Input 1D signal to be detrended
+
+    Returns
+    -------
+    np.ndarray
+        The detrended signal.
+    """
+    from scipy import signal 
+    data1 = data - np.mean(data)
+    data1 = signal.detrend(data,type='linear')
+
+    return data1
 
 def bandpass(
         u: np.ndarray, 
         dt: float, freqmin: float, freqmax: float, 
         max_percentage: float = 0.05, type_: str = 'hann') -> np.ndarray:
     """
-    Apply a SAC-like bandpass filter with pre-processing to a 1D signal.
+    Apply a bandpass filter with tapering to a 1D signal.
 
     This function performs the following steps:
-        1. Detrends and demeans the input signal to remove linear trends and DC offset.
-        2. Applies a Hann taper to the signal to reduce edge effects.
-        3. Applies a zero-phase Butterworth bandpass filter between `freqmin` and `freqmax`.
-        4. taper again to reduce edge effects after filtering.
+        1. Applies a Hann taper to the signal to reduce edge effects.
+        2. Applies a zero-phase Butterworth bandpass filter between `freqmin` and `freqmax`.
 
     Parameters
     ----------
@@ -156,14 +183,12 @@ def bandpass(
     from scipy import signal 
     assert type_ in ['hann','cos'], "type_ should be one of hann/cos"
 
-    # detrend/demean
-    u1 = u - np.mean(u)
-    u1 = signal.detrend(u1,type='linear')
-
     # taper 
     func = _TAPER_ENTRY_POINT[type_]
-    win = func(len(u1),max_percentage)
-    u1 = u1 * win
+    win = func(len(u),max_percentage)
+
+    # taper 
+    u1 = u * win
 
     # check if Nyquist freq is ok
     nyq = 0.5 / dt
@@ -188,10 +213,6 @@ def bandpass(
     sos = signal.butter(4, [freqmin,freqmax], btype='bandpass', fs=1.0/dt, output='sos')
     u1 = signal.sosfiltfilt(sos, u1)
     u1 = u1[startidx:endidx+1]
-
-    # taper again
-    win = func(len(u1),max_percentage * 0.5)
-    u1 = u1 * win
 
     return u1
 

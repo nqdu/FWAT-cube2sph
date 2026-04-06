@@ -289,6 +289,7 @@ def measure_adj_cc(obs,syn,t0,dt,nt,
 
     # data selection
     misfit_flag = 1.
+    tshift_bak = tshift * 1.
     if tshift < tshift_min or tshift > tshift_max or  \
         cc_coef < cc_min or dlna < dlna_min or dlna > dlna_max:
         tshift = 0.
@@ -333,7 +334,7 @@ def measure_adj_cc(obs,syn,t0,dt,nt,
         tend = tend,
         tr_chi = tr_chi,
         am_chi = am_chi,
-        tshift = tshift
+        tshift = tshift_bak
     )
 
     return stats,adjsrc

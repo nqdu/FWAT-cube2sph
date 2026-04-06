@@ -5,15 +5,19 @@ import os
 from fwat.const import SRC_REC, MISFIT
 import glob
 
+import argparse
+
 # Get max iteration from command line argument
 def main():
-    if len(sys.argv) != 3:
-        print("Usage: python plot_noise_misfit.py simu_type max_iteration ")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description='Plot misfit for each iteration.')
+    parser.add_argument('--simu_type', type=str, required=True,help='Simulation type (e.g., tele, noise)')
+    parser.add_argument('--max_iter', type=int, required=True, help='Maximum iteration number (e.g., 0, 1, 2, ...)')
+    parser.add_argument("--path", type=str, default="../../", help='Path to the working directory (default: ../../)')
+    args = parser.parse_args()
 
-    simu_type = sys.argv[1]
-    max_iter = int(sys.argv[2])
-    path = "../.."
+    simu_type = args.simu_type
+    max_iter = args.max_iter
+    path = args.path
     # Read parameter file to get period bands
 
     # Get event list
@@ -22,7 +26,7 @@ def main():
     all_bands_by_iter = {}  # Store bands available at each iteration
     for iter_num in range(0, max_iter + 1):
         mod = f"M{iter_num:02d}"
-        pattern = f"../../{MISFIT}/{mod}/{evts[0]}_*_{simu_type}_window_chi"
+        pattern = f"{path}/{MISFIT}/{mod}/{evts[0]}_*_{simu_type}_window_chi"
         files = glob.glob(pattern)
         # Extract band names from filenames
         bands_at_iter = []
@@ -62,9 +66,9 @@ def main():
             sumn = 0
             
             for ievt in range(len(evts)):
-                filename = f"../../{MISFIT}/{mod}/{evts[ievt]}_{band}_{simu_type}_window_chi"
+                filename = f"{path}/{MISFIT}/{mod}/{evts[ievt]}_{band}_{simu_type}_window_chi"
                 if os.path.exists(filename):
-                    d = np.loadtxt(filename, usecols=28, ndmin=2)
+                    d = np.loadtxt(filename, usecols=-1, ndmin=2)
                     chi = np.sum(d[:, 0])
                     if not np.isnan(chi):
                         sumf += chi
@@ -110,7 +114,7 @@ def main():
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(f'noise_misfit.png', dpi=300, bbox_inches='tight')
+    plt.savefig(f'misfit.png', dpi=300, bbox_inches='tight')
 
 if __name__ == "__main__":
     main()

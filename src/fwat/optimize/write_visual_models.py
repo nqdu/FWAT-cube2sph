@@ -1,6 +1,6 @@
 import numpy as np 
 from fwat.FortranIO import FortranIO
-from fwat.optimize.model import FwatModel
+from fwat import FwatModel
 import glob
 
 def run(argv):
