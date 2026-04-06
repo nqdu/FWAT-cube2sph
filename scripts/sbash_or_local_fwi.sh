@@ -113,6 +113,9 @@ run_measure()
   local iter=$1
   local NPROCS_TOTAL=$2
 
+  # get all simulation types
+  local SIMU_TYPES=(`fwat-utils getparam simulation/types|tr -d '[]",'\'`)
+
   # check copy all events and simutype into arrays
   local evtid_list=()
   local simu_type_list=()

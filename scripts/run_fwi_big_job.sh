@@ -68,7 +68,7 @@ chmod +x $fwd
 
 # submit job
 if [ "$PLATFORM"  == "local"  ]; then 
-  ./$fwd $max_iter
+  ./$fwd $NPROCS_TOTAL $max_iter
 elif [ "$PLATFORM"  == "slurm"  ]; then 
   sbatch $fwd $max_iter
 elif [ "$PLATFORM"  == "pbs"  ]; then 
