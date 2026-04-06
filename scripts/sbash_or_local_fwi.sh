@@ -12,7 +12,7 @@ run_one_simu_() {
   # check if we are in slurm
   local hostfile=""
   local my_hostfile="$work_dir/hostfile_${evtid}.txt"
-  if [ -n "$SLURM_JOB_ID" ]; then
+  if [ -n "$SLURM_JOB_ID" ] || [ -n "$PBS_JOBID" ]; then
     hostfile="--hostfile $my_hostfile"
 
     # atomic checkout of cores 
@@ -102,7 +102,7 @@ run_one_simu_() {
   echo " " >> $fwd
 
   # clean my hostfile
-  if [ -n "$SLURM_JOB_ID" ]; then
+  if [ -n "$SLURM_JOB_ID" ] || [ -n "$PBS_JOBID" ]; then
     flock -x "$GLOBAL_SLOTS" bash -c "cat '$my_hostfile' >> '$GLOBAL_SLOTS'"
     \rm "$my_hostfile"
   fi
@@ -168,8 +168,8 @@ run_measure()
   wait # wait for all jobs to finish
 }
 
-source module_env
-. parameters.sh
+source config.env
+source utils.sh
 
 # submit and get job id
 if [ "$PLATFORM"  == "local"  ]; then 
@@ -189,12 +189,17 @@ else
 
   GLOBAL_SLOTS="all_slots.txt"
   :> $GLOBAL_SLOTS
-  # Loop through each node name and append it 64 times
-  for node in $(scontrol show hostname $SLURM_JOB_NODELIST); do
-    for ((i=1; i<=$SLURM_NTASKS_PER_NODE; i++)); do
-        echo "$node" >> "$GLOBAL_SLOTS"
+
+  if [ "$PLATFORM" == "slurm" ]; then
+    # Loop through each node name and append it 64 times
+    for node in $(scontrol show hostname $SLURM_JOB_NODELIST); do
+      for ((i=1; i<=$SLURM_NTASKS_PER_NODE; i++)); do
+          echo "$node" >> "$GLOBAL_SLOTS"
+      done
     done
-  done
+  else # PBS
+    cat "$PBS_NODEFILE" >> "$GLOBAL_SLOTS"
+  fi
 fi
 
 # working directory
@@ -222,16 +227,16 @@ for ii in `seq 1 $max_iter`;do
     #exit 
     
     # sum kernels, get search direction, generate trial model 
-    bash sbash_postproc_kl.sh > LOG/POST.$iter.txt
+    #bash sbash_postproc_kl.sh > LOG/POST.$iter.txt
+    bash sbash_post.sh post > LOG/POST.$iter.txt
 
   elif [ $flag == "GRAD"  ];then 
     # get search direction, generate trial model 
-    bash sbash_postproc_kl.sh > LOG/POST.$iter.txt
+    bash sbash_post.sh post > LOG/POST.$iter.txt
 
   else  # line search
     run_measure $iter $NPROCS_TOTAL
-
-    bash sbash_wolfe.sh > LOG/WOLFE.$iter.txt
+    bash sbash_post.sh wolfe > LOG/WOLFE.$iter.txt
   fi
 
 done

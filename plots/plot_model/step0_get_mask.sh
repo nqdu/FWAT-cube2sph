@@ -35,6 +35,8 @@ else
   :> out.txt
 fi
 
+mkdir -p profiles
+
 # read back
 python << EOF
 import numpy as np

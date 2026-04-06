@@ -2,8 +2,8 @@
 # error flag
 set -e 
 
-source module_env
-. parameters.sh
+source config.env
+source utils.sh
 
 if [ "$#" -ne 1 ]; then
   echo "Usage: $0 sbash_measure simu_type"
@@ -19,6 +19,7 @@ NPROC=`grep ^"NPROC" DATA/Par_file.$simu_type | cut -d'=' -f2`
 SOURCE_FILE=${FWAT_SRC_REC}/sources.dat.$simu_type
 iter=`fwat-utils getparam iter ${LBFGS_FILE}`
 nevts=`awk 'END { print NR }' ${FWAT_SRC_REC}/sources.dat.$simu_type`
+SIMU_TYPES=(`fwat-utils getparam simulation/types| tr -d '[]",'\'`)
 
 # mod
 MODEL=M`printf %02d $iter`
@@ -103,11 +104,7 @@ for i in `seq 1 $NJOBS`; do
   echo "measure adjoint source for $evtid ..."
   cd $work_dir
   date
-  nproc_run=$NPROC 
-  if [ $nsta_used -lt $NPROC ]; then
-    nproc_run=$nsta_used
-  fi
-  $MPIRUN -np $nproc_run fwat-main measure $simu_type $iter $evtid $run_opt >> $fwd 
+  $MPIRUN -np $NPROC_MEASURE fwat-main measure $simu_type $iter $evtid $run_opt >> $fwd 
   date
 
   # adjoint simulation

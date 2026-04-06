@@ -16,6 +16,27 @@ if [ "$INTP_LS" == "1" ]; then
   lsflag=".ls"
 fi 
 
+get_plotting_range() {
+  local filename=$1
+  local info=`awk '{print $1,$2,$4}' $filename | gmt gmtinfo  -C`
+  local lonmin=`echo $info| awk '{print $1}'`
+  local lonmax=`echo $info| awk '{print $2}'`
+  local latmin=`echo $info| awk '{print $3}'`
+  local latmax=`echo $info| awk '{print $4}'`
+  local hmin=`echo $info| awk '{print $5}'`
+  local hmax=`echo $info| awk '{print $6}'`
+
+  local dlat=`echo "$latmin $latmax" | awk '{print ($2 - $1)}'`
+  local dlon=`echo "$lonmin $lonmax" | awk '{print ($2 - $1)}'`
+
+  local return_value="2 $latmin $latmax"
+  if (( $(echo "$dlat < $dlon" | bc -l) )); then 
+    return_value="1 $lonmin $lonmax"
+  fi
+
+  echo "$return_value $hmin $hmax"
+}
+
 # vertical 
 for param in $param_set; do 
 for iter in $run_indx; do 
@@ -54,18 +75,38 @@ for iter in $run_indx; do
     #   vmin=0
     #   vmax=0.05
     # fi
-    gmt makecpt -T$vmin/$vmax/50+n -Z -D -Cpolar -I > out.cpt
+    gmt makecpt -T$vmin/$vmax/50+n -Z -D -Cvik -I > out.cpt
     #gmt grd2cpt $filename -Z -D -Cpolar -I  > out.cpt
 
     # plot
     proj=-JX12c/6c
 
+    # check if we plot lat/lon 
+    info=`get_plotting_range profiles/topo.verti.$ip.txt`
+    rowid=`echo $info | awk '{print $1}'`
+    xmin1=`echo $info | awk '{print $2}'`
+    xmax1=`echo $info | awk '{print $3}'`
+    ymin1=`echo $info | awk '{print $4}'`
+    ymax1=`echo $info | awk '{print $5}'`
+    bounds1=-R$xmin1/$xmax1/$ymin1/$ymax1
+    if [ "$rowid" == "1" ]; then
+      awk '{print $1,$4}' profiles/topo.verti.$ip.txt > temp.txt 
+      tag="Longitude"
+    else 
+      awk '{print $2,$4}' profiles/topo.verti.$ip.txt > temp.txt 
+      tag="Latitude"
+    fi
     gmt begin pics/$param.diff.iter$idx.$name.$ip jpg 
-      gmt basemap $bounds $proj  -Bxaf+l"Distance,km" -Byaf+l"Depth,km" -BWSet
+
+      gmt basemap $bounds1 -JX12c/2c  -Bxaf+l"$tag" -Byaf+l"Elevation,m" -BWbrN -Y10c -X10c
+      gmt plot temp.txt -W1p,black 
+
+      gmt basemap $bounds $proj  -Bxaf+l"Distance,km" -Byaf+l"Depth,km" -BWSet -Y-6c
       gmt grdimage $filename -Cout.cpt -E200
       gmt colorbar -G$vmin/$vmax -Cout.cpt -Bxaf+l"$param"
     gmt end 
 
+    \rm temp.txt
   done 
 done
 done 
@@ -105,7 +146,7 @@ for iter in $run_indx; do
     vmax=$M
 
     echo $filename $vmin $vmax $vmin $vmax
-    gmt makecpt -T$vmin/$vmax/50+n -Z -D -Cpolar -I > out.cpt
+    gmt makecpt -T$vmin/$vmax/50+n -Z -D -Cvik -I > out.cpt
     #gmt grd2cpt $filename -Z -D -Cpolar -I  > out.cpt
 
     # plot

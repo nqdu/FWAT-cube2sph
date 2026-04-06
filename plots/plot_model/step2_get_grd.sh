@@ -22,6 +22,20 @@ echo "$param_set txt to grd ..."
 # make mask grd
 gmt xyz2grd profiles/mask.dat -Ggrdfiles/mask.grd -I256+n/256+n -R$LON0_H/$LON1_H/$LAT0_H/$LAT1_H
 
+# for vertical slice, get topography
+bounds=-R$LON0_H/$LON1_H/$LAT0_H/$LAT1_H
+gmt grdcut @earth_relief_30s -Ggrdfiles/topo.grd $bounds -Vq
+for ip in `seq 1 $NSLICE_VERTI`; do 
+  let ii=$p-1
+  lon0=${LON0_V[$ii]}
+  lon1=${LON1_V[$ii]}
+  lat0=${LAT0_V[$ii]}
+  lat1=${LAT1_V[$ii]}
+  python src/generate_gc.py $lon0 $lon1 $lat0 $lat1 300 profile.txt
+  gmt grdtrack profile.txt -Ggrdfiles/topo.grd > profiles/topo.verti.$ip.txt
+done 
+
+
 for param in $param_set ;do 
 for iter in $run_indx;do 
   ii=`printf %02d $iter`

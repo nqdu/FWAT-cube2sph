@@ -6,10 +6,10 @@ SHELL_HEADER_SEM(){
     cat << EOF
 #!/bin/bash
 EOF
-  else
-  local narray=$1
-  local stype=$2
-  local walltime=$3
+  elif [[ "$PLATFORM"  == "slurm" ]]; then
+    local narray=$1
+    local stype=$2
+    local walltime=$3
     cat << EOF
 #!/bin/bash
 #SBATCH --nodes=1
@@ -23,10 +23,28 @@ EOF
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=nanqiao.du@mail.utoronto.ca
 EOF
+  else 
+    # for PBS, we cannot specify job array like 1-1, it should be like 1-2,2
+    array_str="1-$narray"
+    if [[ "$narray" -eq 1 ]]; then
+      array_str="1-2,2"
+    fi
+    cat << EOF 
+#!/bin/bash -l
+#PBS -l nodes=1:ppn=192
+#PBS -l walltime=00:25:00
+#PBS -N FWD.$stype
+#PBS -J $array_str
+#PBS -q starq
+#PBS -j oe
+EOF
   fi
 }
+
 RUN_SEM()
 {
+  local SIMU_TYPES=(`fwat-utils getparam simulation/types|tr -d '[]",'\'`)
+  
   nsimtypes="${#SIMU_TYPES[@]}"
   for ((isim=0;isim<$nsimtypes;isim++)); 
   do 
@@ -56,16 +74,22 @@ RUN_SEM()
     # submit and get job id
     if [ "$PLATFORM"  == "local"  ]; then 
       bash $fwd $simu_type > LOG/FWD.$simu_type.0.txt
-    else 
+    elif [ "$PLATFORM"  == "slurm" ]; then
       sbatch $fwd $simu_type
+    else
+      qsub $fwd $simu_type
     fi
   done 
 }
 
 ######### USER PARAMETERS ###############
-source parameters.sh
+source config.env
+source utils.sh
+
+SANITY_CHECK
+
 
 # mkdir 
-mkdir -p misfits optimize solver LOG
+mkdir -p $FWAT_MISFIT $FWAT_OPT_DIR $FWAT_DATA_DIR $FWAT_SOLVER LOG
 
 RUN_SEM

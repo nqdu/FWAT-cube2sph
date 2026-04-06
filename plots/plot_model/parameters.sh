@@ -1,7 +1,7 @@
 #!/bin/bash
-specfem_dir="${HOME}/specfem3d-cube2sph/"
+specfem_dir="${HOME}/software/specfem3d-cube2sph/"
 cube2sph_dir=$specfem_dir/utils/cube2sph/
-NPROC=80
+NPROC=192
 
 # horizontal slice
 NSLICE_HORIZ=1

@@ -34,8 +34,8 @@ EOF
   fi
 }
 
-source module_env 
-. parameters.sh
+source config.env
+source utils.sh
 
 # check input args 
 # submit and get job id
@@ -56,6 +56,9 @@ else
   NPROCS_PER_NODE=$2
   max_iter=$3
 fi
+
+# sanity check
+SANITY_CHECK
 
 # generate a temp file to submit job 
 fwd=tmp.fwi.sh 

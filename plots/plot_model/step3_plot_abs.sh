@@ -34,7 +34,7 @@ for iter in $run_indx; do
     vmin=`echo $info| awk '{print $6}'`
     vmax=`echo $info| awk '{print $7}'`
     echo $filename $vmin $vmax $vmin $vmax
-    gmt makecpt -T$vmin/$vmax/50+n -Z -D -Cpolar -I > out.cpt
+    gmt makecpt -T$vmin/$vmax/50+n -Z -D -Cseis > out.cpt
     #gmt grd2cpt $filename -Z -D -Cpolar -I  > out.cpt
 
     # plot
@@ -62,7 +62,7 @@ for iter in $run_indx; do
     vmin=`echo $info| awk '{print $6}'`
     vmax=`echo $info| awk '{print $7}'`
     echo $filename $vmin $vmax $vmin $vmax
-    gmt makecpt -T$vmin/$vmax/50+n -Z -D -Cpolar -I > out.cpt
+    gmt makecpt -T$vmin/$vmax/50+n -Z -D -Cseis > out.cpt
     #gmt grd2cpt $filename -Z -D -Cpolar -I  > out.cpt
 
     # plot
