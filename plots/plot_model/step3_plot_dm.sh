@@ -112,7 +112,7 @@ done
 done 
 
 
-# vertical 
+# horizontal
 for param in $param_set; do 
 for iter in $run_indx; do 
   if [ "$iter" == "0" ]; then 

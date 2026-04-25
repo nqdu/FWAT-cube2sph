@@ -114,7 +114,7 @@ def main():
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(f'misfit.png', dpi=300, bbox_inches='tight')
+    plt.savefig(f'{simu_type}_misfit.png', dpi=300, bbox_inches='tight')
 
 if __name__ == "__main__":
     main()

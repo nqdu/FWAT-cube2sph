@@ -55,13 +55,13 @@ def main():
         chi0 = 0.
         filenames = glob(f"{misfits}/{M1}/*_{band}_noise_window_chi")
         for i in range(len(filenames)):
-            temp = np.loadtxt(filenames[i],usecols=[5,-1])
+            temp = np.loadtxt(filenames[i],usecols=[5,-1],ndmin=2)
             idx = np.where(abs(temp[:,0]) > 1.0e-5)[0]
             data =  np.append(data,temp[idx,0])
             chi += np.sum(temp[:,-1])
         filenames = glob(f"{misfits}/{M0}/*_{band}_noise_window_chi")
         for i in range(len(filenames)):
-            temp = np.loadtxt(filenames[i],usecols=[5,-1])
+            temp = np.loadtxt(filenames[i],usecols=[5,-1],ndmin=2)
             idx = np.where(abs(temp[:,0]) > 1.0e-5)[0]
             data0 =  np.append(data0,temp[idx,0])
             chi0 += np.sum(temp[:,-1])
