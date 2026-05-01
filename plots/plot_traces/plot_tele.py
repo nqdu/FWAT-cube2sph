@@ -153,7 +153,7 @@ def plot_event(line:str,M1:str,M0:str,solver:str,outdir:str,band:str,
 def main():
     parser = argparse.ArgumentParser(description='Plot teleseismic traces for all events and stations.')
     parser.add_argument('--model', type=str, required=True,help='Model name (e.g., M03)')
-    parser.add_argument('--window',type=list, default=[5,45], help='Time window around the reference travel time (e.g., 5 45)')
+    parser.add_argument('--window',type=float,nargs="+", default=[10, 50], help='Time window around the reference travel time (e.g., 5 45)')
     parser.add_argument('--band', type=str, default="T005_T050", help='Period band for plotting (e.g., T005_T050)')
     parser.add_argument("--model0", type=str, default="M00", help='Initial model name for comparison (default: M00)')
     parser.add_argument("--path", type=str, default="../../", help='Path to the working directory (default: ../../)')

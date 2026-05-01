@@ -41,7 +41,11 @@ for iter in $run_indx;do
   ii=`printf %02d $iter`
   idx=${ii}${lsflag}
   for name in verti horiz; do 
-    nfiles=`ls input/ |grep $name.*.loc |wc -l`
+    if [ "$name" == "horiz" ]; then 
+      nfiles=$NSLICE_HORIZ
+    else
+      nfiles=$NSLICE_VERTI
+    fi
 
     for ip in `seq 1 $nfiles`; do
       

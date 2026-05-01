@@ -47,7 +47,7 @@ for iter in $run_indx; do
   ii=`printf %02d $iter`
   idx=${ii}${lsflag}
   name=verti
-  nfiles=`ls input/ |grep $name.*.loc |wc -l`
+  nfiles=$NSLICE_VERTI
   for ip in `seq 1 $nfiles`; do
     filename=grdfiles/$param.diff.iter$idx.$name.$ip.grd
     grdc=grdfiles/$param.iter$idx.$name.$ip.grd
@@ -96,6 +96,7 @@ for iter in $run_indx; do
       awk '{print $2,$4}' profiles/topo.verti.$ip.txt > temp.txt 
       tag="Latitude"
     fi
+    plot_name=`get_plot_latex_name d$param`
     gmt begin pics/$param.diff.iter$idx.$name.$ip jpg 
 
       gmt basemap $bounds1 -JX12c/2c  -Bxaf+l"$tag" -Byaf+l"Elevation,m" -BWbrN -Y10c -X10c
@@ -103,7 +104,7 @@ for iter in $run_indx; do
 
       gmt basemap $bounds $proj  -Bxaf+l"Distance,km" -Byaf+l"Depth,km" -BWSet -Y-6c
       gmt grdimage $filename -Cout.cpt -E200
-      gmt colorbar -G$vmin/$vmax -Cout.cpt -Bxaf+l"$param"
+      gmt colorbar -G$vmin/$vmax -Cout.cpt -Bxaf+l"$plot_name"
     gmt end 
 
     \rm temp.txt
@@ -121,7 +122,9 @@ for iter in $run_indx; do
   ii=`printf %02d $iter`
   idx=${ii}${lsflag}
   name=horiz
-  nfiles=`ls input/ |grep $name.*.loc |wc -l`
+  nfiles=$NSLICE_HORIZ
+  #nfiles=`ls input/ |grep $name.*.loc |wc -l`
+  
   for ip in `seq 1 $nfiles`; do
     filename=grdfiles/$param.diff.iter$idx.$name.$ip.grd
     grdc=grdfiles/$param.iter$idx.$name.$ip.grd
@@ -151,12 +154,12 @@ for iter in $run_indx; do
 
     # plot
     proj=-JM12c
-
+    plot_name=`get_plot_latex_name d$param`
     gmt begin pics/$param.diff.iter$idx.$name.$ip jpg
       gmt basemap $bounds $proj  -Bxaf+l"Distance,km" -Byaf+l"Depth,km" -BWSet
       gmt grdimage $filename -Cout.cpt -E200
       gmt coast -A200 -W1p,black
-      gmt colorbar -G$vmin/$vmax -Cout.cpt -Bxaf+l"$param"
+      gmt colorbar -G$vmin/$vmax -Cout.cpt -Bxaf+l"$plot_name"
     gmt end 
 
   done 

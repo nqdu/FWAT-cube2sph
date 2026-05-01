@@ -29,7 +29,11 @@ for iter in $run_indx;do
 
     for param in $param_set ;do 
     for name in horiz verti ;  do
-      nfiles=`ls input/ |grep $name.*.loc |wc -l`
+      if [ "$name" == "horiz" ]; then 
+        nfiles=$NSLICE_HORIZ
+      else
+        nfiles=$NSLICE_VERTI
+      fi
       for ip in `seq 1 $nfiles`; do
         # interpolate
         $specfem_dir/bin/xcreate_slice $param $workdir  $DATABASE_DIR \
@@ -53,7 +57,7 @@ for iter in $run_indx;do
   for evt in `ls ${WORK_PREFIX}${ii}${lsflag}/`;
   do
     name=horiz
-    nfiles=`ls input/ |grep $name.*.loc |wc -l`
+    nfiles=$NSLICE_HORIZ
     for ip in `seq 1 $nfiles`; do
     
       
@@ -65,7 +69,7 @@ for iter in $run_indx;do
     done
 
     name=verti
-    nfiles=`ls input/ |grep $name.*.loc |wc -l`
+    nfiles=$NSLICE_VERTI
     for ip in `seq 1 $nfiles`; do
       awk '{print $5,-$4/1000}' input/$name.$ip.txt > tmp.1 
       awk '{print $1}' $param.$evt.$name.$ip.$ii.out > tmp.2 

@@ -23,7 +23,7 @@
   },
 
   // Tame heavy features
-  "python.analysis.typeCheckingMode": "standard",        // or "off" for max speed
+  "python.analysis.typeCheckingMode": "standard",
   "python.analysis.autoImportCompletions": false,     // speeds up IntelliSense
   "python.analysis.useLibraryCodeForTypes": false,    // faster, less precise
   "python.analysis.indexing": false,                  // disable global indexing if startup is slow

@@ -166,15 +166,13 @@ def time_decon(u,w,dt,freqmax=None):
 
     dobs = uflt * 1.
     src_one = np.zeros((nt))
-    for i in range(1500):
+    for i in range(4500):
         if abs(d_error) < minderr: break
 
         #cuw = mycorrelate(dobs,wflt) * dt 
         cuw = correlate(dobs,wflt,'same') * dt 
         
         # fetch center
-        n = len(cuw)
-        n1 = int(10 / dt)
         idx = np.argmax(abs(cuw[:]))
         amp = cuw[idx] * invpow  / dt
         rf[idx] += amp

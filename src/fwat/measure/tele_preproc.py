@@ -76,14 +76,10 @@ class Tele_PreOP(FwatPreOP):
         # load stf for tele seismic events
         stf = np.zeros((ncomp,npt_syn))
         if self.adjsrc_type == 'l2': # only load stf for l2
-            for ib in range(len(self.Tmax)):
-                bandname = self._get_bandname(ib)
-                for ic in range(self.ncomp):
-                    ch = self.components[ic]
-                    tr = SACTrace.read(f'{self.SRC_REC}/stf_{ch}.sac.{bandname}_{evtid}')
-                    stf[ic,:] = stf[ic,:] + np.asarray(tr.data) 
-            # normalize stf by the number of frequency bands
-            stf /= len(self.Tmax)
+            for ic in range(self.ncomp):
+                ch = self.components[ic]
+                tr = SACTrace.read(f'{self.SRC_REC}/stf_{ch}.sac.{evtid}')
+                stf[ic,:] = np.asarray(tr.data) * 1.
         
         # loop every station to save sac
         for ir in range(self.nsta_loc):
@@ -256,7 +252,8 @@ class Tele_PreOP(FwatPreOP):
         glob_syn = self._process_all_seismograms(ib, type_='syn')
 
         # get source time function 
-        stf_names = [f'{self.SRC_REC}/stf_{ch}.sac.' + f"{bandname}" + f"_{self.evtid}" for ch in self.components]
+        #stf_names = [f'{self.SRC_REC}/stf_{ch}.sac.' + f"{bandname}" + f"_{self.evtid}" for ch in self.components]
+        stf_names = [f'{self.SRC_REC}/stf_{ch}.sac.{self.evtid}' for ch in self.components]
         has_stf_flag = True 
         for ic in range(ncomp):
             has_stf_flag = has_stf_flag and os.path.isfile(stf_names[ic])
@@ -353,6 +350,7 @@ class Tele_PreOP(FwatPreOP):
             frequency band index
         """
         from fwat.adjoint.cc_misfit import measure_adj_cc_dd
+        from mpi4py.typing import TargetSpec
 
         # get frequency band
         bandname = self._get_bandname(ib)
@@ -462,8 +460,10 @@ class Tele_PreOP(FwatPreOP):
 
                 # accumulate adjoint sources 
                 stride = self.ncomp * npt_syn
-                self._sh_adj_win.Accumulate(adj_i,target_rank=0,target=i*stride+ic*npt_syn,op=MPI.SUM)
-                self._sh_adj_win.Accumulate(adj_j,target_rank=0,target=j*stride+ic*npt_syn,op=MPI.SUM)
+                target1 = i*stride + ic*npt_syn
+                target2 = j*stride + ic*npt_syn
+                self._sh_adj_win.Accumulate(adj_i,target_rank=0,target=target1,op=MPI.SUM) # type: ignore
+                self._sh_adj_win.Accumulate(adj_j,target_rank=0,target=target2,op=MPI.SUM) # type: ignore
                 
         
         # merge adjoint sources from all procs
