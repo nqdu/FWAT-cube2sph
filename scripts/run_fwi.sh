@@ -125,8 +125,11 @@ RUN_SEM()
     # submit and get job id
     if [ "$PLATFORM"  == "local"  ]; then 
       bash $fwd $simu_type > LOG/ADJ.$flag.$simu_type.$iter.txt
-    else 
+    elif [ "$PLATFORM"  == "slurm" ]; then
       local jid=$(sbatch $fwd $simu_type |cut -d ' ' -f4 ) 
+      job_ids+=($jid)
+    else 
+      local jid=$(qsub $fwd | cut -d '.' -f1)
       job_ids+=($jid)
     fi
   done 
@@ -147,11 +150,17 @@ RUN_POST ()
   echo "post processing ..."
   if [[ "$PLATFORM"  == "local" ]];  then  
     bash $fwd post > LOG/POST.$iter.txt 
-  else 
+  elif [[ "$PLATFORM"  == "slurm" ]]; then
     if [ "$flag" == "GRAD" ]; then 
       job_post=$(sbatch $fwd post | cut -d ' ' -f4)
     else 
       job_post=$(sbatch --dependency=afterok:${job_adj} $fwd  post | cut -d ' ' -f4)
+    fi
+  else 
+    if [ "$flag" == "GRAD" ]; then 
+      job_post=$(qsub $fwd | cut -d '.' -f1)
+    else 
+      job_post=$(qsub -W depend=afterok:$job_adj $fwd | cut -d '.' -f1)
     fi
   fi 
 }
@@ -167,8 +176,10 @@ RUN_WOLFE () {
 
   if [[ "$PLATFORM"  == "local" ]];  then  
     bash $fwd wolfe > LOG/WOLFE.$iter.txt 
-  else 
+  elif [[ "$PLATFORM"  == "slurm" ]]; then
     job_post=$(sbatch --dependency=afterok:${job_adj} $fwd wolfe | cut -d ' ' -f4)
+  else 
+    job_post=$(qsub -W depend=afterok:$job_adj $fwd wolfe | cut -d '.' -f1)
   fi
 } 
 

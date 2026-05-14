@@ -493,26 +493,52 @@ fwat_data/$NAME_[RTZ]
 All of the following files are stored in `INSTALL_DIR` during installation.
 
 ### `config.env`
-Contains the environment module commands required to load dependencies on the cluster.
-- **`SEM_PATH`** – Path to the solver binary directory.  
-  Example:  
+Contains the shell environment setup and runtime options used by the workflow scripts.
+
+- Shell setup lines at the top of this file are executed before the workflow starts. Use them to load modules, source site-specific environment scripts, and export MPI or OpenMP variables required on your system.
+- **`SEM_PATH`** – Path to the SPECFEM solver directory. The scripts expect solver binaries such as `xspecfem3D`, `xsmooth_sem_sph_pde`, and `xgenerate_databases` under `$SEM_PATH/bin`.
+
+  Example:
   ```bash
-  SEM_PATH=~/specfem3d-cube2sph
+  SEM_PATH=~/software/specfem3d-cube2sph
   ```
-- **`MPIRUN`** – Command for running MPI jobs.  
-  Example:  
+- **`MPIRUN`** – Command used to launch MPI jobs.
+
+  Example:
   ```bash
   MPIRUN=mpirun
-
-- **`PLATFORM`** – Execution platform.  
-  Options:  
-  - `local` – Run locally.  
-  - `slurm` – Run on a SLURM-based cluster. 
-  - `pbs` – Run on a PBS-based cluster.  
   ```
-- **`NJOBS_PER_JOBARRAY`** – Number of jobs per job array for each simulation type. Should be with same length as the `simulation.types` in `fwat.yaml`.
+- **`NPROC_MEASURE`** – Number of MPI ranks used by the measurement step (`fwat-main measure`). This may differ from the number of solver ranks used by SPECFEM.
 
-  Example:  
+  Example:
+  ```bash
+  NPROC_MEASURE=16
+  ```
+- **`PLATFORM`** – Execution platform.
+  Options:
+  - `local` – Run locally.
+  - `slurm` – Run on a SLURM-based cluster.
+  - `pbs` – Run on a PBS-based cluster.
+
+  Example:
+  ```bash
+  PLATFORM="slurm"
+  ```
+- **`USE_IO_TMPDIR`** – If set to `1`, the measurement scripts stage temporary working files in node-local storage when available. Set it to `0` to keep all I/O in the run directory.
+
+  Example:
+  ```bash
+  USE_IO_TMPDIR=1
+  ```
+- **`IO_TMPDIR`** – Path to the node-local temporary directory used when `USE_IO_TMPDIR=1`. On SLURM systems this is commonly set to `$SLURM_TMPDIR`.
+
+  Example:
+  ```bash
+  IO_TMPDIR=$SLURM_TMPDIR
+  ```
+- **`NJOBS_PER_JOBARRAY`** – Number of jobs per job array for each simulation type. Its length must match `simulation.types` in `fwat.yaml` when running on `slurm` or `pbs`.
+
+  Example:
   ```bash
   NJOBS_PER_JOBARRAY=(1)
   ```

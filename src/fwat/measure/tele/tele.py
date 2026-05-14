@@ -157,7 +157,7 @@ def shift_data(u,dt,t0):
 
     return u_out 
 
-def seis_pca(stf_collect:np.ndarray):
+def seis_pca(stf_collect:np.ndarray,verbose=False):
     """
     compute stf by PCA method, which is the first principle component of stf_collect
     
@@ -165,6 +165,8 @@ def seis_pca(stf_collect:np.ndarray):
     ---------
     stf_collect: np.ndarray
         stf collected from all stations, shape(nsta,nt)
+    verbose: bool
+        whether to print eigenvalues and save the PCA components, default False
 
     Returns
     -------
@@ -187,6 +189,28 @@ def seis_pca(stf_collect:np.ndarray):
     idx = np.argsort(w)[::-1]
     w = w[idx]
     v = v[:,idx]
+
+    # save the first 10 components
+    if verbose:
+        print("PCA eigenvalues:")
+        for i in range(min(10,len(w))):
+            print(f"Component {i+1}: {w[i]:.4e} ({w[i]/np.sum(w)*100:.2f}%)")
+        
+        # save ratios
+        w_ratios = w / np.sum(w)
+        np.savetxt('pca_eigenvalues.txt', w_ratios)
+        data = np.zeros((len(w),nt),'f4')
+        for i in range(len(w)):
+            data[i,:] = rec.T @ v[:,i]
+            data[i,:] /= np.max(np.abs(data[i,:]))
+        
+        # save components
+        fio = open('pca_components.txt','w')
+        for it in range(nt):
+            for i in range(min(10,len(w))):
+                fio.write("%g " %(data[i,it]))
+            fio.write("\n")
+        fio.close()
 
     # first Principle component is what we need
     stf = (rec.T @ v[:,0]).real

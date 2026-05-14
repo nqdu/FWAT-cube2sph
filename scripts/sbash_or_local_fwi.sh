@@ -34,14 +34,24 @@ run_one_simu_() {
   for evtid_wk in $evtlist;
   do 
     evtdir=${FWAT_SOLVER}/$MODEL/$evtid_wk
-    cd $evtdir/
+    if [ "$USE_IO_TMPDIR" == "1" ]; then
+      mkdir -p $MYDIR/$evtdir
+      cp -r $evtdir/* $MYDIR/$evtdir/
+    fi
+
+    cd $MYDIR/$evtdir/
     echo ""
     echo "forward simulation for $evtid_wk `date` ..."
     $MPIRUN $hostfile -np $NPROC $SEM_PATH/bin/xspecfem3D
     echo "finished $evtid_wk at `date`"
 
     # copy output_solver.txt to output_solver.fwd.txt 
-    \cp OUTPUT_FILES/output_solver.txt OUTPUT_FILES/output_solver.fwd.txt
+    if [ "$USE_IO_TMPDIR" == "1" ]; then
+      \cp OUTPUT_FILES/seismograms.h5 $work_dir/$evtdir/OUTPUT_FILES/
+      \cp OUTPUT_FILES/output_solver.txt $work_dir/$evtdir/OUTPUT_FILES/output_solver.fwd.txt
+    else
+      \cp OUTPUT_FILES/output_solver.txt OUTPUT_FILES/output_solver.fwd.txt
+    fi
 
     # merge all seismograms to one big file
     echo " "
@@ -70,13 +80,19 @@ run_one_simu_() {
   for evtid_wk in $evtlist;
   do 
     evtdir=${FWAT_SOLVER}/$MODEL/$evtid_wk
-    cd $evtdir/
+    if [ "$USE_IO_TMPDIR" == "1" ]; then
+      \rm -rf $MYDIR/$evtdir/SEM
+      mv $work_dir/$evtdir/SEM $MYDIR/$evtdir/
+      \cp -r $work_dir/$evtdir/DATA/* $MYDIR/$evtdir/DATA/
+    fi
+
+    cd $MYDIR/$evtdir/
     echo ""
     echo "adjoint simulation for $evtid_wk at `date` ..."
     $MPIRUN $hostfile -np $NPROC $SEM_PATH/bin/xspecfem3D
     echo "finished adjoint for $evtid_wk at `date`"
     echo " "
-    cd $work_dir
+    cd $MYDIR
 
     # combine kernels
     mkdir -p $evtdir/GRADIENT
@@ -92,7 +108,19 @@ run_one_simu_() {
     echo ""
 
     # delete useless information
+    if [ "$USE_IO_TMPDIR" == "1" ]; then
+      fwat-utils clean $MODEL $evtid_wk
+    fi
+
+    cd $work_dir
     fwat-utils clean $MODEL $evtid_wk 
+    if [ "$USE_IO_TMPDIR" == "1" ]; then
+      \rm -rf $evtdir/GRADIENT/
+      mv $MYDIR/$evtdir/GRADIENT $evtdir/
+      \cp $MYDIR/$evtdir/OUTPUT_FILES/output_solver.txt $work_dir/$evtdir/OUTPUT_FILES/output_solver.adj.txt
+    else
+      \cp $evtdir/OUTPUT_FILES/output_solver.txt $work_dir/$evtdir/OUTPUT_FILES/output_solver.adj.txt
+    fi
   done
 
   # print flags
@@ -207,6 +235,22 @@ fi
 
 # working directory
 work_dir=`pwd`
+MYDIR=$work_dir
+if [ "$USE_IO_TMPDIR" == "1" ]; then
+  if [ -d "$IO_TMPDIR" ]; then
+    echo "working directory is $IO_TMPDIR"
+    job_tmp_id=${SLURM_JOB_ID:-$PBS_JOBID}
+    if [ -z "$job_tmp_id" ]; then
+      job_tmp_id=$$
+    fi
+    MYDIR=$IO_TMPDIR/$job_tmp_id
+    mkdir -p $MYDIR
+  else
+    echo "IO_TMPDIR is not available, disable USE_IO_TMPDIR"
+    USE_IO_TMPDIR=0
+    echo "working directory is current dir"
+  fi
+fi
 
 # create working directories
 mkdir -p misfits optimize solver LOG

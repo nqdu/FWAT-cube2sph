@@ -24,8 +24,8 @@ SIMU_TYPES=(`fwat-utils getparam simulation/types| tr -d '[]",'\'`)
 # mod
 MODEL=M`printf %02d $iter`
 
-# working directory
-work_dir=`pwd`
+# current directory
+curr_dir=`pwd`
 
 # assign job id
 TASK_ID=1
@@ -56,8 +56,26 @@ if [  "$FLAG" == "LS" ]; then
 fi
 :> $fwd
 
+# working dir is IO_TMPDIR when enabled and available
+MYDIR=$curr_dir
+if [ "$USE_IO_TMPDIR" == "1" ];  then
+  if [ -d "$IO_TMPDIR" ]; then
+    echo "working directory is $IO_TMPDIR"
+    if [ "$PLATFORM"  == "slurm" ];  then 
+      MYDIR=$IO_TMPDIR/$SLURM_JOB_ID
+    elif [ "$PLATFORM"  == "pbs" ];  then 
+      MYDIR=$IO_TMPDIR/$PBS_JOBID
+    fi
+    mkdir -p $MYDIR
+  else
+    echo "IO_TMPDIR is not available, disable USE_IO_TMPDIR"
+    USE_IO_TMPDIR=0
+    echo "working directory is current dir"
+  fi
+fi
+
 for i in `seq 1 $NJOBS`; do
-  cd $work_dir
+  cd $curr_dir
   ievt=`echo "($TASK_ID-1) * $NJOBS + $i" |bc`
   ievt_ed=`echo "($TASK_ID-1) * $NJOBS + $NJOBS" |bc`
 
@@ -76,12 +94,22 @@ for i in `seq 1 $NJOBS`; do
   evtlist=`cat LOG/.$simu_type-$iter-$evtid-$run_opt`
   \rm LOG/.$simu_type-$iter-$evtid-$run_opt
 
+  # copy fwat_params to MYDIR if using IO_TMPDIR
+  if [ "$USE_IO_TMPDIR" == "1" ]; then
+    cp -r $curr_dir/fwat_params $MYDIR/fwat_params
+  fi
+
   # run forward simulation
-  nsta_used=0
   for evtid_wk in $evtlist;
   do 
     evtdir=${FWAT_SOLVER}/$MODEL/$evtid_wk
-    cd $evtdir/
+    if [ "$USE_IO_TMPDIR" == "1" ]; then
+      mkdir -p $MYDIR/$evtdir
+      cp -r $evtdir/* $MYDIR/$evtdir/
+    fi
+
+    # go to working directory
+    cd $MYDIR/$evtdir/
     echo ""
     echo "forward simulation for $evtid_wk ..."
     date
@@ -93,16 +121,19 @@ for i in `seq 1 $NJOBS`; do
     echo "packing seismograms for $evtid_wk ..."
     fwat-main pack OUTPUT_FILES/seismograms.h5 OUTPUT_FILES/all_seismograms.*
     \rm -rf OUTPUT_FILES/all_seismograms.*
-    cd $work_dir
+    if [ "$USE_IO_TMPDIR" == "1" ]; then
+      \cp -r OUTPUT_FILES/seismograms.h5 $curr_dir/$evtdir/OUTPUT_FILES/
+    fi
+    \cp $MYDIR/$evtdir/OUTPUT_FILES/output_solver.txt $curr_dir/$evtdir/OUTPUT_FILES/output_solver.fwd.txt
 
-    # count stations used
-    nsta_used=`awk 'END{print NR}' $evtdir/DATA/STATIONS`
+    # go back to current dir 
+    cd $curr_dir
   done 
 
   # run measure
   echo ""
   echo "measure adjoint source for $evtid ..."
-  cd $work_dir
+  cd $curr_dir
   date
   $MPIRUN -np $NPROC_MEASURE fwat-main measure $simu_type $iter $evtid $run_opt >> $fwd 
   date
@@ -112,16 +143,24 @@ for i in `seq 1 $NJOBS`; do
   for evtid_wk in $evtlist;
   do 
     evtdir=${FWAT_SOLVER}/$MODEL/$evtid_wk
-    cd $evtdir/
+    if [ "$USE_IO_TMPDIR" == "1" ]; then
+      \rm -rf $MYDIR/$evtdir/SEM
+      mv $curr_dir/$evtdir/SEM $MYDIR/$evtdir/
+      \cp -r $curr_dir/$evtdir/DATA/* $MYDIR/$evtdir/DATA/
+      cd $MYDIR/$evtdir
+    fi
+
+    # go to working directory
+    cd $MYDIR/$evtdir
     echo ""
     echo "adjoint simulation for $evtid_wk ..."
     date
     $MPIRUN -np $NPROC $SEM_PATH/bin/xspecfem3D
     date
     echo " "
-    cd $work_dir
 
     # combine kernels
+    cd $MYDIR
     mkdir -p $evtdir/GRADIENT
     \rm -rf $evtdir/GRADIENT/*
     mv $evtdir/DATABASES_MPI/*_kernel.bin $evtdir/GRADIENT
@@ -135,7 +174,18 @@ for i in `seq 1 $NJOBS`; do
     echo ""
 
     # delete useless information
+    if [ "$USE_IO_TMPDIR" == "1" ]; then
+      fwat-utils clean $MODEL $evtid_wk 
+    fi
+
+    # copy back to solver dir
+    cd $curr_dir
     fwat-utils clean $MODEL $evtid_wk 
+    if [ "$USE_IO_TMPDIR" == "1" ]; then
+      \rm -rf $evtdir/GRADIENT/
+      mv $MYDIR/$evtdir/GRADIENT $evtdir/
+    fi
+    \cp $MYDIR/$evtdir/OUTPUT_FILES/output_solver.txt $curr_dir/$evtdir/OUTPUT_FILES/output_solver.adj.txt
   done
 
   # print flags
