@@ -1,3 +1,5 @@
+import os
+
 import numpy as np 
 from mpi4py import MPI
 from fwat.adjoint.MeasureStats import MeasureStats
@@ -126,13 +128,22 @@ class FwatPreOP:
         self.bazd = np.zeros((self.nsta))
 
         # read simulation info dt,t0,npts
-        fio = h5py.File(f"{self.syndir}/OUTPUT_FILES/seismograms.h5","r")
-        t = np.asarray(fio[list(fio.keys())[0]][:,0])
-        fio.close()
-        self.t0_syn = t[0]
-        self.dt_syn = t[1] - t[0]
-        self.npt_syn = len(t)
-        
+        if os.path.exists(f"{self.syndir}/OUTPUT_FILES/seismograms.h5"):
+            fio = h5py.File(f"{self.syndir}/OUTPUT_FILES/seismograms.h5","r")
+            t = np.asarray(fio[list(fio.keys())[0]][:,0])
+            fio.close()
+            self.t0_syn = t[0]
+            self.dt_syn = t[1] - t[0]
+            self.npt_syn = len(t)
+        else:
+            # open Par_file and read dt,t0,npts
+            from fwat.system.specfem import get_param
+            parfile = "DATA/Par_file.%s" %(measure_type)
+            self.t0_syn = 0.
+            self.dt_syn = float(get_param(parfile,"DT"))
+            self.npt_syn = int(get_param(parfile,"NSTEP"))
+
+            
         # allocate jobs for each proc 
         istart,iend = alloc_mpi_jobs(self.nsta,self.nprocs,self.myrank)
         self.nsta_loc = iend - istart + 1
@@ -291,6 +302,8 @@ class FwatPreOP:
 
             for ib in range(nb):
                 bandname = self._get_bandname(ib)
+                if self.myrank == 0 and ir == 0:
+                    print(f"processing band {bandname}, {ib+1} of {nb} ...")
                 input_dir = f"{self.syndir}/OUTPUT_FILES/{bandname}"
 
                 for ic,ch in enumerate(comps_read):

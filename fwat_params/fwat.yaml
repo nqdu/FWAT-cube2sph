@@ -2,6 +2,17 @@
 simulation:
   DUMP_WAVEFIELDS: True
 
+  types: ["noise"] # simulation types: noise/tele/sks/rf
+  weights: [1.] # weight for each simu type, used for multiple simu types, e.g., ["noise","tele"], [0.5,0.5]
+
+  # # < 0 NO ADAPTIVE WEIGHTS, >=0 use this iteration misfit to compute weights chi = \sum chi_i * w_i
+  # chi = \sum_i L_i(x) / L_i(x0) / |g_i(x0)| * w_i, and weights will be re-written as (w_i / L_i(x0) / |g_i(x0)|)
+  iter_wts: 0 
+
+  # Normalization by gradient norm or misfit at iter_wts, if iter_wts >= 0
+  norm_type: 'misfit' # gradient or misfit
+
+
 # Measurements block, for computing adjoint source
 measure:
   # tele seismic
@@ -28,6 +39,9 @@ measure:
       - [2.0,5.]
       - [2.0,5.]
     SNR_THRESHOLD: [0.,0.,0.,0.] # exclude data when SNR < SNR_THRESHOLD in a each band 
+    TSHIFT_MAX: [4.5,4.5,4.5,4.5] # exclude data when ABS(TSHIFT) > TSHIFT_MAX in a each band
+    DLNA_MAX: [1.5,1.5,1.5,1.5] # exclude data when ABS(DLNA) > DLNA_MAX in a each band
+    CC_MIN: [0.8,0.8,0.8,0.8] # exclude data when CC_COEF < CC_MIN in a each band
     USE_EGF: True   # if False, the input data is Cross-correlation, a negative derivative will be applied
     ADJ_SRC_NORM: False  # if true, the adjoint source will be normalized
     USE_NEAR_OFFSET: True # if FALSE, reset tstart

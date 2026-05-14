@@ -235,7 +235,8 @@ class RF_PreOP(FwatPreOP):
             evdp=self.evdp,stla=0.,
             stlo=0.,stel=0,lcalda=1,
             delta = dt_syn,
-            b=-self._tshift
+            b=-self._tshift,
+            isynth = 'irldta'
         )
 
         # time window 

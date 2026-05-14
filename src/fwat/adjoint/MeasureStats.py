@@ -21,3 +21,6 @@ class MeasureStats():
             am_chi=self.am_chi,
             tshift=self.tshift
         )
+    
+    def __str__(self) -> str:
+        return f"MeasureStats(adj_type={self.adj_type}, misfit={self.misfit}, tstart={self.tstart}, tend={self.tend}, code='{self.code}', tr_chi={self.tr_chi}, am_chi={self.am_chi}, tshift={self.tshift})"

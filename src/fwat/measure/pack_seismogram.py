@@ -48,7 +48,7 @@ def run(argv):
                     
                     fout.create_dataset(name,dtype='f4',shape=data.shape)
                         
-                    fout[name][:,:] = data[:,:]
+                    fout[name][:,:] = data[:,:].astype('f4')
 
         elif 'all_seismograms.ascii' in filename:
             # get how many components

@@ -88,6 +88,18 @@ def _get_window_by_group_vel(dist:float,vmin:float,vmax:float,Tmax:float,
 
     return win_b,win_e,tstart,tend
 
+def _get_default_values(key:str) -> float:
+    mydict = {
+        'tshift':4.5,
+        'dlna': 1.5,
+        'cc_min':0.8
+    }
+    
+    if key in mydict:
+        return mydict[key]
+    else:
+        raise ValueError(f"Key '{key}' not found in default values dictionary.")
+
 class NoiseMC_PreOP():
     def __init__(self, measure_type:str, iter:int, evtid:str, run_opt:int):
         # import packages
@@ -367,6 +379,25 @@ class NoiseMC_PreOP():
                          t0_inp,dt_inp,npt_cut,
                          ib:int,tstart:float,tend:float):
         
+
+        # get parameters 
+        tshift = _get_default_values('tshift')
+        cc_coef = _get_default_values('cc_min')
+        dlna = _get_default_values('dlna')
+
+        if 'TSHIFT_MAX' in self.pdict:
+            tshift1 = self.pdict['TSHIFT_MAX'][ib]
+            if tshift1 > 0:
+                tshift = tshift1 * 1.
+        if 'DLNA_MAX' in self.pdict:
+            dlna1 = self.pdict['DLNA_MAX'][ib]
+            if dlna1 > 0:
+                dlna = dlna1 * 1.
+        if 'CC_MIN' in self.pdict:
+            cc_min1 = self.pdict['CC_MIN'][ib]
+            if cc_min1 > 0:
+                cc_coef = cc_min1 * 1.
+        
         if self.adjsrc_type == 'exp_phase':
             from fwat.adjoint.exp_phase_misfit import measure_adj_exphase
             return measure_adj_exphase(
@@ -376,11 +407,15 @@ class NoiseMC_PreOP():
                         tstart,tend)
         elif self.adjsrc_type == 'cc_time':
             from fwat.adjoint.cc_misfit import measure_adj_cc
+
             return measure_adj_cc(
                         dat_inp,syn_inp,
                         t0_inp,dt_inp,npt_cut,
                         self.Tmin[ib],self.Tmax[ib],
-                        tstart,tend)
+                        tstart,tend,
+                        tshift_min=-tshift,tshift_max=tshift,
+                        dlna_min=-dlna,dlna_max=dlna,
+                        cc_min=cc_coef)
         else:
             from .measure import measure_adj
             imeas = int(self.adjsrc_type)
@@ -392,7 +427,12 @@ class NoiseMC_PreOP():
                         self.Tmax[ib]*1.01,
                         self.Tmin[ib]*0.99,
                         verbose,dat_inp,
-                        syn_inp)
+                        syn_inp,
+                        tshift_max=tshift,
+                        tshift_min=-tshift,
+                        dlna_max=dlna,
+                        dlna_min=-dlna,
+                        cc_min=cc_coef)
     
     def _cal_adj_by_name_dd(self,dat_inp_i,dat_inp_j,
                             syn_inp_i,syn_inp_j,
@@ -420,7 +460,8 @@ class NoiseMC_PreOP():
             evdp=self.evdp,stla=0.,
             stlo=0.,stel=0,lcalda=True,
             delta = dt_syn,
-            b=t0_syn
+            b=t0_syn,
+            isynth = 'irldta'
         )
 
         if self.myrank == 0:
@@ -558,6 +599,7 @@ class NoiseMC_PreOP():
         self.seismo_win['npts'] = npt_cut
 
         # loop each station
+        print_EGF = True
         for ir in range(nsta_loc):
             i = ir + istart 
 
@@ -602,7 +644,9 @@ class NoiseMC_PreOP():
                 # compute time derivative 
                 if self.pdict['USE_EGF'] == False:
                     dat_inp1 = -dif1(dat_inp1,dt_inp)
-                    if self.myrank == 0: print("CCFs => EGFs ...")
+                    if self.myrank == 0 and print_EGF:
+                        print("CCFs => EGFs ...")
+                        print_EGF = False
         
                 # cut 
                 dat_inp = interpolate_syn(dat_inp1,t0_obs + dt_inp,dt_inp,npt1_inp,
@@ -621,6 +665,10 @@ class NoiseMC_PreOP():
                 dat_inp *= np.max(np.abs(syn_inp[win_b:win_e])) / amp
 
                 # compute misfits and adjoint source
+                # if self.evtid == 'TA.D33A' and code == 'TA.F36A.BXZ' and bandname == 'T006_T015':
+                #     print("Debugging station TA.F36A.BXZ ...")
+                #     np.save("./debug_obs.npy",dat_inp)
+                #     np.save("./debug_syn.npy",syn_inp)
                 stats,adjsrc =  \
                     self._cal_adj_by_name(
                         self.sta_names[i],dat_inp,syn_inp,
@@ -728,8 +776,8 @@ class NoiseMC_PreOP():
 
         # allocate shared memory for syn/obs data 
         array_shape = (nsta,3,3,npt_cut)
-        sh_syn_win,syn_data = create_shared_array(node_comm,array_shape,dtype=np.float64)
-        sh_obs_win,obs_data = create_shared_array(node_comm,array_shape,dtype=np.float64)
+        sh_syn_win,syn_data = create_shared_array(node_comm,array_shape,dtype=float)
+        sh_obs_win,obs_data = create_shared_array(node_comm,array_shape,dtype=float)
 
         # misfits
         ncomp = self.ncomp
@@ -808,7 +856,7 @@ class NoiseMC_PreOP():
 
         # adjoint sources
         array_shape_adj = (nsta,3,3,npt_syn)
-        sh_adj_win,adj_src_all = create_shared_array(node_comm,array_shape_adj,dtype=np.float64) 
+        sh_adj_win,adj_src_all = create_shared_array(node_comm,array_shape_adj,dtype=float) 
 
         # atomic operation for adj_src_all
         sh_adj_win.Lock_all(0)

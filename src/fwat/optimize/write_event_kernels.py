@@ -3,7 +3,7 @@ import h5py
 from mpi4py import MPI
 import glob
 
-from fwat.optimize.model import FwatModel
+from fwat import FwatModel
 from fwat.FortranIO import FortranIO
 
 def run(argv):

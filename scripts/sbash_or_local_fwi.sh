@@ -12,7 +12,7 @@ run_one_simu_() {
   # check if we are in slurm
   local hostfile=""
   local my_hostfile="$work_dir/hostfile_${evtid}.txt"
-  if [ -n "$SLURM_JOB_ID" ]; then
+  if [ -n "$SLURM_JOB_ID" ] || [ -n "$PBS_JOBID" ]; then
     hostfile="--hostfile $my_hostfile"
 
     # atomic checkout of cores 
@@ -34,14 +34,24 @@ run_one_simu_() {
   for evtid_wk in $evtlist;
   do 
     evtdir=${FWAT_SOLVER}/$MODEL/$evtid_wk
-    cd $evtdir/
+    if [ "$USE_IO_TMPDIR" == "1" ]; then
+      mkdir -p $MYDIR/$evtdir
+      cp -r $evtdir/* $MYDIR/$evtdir/
+    fi
+
+    cd $MYDIR/$evtdir/
     echo ""
     echo "forward simulation for $evtid_wk `date` ..."
     $MPIRUN $hostfile -np $NPROC $SEM_PATH/bin/xspecfem3D
     echo "finished $evtid_wk at `date`"
 
     # copy output_solver.txt to output_solver.fwd.txt 
-    \cp OUTPUT_FILES/output_solver.txt OUTPUT_FILES/output_solver.fwd.txt
+    if [ "$USE_IO_TMPDIR" == "1" ]; then
+      \cp OUTPUT_FILES/seismograms.h5 $work_dir/$evtdir/OUTPUT_FILES/
+      \cp OUTPUT_FILES/output_solver.txt $work_dir/$evtdir/OUTPUT_FILES/output_solver.fwd.txt
+    else
+      \cp OUTPUT_FILES/output_solver.txt OUTPUT_FILES/output_solver.fwd.txt
+    fi
 
     # merge all seismograms to one big file
     echo " "
@@ -70,13 +80,19 @@ run_one_simu_() {
   for evtid_wk in $evtlist;
   do 
     evtdir=${FWAT_SOLVER}/$MODEL/$evtid_wk
-    cd $evtdir/
+    if [ "$USE_IO_TMPDIR" == "1" ]; then
+      \rm -rf $MYDIR/$evtdir/SEM
+      mv $work_dir/$evtdir/SEM $MYDIR/$evtdir/
+      \cp -r $work_dir/$evtdir/DATA/* $MYDIR/$evtdir/DATA/
+    fi
+
+    cd $MYDIR/$evtdir/
     echo ""
     echo "adjoint simulation for $evtid_wk at `date` ..."
     $MPIRUN $hostfile -np $NPROC $SEM_PATH/bin/xspecfem3D
     echo "finished adjoint for $evtid_wk at `date`"
     echo " "
-    cd $work_dir
+    cd $MYDIR
 
     # combine kernels
     mkdir -p $evtdir/GRADIENT
@@ -92,7 +108,19 @@ run_one_simu_() {
     echo ""
 
     # delete useless information
+    if [ "$USE_IO_TMPDIR" == "1" ]; then
+      fwat-utils clean $MODEL $evtid_wk
+    fi
+
+    cd $work_dir
     fwat-utils clean $MODEL $evtid_wk 
+    if [ "$USE_IO_TMPDIR" == "1" ]; then
+      \rm -rf $evtdir/GRADIENT/
+      mv $MYDIR/$evtdir/GRADIENT $evtdir/
+      \cp $MYDIR/$evtdir/OUTPUT_FILES/output_solver.txt $work_dir/$evtdir/OUTPUT_FILES/output_solver.adj.txt
+    else
+      \cp $evtdir/OUTPUT_FILES/output_solver.txt $work_dir/$evtdir/OUTPUT_FILES/output_solver.adj.txt
+    fi
   done
 
   # print flags
@@ -102,7 +130,7 @@ run_one_simu_() {
   echo " " >> $fwd
 
   # clean my hostfile
-  if [ -n "$SLURM_JOB_ID" ]; then
+  if [ -n "$SLURM_JOB_ID" ] || [ -n "$PBS_JOBID" ]; then
     flock -x "$GLOBAL_SLOTS" bash -c "cat '$my_hostfile' >> '$GLOBAL_SLOTS'"
     \rm "$my_hostfile"
   fi
@@ -112,6 +140,9 @@ run_measure()
 {
   local iter=$1
   local NPROCS_TOTAL=$2
+
+  # get all simulation types
+  local SIMU_TYPES=(`fwat-utils getparam simulation/types|tr -d '[]",'\'`)
 
   # check copy all events and simutype into arrays
   local evtid_list=()
@@ -168,8 +199,8 @@ run_measure()
   wait # wait for all jobs to finish
 }
 
-source module_env
-. parameters.sh
+source config.env
+source utils.sh
 
 # submit and get job id
 if [ "$PLATFORM"  == "local"  ]; then 
@@ -189,16 +220,37 @@ else
 
   GLOBAL_SLOTS="all_slots.txt"
   :> $GLOBAL_SLOTS
-  # Loop through each node name and append it 64 times
-  for node in $(scontrol show hostname $SLURM_JOB_NODELIST); do
-    for ((i=1; i<=$SLURM_NTASKS_PER_NODE; i++)); do
-        echo "$node" >> "$GLOBAL_SLOTS"
+
+  if [ "$PLATFORM" == "slurm" ]; then
+    # Loop through each node name and append it 64 times
+    for node in $(scontrol show hostname $SLURM_JOB_NODELIST); do
+      for ((i=1; i<=$SLURM_NTASKS_PER_NODE; i++)); do
+          echo "$node" >> "$GLOBAL_SLOTS"
+      done
     done
-  done
+  else # PBS
+    cat "$PBS_NODEFILE" >> "$GLOBAL_SLOTS"
+  fi
 fi
 
 # working directory
 work_dir=`pwd`
+MYDIR=$work_dir
+if [ "$USE_IO_TMPDIR" == "1" ]; then
+  if [ -d "$IO_TMPDIR" ]; then
+    echo "working directory is $IO_TMPDIR"
+    job_tmp_id=${SLURM_JOB_ID:-$PBS_JOBID}
+    if [ -z "$job_tmp_id" ]; then
+      job_tmp_id=$$
+    fi
+    MYDIR=$IO_TMPDIR/$job_tmp_id
+    mkdir -p $MYDIR
+  else
+    echo "IO_TMPDIR is not available, disable USE_IO_TMPDIR"
+    USE_IO_TMPDIR=0
+    echo "working directory is current dir"
+  fi
+fi
 
 # create working directories
 mkdir -p misfits optimize solver LOG
@@ -222,16 +274,16 @@ for ii in `seq 1 $max_iter`;do
     #exit 
     
     # sum kernels, get search direction, generate trial model 
-    bash sbash_postproc_kl.sh > LOG/POST.$iter.txt
+    #bash sbash_postproc_kl.sh > LOG/POST.$iter.txt
+    bash sbash_post.sh post > LOG/POST.$iter.txt
 
   elif [ $flag == "GRAD"  ];then 
     # get search direction, generate trial model 
-    bash sbash_postproc_kl.sh > LOG/POST.$iter.txt
+    bash sbash_post.sh post > LOG/POST.$iter.txt
 
   else  # line search
     run_measure $iter $NPROCS_TOTAL
-
-    bash sbash_wolfe.sh > LOG/WOLFE.$iter.txt
+    bash sbash_post.sh wolfe > LOG/WOLFE.$iter.txt
   fi
 
 done

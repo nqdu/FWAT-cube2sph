@@ -17,7 +17,7 @@ dependencies = [
     "h5py",
     "obspy >=1.4.2",
     "numba",
-    "pybind11-global",
+    "pybind11",
     "pyyaml"
 ]
 

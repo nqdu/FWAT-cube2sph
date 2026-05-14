@@ -3,6 +3,7 @@ import numpy as np
 from glob import glob
 import os 
 import yaml 
+import argparse
 
 import matplotlib.pyplot as plt 
 import matplotlib as mpl
@@ -15,14 +16,17 @@ mpl.rcParams['legend.fontsize'] = 8
 mpl.rcParams['legend.fontsize'] = 8
 mpl.rcParams['savefig.bbox'] = 'tight'
 
+from fwat.const import PARAM_FILE
+
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: ./compare_tele.py model(M03)")
-        exit(1)
+    parser = argparse.ArgumentParser(description='Plot histogram of noise traces for all events and stations.')
+    parser.add_argument('--model', type=str, required=True,help='Model name (e.g., M03)')
+    parser.add_argument("--model0", type=str, default="M00", help='Initial model name for comparison (default: M00)')
+    parser.add_argument("--path", type=str, default="../../", help='Path to the working directory (default: ../../)')
+    args = parser.parse_args()
     
     # set directory
-    from fwat.const import PARAM_FILE
-    path = "../.."
+    path = args.path
     seisdir= "noise_hist/"
     misfits = f"{path}/misfits"
     paramfile = f"{path}/{PARAM_FILE}"
@@ -30,7 +34,8 @@ def main():
     #### stop here
 
     # read model name
-    M1 = sys.argv[1]
+    M1 = args.model
+    M0 = args.model0
 
     os.makedirs(seisdir,exist_ok=True)
 
@@ -46,23 +51,29 @@ def main():
         band="T%03g_T%03g" %(Tmin,Tmax)
 
         # load misfits data
+        chi = 0.
+        chi0 = 0.
         filenames = glob(f"{misfits}/{M1}/*_{band}_noise_window_chi")
         for i in range(len(filenames)):
-            temp = np.loadtxt(filenames[i],usecols=[14])
-            data =  np.append(data,temp)
-        filenames = glob(f"{misfits}/M00/*_{band}_noise_window_chi")
+            temp = np.loadtxt(filenames[i],usecols=[5,-1],ndmin=2)
+            idx = np.where(abs(temp[:,0]) > 1.0e-5)[0]
+            data =  np.append(data,temp[idx,0])
+            chi += np.sum(temp[:,-1])
+        filenames = glob(f"{misfits}/{M0}/*_{band}_noise_window_chi")
         for i in range(len(filenames)):
-            temp = np.loadtxt(filenames[i],usecols=[14])
-            data0 =  np.append(data0,temp)
+            temp = np.loadtxt(filenames[i],usecols=[5,-1],ndmin=2)
+            idx = np.where(abs(temp[:,0]) > 1.0e-5)[0]
+            data0 =  np.append(data0,temp[idx,0])
+            chi0 += np.sum(temp[:,-1])
+        print(f"{band}: {len(data)} traces, chi = {chi:.2f}, chi0 = {chi0:.2f}")
 
         # create figures
         fig,ax = plt.subplots(1,1,figsize=(12,5))
-        ax.hist(data0,bins=30,range=(-5.5,5.5),label='M00')
+        ax.hist(data0,bins=30,range=(-5.5,5.5),label=f'{M0}',color='blue',alpha=0.5)
         ax.hist(data,bins=30,range=(-5.5,5.5),label=f'{M1}',color='gray',alpha=0.5)
         ax.legend()
         fig.savefig(f"{seisdir}/{M1}.{band}.jpg")
         fig.clear()
-        print(np.max(abs(data)),np.max(abs(data0)))
 
 
 if __name__ == "__main__":

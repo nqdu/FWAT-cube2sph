@@ -34,8 +34,8 @@ EOF
   fi
 }
 
-source module_env 
-. parameters.sh
+source config.env
+source utils.sh
 
 # check input args 
 # submit and get job id
@@ -57,6 +57,9 @@ else
   max_iter=$3
 fi
 
+# sanity check
+SANITY_CHECK
+
 # generate a temp file to submit job 
 fwd=tmp.fwi.sh 
 SHELL_HEADER_PRE $NODES $NPROCS_PER_NODE > $fwd
@@ -65,7 +68,7 @@ chmod +x $fwd
 
 # submit job
 if [ "$PLATFORM"  == "local"  ]; then 
-  ./$fwd $max_iter
+  ./$fwd $NPROCS_TOTAL $max_iter
 elif [ "$PLATFORM"  == "slurm"  ]; then 
   sbatch $fwd $max_iter
 elif [ "$PLATFORM"  == "pbs"  ]; then 

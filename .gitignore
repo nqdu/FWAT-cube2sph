@@ -17,6 +17,10 @@ __pycache__/
 *.so
 *.exe
 
+*.png
+
+build/
+
 # Logs
 *.log
 

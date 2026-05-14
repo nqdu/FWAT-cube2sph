@@ -1,3 +1,5 @@
+import argparse
+
 import numpy as np
 import matplotlib.pyplot as plt 
 import sys 
@@ -41,11 +43,10 @@ def compute_ak135_time(evla,evlo,evdp,statxt):
     return t_ref,dist
 
 
-def plot_event(line:str,M1:str,solver:str,outdir:str,band:str,
+def plot_event(line:str,M1:str,M0:str,solver:str,outdir:str,band:str,
                 twb:float,twe:float):
     import h5py 
 
-    M0="M00"
     info = line.split()
     evtid = info[0]
     path2init = f"{solver}/{M0}/{evtid}/OUTPUT_FILES/"
@@ -86,7 +87,7 @@ def plot_event(line:str,M1:str,solver:str,outdir:str,band:str,
 
 
     # create figures
-    fig = plt.figure(1,figsize=(6.7,9.3))
+    fig = plt.figure(figsize=(6.7,9.3))
     ax1=fig.add_subplot(2,2,1)
     ax2=fig.add_subplot(2,2,2)
     ax3=fig.add_subplot(2,2,3)
@@ -151,6 +152,7 @@ def plot_event(line:str,M1:str,solver:str,outdir:str,band:str,
     ax1.legend(loc='upper right')
     fig.savefig(f"{outdir}/inv.{evtid}.jpg",dpi=300)
     fig.clear()
+    plt.close(fig)
 
     # close h5file
     f0syn.close()
@@ -159,19 +161,21 @@ def plot_event(line:str,M1:str,solver:str,outdir:str,band:str,
 
 
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: ./compare_tele.py model(M03)")
-        exit(1)
+    parser = argparse.ArgumentParser(description='Plot SKS traces for all events and stations.')
+    parser.add_argument('--model', type=str, required=True,help='Model name (e.g., M03)')
+    parser.add_argument('--window',type=list, default=[15,20], help='Time window around the reference travel time (e.g., 15 20)')
+    parser.add_argument('--band', type=str, default="T010_T050", help='Period band for plotting (e.g., T010_T050)')
+    parser.add_argument("--model0", type=str, default="M00", help='Initial model name for comparison (default: M00)')
+    parser.add_argument("--path", type=str, default="../../", help='Path to the working directory (default: ../../)')
+    args = parser.parse_args()
     
-    # set directory
-    path = "../"
+    path = args.path
 
     # ploting window
-    twb=15
-    twe=20
+    twb,twe = args.window
 
     # ploting band
-    band="T010_T050"
+    band = args.band
 
     #### stop here 
 
@@ -183,7 +187,8 @@ def main():
     os.makedirs(seisdir,exist_ok=True)
 
     # read model name
-    M1 = sys.argv[1]
+    M1 = args.model
+    M0 = args.model0
 
 
     # loop each line to plot 
@@ -192,7 +197,7 @@ def main():
     infile.close()
     for line in lines:
         # plot
-        plot_event(line,M1,solver,seisdir,band,twb,twe)
+        plot_event(line,M1,M0,solver,seisdir,band,twb,twe)
 
 if __name__ == "__main__":
     main()

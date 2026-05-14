@@ -3,32 +3,25 @@ import os
 import sys 
 import yaml
 
-def run(argv: list) -> None:
+from fwat.const import PARAM_FILE,SRC_REC,MISFIT
+
+def compute_misfit(mod:str,simu_type:str) -> tuple[float,int]:
     """
-    run the misfit calculation for a given model and simulation type
+    compute the total misfit for a given model and simulation type
     
     Parameters 
     ----------
-    argv : list
-        list of arguments, should contain two elements:
-        1. model name (e.g., M00)
-        2. simulation type (e.g., rf, ss, etc.)
+    mod : str
+        model name (e.g., M00)
+    simu_type : str
+        simulation type (e.g., rf, ss, etc.)
+    
     Returns
     -------
-    None
-        This function prints the total misfit and the number of data points processed.
-
+    tuple[float,int]
+        total misfit and number of data points processed
 
     """
-    from fwat.const import PARAM_FILE,SRC_REC,MISFIT
-
-    # check input args
-    if len(argv) !=2:
-        print("Usage: fwat misfit MODEL(M00) simu_type")
-        exit(1)
-
-    mod = argv[0]
-    simu_type = argv[1]
 
     # get period band used
     all_bands = []
@@ -67,6 +60,36 @@ def run(argv: list) -> None:
                 sumf += chi 
                 sumn += n 
 
+    return float(sumf),sumn
+
+def run(argv: list) -> None:
+    """
+    run the misfit calculation for a given model and simulation type
+    
+    Parameters 
+    ----------
+    argv : list
+        list of arguments, should contain two elements:
+        1. model name (e.g., M00)
+        2. simulation type (e.g., rf, ss, etc.)
+    Returns
+    -------
+    None
+        This function prints the total misfit and the number of data points processed.
+
+
+    """
+
+    # check input args
+    if len(argv) !=2:
+        print("Usage: fwat misfit MODEL(M00) simu_type")
+        exit(1)
+
+    mod = argv[0]
+    simu_type = argv[1]
+
+    # compute misfit
+    sumf,sumn = compute_misfit(mod,simu_type)
     print(sumf,sumn)
 
 def main():

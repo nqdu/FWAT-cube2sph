@@ -106,7 +106,7 @@ def install(argv):
     os.makedirs(install_dir)
     shutil.copytree("fwat_params",f"{install_dir}/fwat_params/")
     shutil.copytree("plots",f"{install_dir}/plots/")
-    shutil.copy("scripts/module_env",f"{install_dir}/module_env")
+    shutil.copy("scripts/config.env",f"{install_dir}/config.env")
 
     # find all sh files in scripts
     sh_files = glob.glob("scripts/*.sh")
@@ -125,11 +125,18 @@ def install(argv):
     }
 
     # append something to parameters.sh 
-    with open(f"{install_dir}/parameters.sh","a") as f:
+    with open(f"{install_dir}/utils.sh","a") as f:
         f.write("\n")
         f.write("# FWAT constants\n")
         for key in const_dict:
             f.write(f"{key}={const_dict[key]}\n")
+
+
+def param_sanity_check():
+    """
+    sanity check for parameters, make sure the parameters are valid 
+    """
+    pass
 
 
 def main():

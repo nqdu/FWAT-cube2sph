@@ -64,7 +64,7 @@ class Tele_PreOP(FwatPreOP):
             evla=self.evla,evlo=self.evlo,
             evdp=self.evdp,stla=0.,
             stlo=0.,stel=0,lcalda=True,
-            delta = dt_syn
+            delta = dt_syn,isynth = 'irldta',
         )
 
         outdir = f"{self.DATA_DIR}/{evtid}"
@@ -76,14 +76,10 @@ class Tele_PreOP(FwatPreOP):
         # load stf for tele seismic events
         stf = np.zeros((ncomp,npt_syn))
         if self.adjsrc_type == 'l2': # only load stf for l2
-            for ib in range(len(self.Tmax)):
-                bandname = self._get_bandname(ib)
-                for ic in range(self.ncomp):
-                    ch = self.components[ic]
-                    tr = SACTrace.read(f'{self.SRC_REC}/stf_{ch}.sac.{bandname}_{evtid}')
-                    stf[ic,:] = stf[ic,:] + np.asarray(tr.data) 
-            # normalize stf by the number of frequency bands
-            stf /= len(self.Tmax)
+            for ic in range(self.ncomp):
+                ch = self.components[ic]
+                tr = SACTrace.read(f'{self.SRC_REC}/stf_{ch}.sac.{evtid}')
+                stf[ic,:] = np.asarray(tr.data) * 1.
         
         # loop every station to save sac
         for ir in range(self.nsta_loc):
@@ -248,7 +244,7 @@ class Tele_PreOP(FwatPreOP):
 
         # misfits
         ncomp = self.ncomp
-        stats_list = []
+        stats_list = [MeasureStats(adj_type='l2') for _ in range(nsta_loc*ncomp)]
 
         # glob arrays
         ncomp = self.ncomp
@@ -256,7 +252,8 @@ class Tele_PreOP(FwatPreOP):
         glob_syn = self._process_all_seismograms(ib, type_='syn')
 
         # get source time function 
-        stf_names = [f'{self.SRC_REC}/stf_{ch}.sac.' + f"{bandname}" + f"_{self.evtid}" for ch in self.components]
+        #stf_names = [f'{self.SRC_REC}/stf_{ch}.sac.' + f"{bandname}" + f"_{self.evtid}" for ch in self.components]
+        stf_names = [f'{self.SRC_REC}/stf_{ch}.sac.{self.evtid}' for ch in self.components]
         has_stf_flag = True 
         for ic in range(ncomp):
             has_stf_flag = has_stf_flag and os.path.isfile(stf_names[ic])
@@ -319,7 +316,7 @@ class Tele_PreOP(FwatPreOP):
                 stats.code = self._get_station_code(i,ic)
 
                 # save misfit stats
-                stats_list.append(stats)
+                stats_list[ir*ncomp+ic] = stats
 
                 # contributions on stf
                 adjsrc /= avgamp 
@@ -353,6 +350,7 @@ class Tele_PreOP(FwatPreOP):
             frequency band index
         """
         from fwat.adjoint.cc_misfit import measure_adj_cc_dd
+        from mpi4py.typing import TargetSpec
 
         # get frequency band
         bandname = self._get_bandname(ib)
@@ -372,9 +370,6 @@ class Tele_PreOP(FwatPreOP):
         
         # allocate global arrays 
         nsta_loc = self.nsta_loc
-
-        # misfits
-        stats_list: list = []
 
         # read time shift by user if existed
         if os.path.isfile(f"{self.DATA_DIR}/{self.evtid}/cc_time.txt"):
@@ -410,6 +405,8 @@ class Tele_PreOP(FwatPreOP):
         nsta = self.nsta
         njobs = self.nsta * (self.nsta - 1) // 2
         kstart,kend = alloc_mpi_jobs(njobs,self.nprocs,self.myrank)
+        stats_list = [MeasureStats(adj_type='cc_time_dd') for _ in range(self.ncomp * (kend-kstart+1))]
+        icount = 0
         for ic in range(self.ncomp):
             for k in range(kstart,kend+1):
                 # get (i,j) pair from k
@@ -457,12 +454,16 @@ class Tele_PreOP(FwatPreOP):
                     tstart_i,tend_i,tstart_j,tend_j,dd_shift_ij
                 )
                 stats.code = f"{self._get_station_code(i,ic)}-{self._get_station_code(j,ic)}"
-                stats_list.append(stats)
+                # stats_list.append(stats)
+                stats_list[icount] = stats
+                icount += 1
 
                 # accumulate adjoint sources 
                 stride = self.ncomp * npt_syn
-                self._sh_adj_win.Accumulate(adj_i,target_rank=0,target=i*stride+ic*npt_syn,op=MPI.SUM)
-                self._sh_adj_win.Accumulate(adj_j,target_rank=0,target=j*stride+ic*npt_syn,op=MPI.SUM)
+                target1 = i*stride + ic*npt_syn
+                target2 = j*stride + ic*npt_syn
+                self._sh_adj_win.Accumulate(adj_i,target_rank=0,target=target1,op=MPI.SUM) # type: ignore
+                self._sh_adj_win.Accumulate(adj_j,target_rank=0,target=target2,op=MPI.SUM) # type: ignore
                 
         
         # merge adjoint sources from all procs
@@ -526,7 +527,7 @@ class Tele_PreOP(FwatPreOP):
         nsta_loc = self.nsta_loc
 
         # misfits
-        stats_list: list = []
+        stats_list: list = [MeasureStats(adj_type='cross-conv') for _ in range(nsta_loc)]
 
         # glob arrays
         glob_obs = self._process_all_seismograms(ib, type_='obs')
@@ -594,7 +595,7 @@ class Tele_PreOP(FwatPreOP):
                     tend,
                 )
             stats.code = f"{self.netwk[i]}.{self.stnm[i]}.cross-conv"
-            stats_list.append(stats)
+            stats_list[ir] = stats
         
 
             # filter adjoint source

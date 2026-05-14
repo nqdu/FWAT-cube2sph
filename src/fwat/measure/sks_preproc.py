@@ -131,7 +131,8 @@ class SKS_PreOP(FwatPreOP):
             evla=self.evla,evlo=self.evlo,
             evdp=self.evdp,stla=0.,
             stlo=0.,stel=0,lcalda=1,
-            delta = dt_syn
+            delta = dt_syn,
+            isynth='irldta'
         )
 
         outdir = f"{self.DATA_DIR}/{evtid}"

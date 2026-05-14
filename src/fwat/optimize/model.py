@@ -95,10 +95,11 @@ class FwatModel:
         else:
             grad_list = [f'c{i+1}{j+1}_kernel' for i in range(6) for j in range(i,6)]
             grad_list += ['rho_kernel']
-            if not base:
-                grad_list = self.get_direc_names()
-                for i in range(len(grad_list)):
-                    grad_list[i] = grad_list[i][1:] + "_kernel"
+
+        if not base:
+            grad_list = self.get_direc_names()
+            for i in range(len(grad_list)):
+                grad_list[i] = grad_list[i][1:] + "_kernel"
 
         return grad_list
     

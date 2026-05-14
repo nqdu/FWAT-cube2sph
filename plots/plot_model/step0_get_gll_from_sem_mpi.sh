@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --nodes=2
-#SBATCH --ntasks-per-node=40
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=192
 #SBATCH --time=00:12:59
 #SBATCH --job-name step0
 #SBATCH --output=step0.txt 

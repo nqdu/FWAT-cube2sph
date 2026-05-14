@@ -21,7 +21,7 @@ for iter in $run_indx; do
   ii=`printf %02d $iter`
   idx=${ii}${lsflag}
   name=verti
-  nfiles=`ls input/ |grep $name.*.loc |wc -l`
+  nfiles=$NSLICE_VERTI
   for ip in `seq 1 $nfiles`; do
     filename=grdfiles/$param.iter$idx.$name.$ip.grd
     xmin=`gmt grdinfo $filename |grep x_min |awk '{print $3}'`
@@ -34,22 +34,24 @@ for iter in $run_indx; do
     vmin=`echo $info| awk '{print $6}'`
     vmax=`echo $info| awk '{print $7}'`
     echo $filename $vmin $vmax $vmin $vmax
-    gmt makecpt -T$vmin/$vmax/50+n -Z -D -Cpolar -I > out.cpt
+    gmt makecpt -T$vmin/$vmax/50+n -Z -D -Cseis > out.cpt
     #gmt grd2cpt $filename -Z -D -Cpolar -I  > out.cpt
 
     # plot
     proj=-JX12c/6c
+    plot_name=`get_plot_latex_name $param`
 
     gmt begin pics/$param.iter$idx.$name.$ip jpg 
       gmt basemap $bounds $proj  -Bxaf+l"Distance,km" -Byaf+l"Depth,km" -BWSet
       gmt grdimage $filename -Cout.cpt -E200
-      gmt colorbar -G$vmin/$vmax -Cout.cpt -Bxaf+l"$param"
+      gmt grdcontour $filename -A200 -C200 -W0.5,black
+      gmt colorbar -G$vmin/$vmax -Cout.cpt -Bxaf+l"$plot_name"
     gmt end 
 
   done 
 
   name=horiz
-  nfiles=`ls input/ |grep $name.*.loc |wc -l`
+  nfiles=$NSLICE_HORIZ
   for ip in `seq 1 $nfiles`; do
     filename=grdfiles/$param.iter$idx.$name.$ip.grd
     xmin=`gmt grdinfo $filename |grep x_min |awk '{print $3}'`
@@ -62,17 +64,17 @@ for iter in $run_indx; do
     vmin=`echo $info| awk '{print $6}'`
     vmax=`echo $info| awk '{print $7}'`
     echo $filename $vmin $vmax $vmin $vmax
-    gmt makecpt -T$vmin/$vmax/50+n -Z -D -Cpolar -I > out.cpt
+    gmt makecpt -T$vmin/$vmax/50+n -Z -D -Cseis > out.cpt
     #gmt grd2cpt $filename -Z -D -Cpolar -I  > out.cpt
 
     # plot
     proj=-JM12c
-
+    plot_name=`get_plot_latex_name $param`
     gmt begin pics/$param.iter$idx.$name.$ip jpg 
       gmt basemap $bounds $proj  -Bxaf -Byaf -BWSet+t"Depth=${DEPTH_H[$((ip-1))]} km"
       gmt grdimage $filename -Cout.cpt -E200
       gmt coast -A200 -W1p,black
-      gmt colorbar -G$vmin/$vmax -Cout.cpt -Bxaf+l"$param"
+      gmt colorbar -G$vmin/$vmax -Cout.cpt -Bxaf+l"$plot_name"
     gmt end 
 
   done 

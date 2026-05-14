@@ -20,7 +20,11 @@ for iter in $run_indx;do
 for name in verti horiz; do 
   ii=`printf %02d $iter`
   idx=${ii}${lsflag}
-  nfiles=`ls input/ |grep $name.*.loc |wc -l`
+  if [ "$name" == "horiz" ]; then 
+    nfiles=$NSLICE_HORIZ
+  else
+    nfiles=$NSLICE_VERTI
+  fi
   for evt in `ls $SOLVER_DIR/M$ii/`; do 
   for ip in `seq 1 $nfiles`; do
     info=`gmt gmtinfo -C profiles/$param.$evt.iter$idx.$name.$ip.txt`
