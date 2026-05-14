@@ -79,8 +79,7 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#cluster-parameters">Cluster Parameters</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#module-env"><code class="docutils literal notranslate"><span class="pre">module_env</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#parameters-sh"><code class="docutils literal notranslate"><span class="pre">parameters.sh</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#config-env"><code class="docutils literal notranslate"><span class="pre">config.env</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#run-fwi-sh-and-run-forward-sh"><code class="docutils literal notranslate"><span class="pre">run_fwi.sh</span></code> and <code class="docutils literal notranslate"><span class="pre">run_forward.sh</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#run-fwi-big-job-sh"><code class="docutils literal notranslate"><span class="pre">run_fwi_big_job.sh</span></code></a></li>
 </ul>
@@ -135,6 +134,17 @@
 <span class="nt">simulation</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">DUMP_WAVEFIELDS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">True</span>
 
+<span class="w">  </span><span class="nt">types</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;noise&quot;</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="c1"># simulation types: noise/tele/sks/rf</span>
+<span class="w">  </span><span class="nt">weights</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">1.</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="c1"># weight for each simu type, used for multiple simu types, e.g., [&quot;noise&quot;,&quot;tele&quot;], [0.5,0.5]</span>
+
+<span class="w">  </span><span class="c1"># # &lt; 0 NO ADAPTIVE WEIGHTS, &gt;=0 use this iteration misfit to compute weights chi = \sum chi_i * w_i</span>
+<span class="w">  </span><span class="c1"># chi = \sum_i L_i(x) / L_i(x0) / |g_i(x0)| * w_i, and weights will be re-written as (w_i / L_i(x0) / |g_i(x0)|)</span>
+<span class="w">  </span><span class="nt">iter_wts</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span><span class="w"> </span>
+
+<span class="w">  </span><span class="c1"># Normalization by gradient norm or misfit at iter_wts, if iter_wts &gt;= 0</span>
+<span class="w">  </span><span class="nt">norm_type</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;misfit&#39;</span><span class="w"> </span><span class="c1"># gradient or misfit</span>
+
+
 <span class="c1"># Measurements block, for computing adjoint source</span>
 <span class="nt">measure</span><span class="p">:</span>
 <span class="w">  </span><span class="c1"># tele seismic</span>
@@ -144,11 +154,11 @@
 <span class="w">    </span><span class="nt">FILTER_BANDS</span><span class="p">:</span><span class="w"> </span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">5.</span><span class="p p-Indicator">,</span><span class="nv">50.</span><span class="p p-Indicator">]</span>
 <span class="w">    </span><span class="nt">TIME_WINDOW</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">5.</span><span class="p p-Indicator">,</span><span class="nv">45.</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="c1"># before and after first arrival</span>
-<span class="w">    </span><span class="nt">VERBOSE_MODE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">True</span>
-<span class="w">    </span><span class="nt">ADJSRC_TYPE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w"> </span><span class="c1"># 2,cross-conv</span>
+<span class="w">    </span><span class="nt">VERBOSE_MODE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">False</span>
+<span class="w">    </span><span class="nt">ADJSRC_TYPE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w"> </span><span class="c1"># 2 (l2),cross-conv,cc_time_dd</span>
 
 <span class="w">  </span><span class="nt">noise</span><span class="p">:</span><span class="w"> </span><span class="c1"># multichannel noise </span>
-<span class="w">    </span><span class="nt">CC_COMPS</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;ZZ&#39;</span><span class="p p-Indicator">]</span><span class="w">  </span><span class="c1"># {SOURCE-COMP}{RECEIVER-COMP}</span>
+<span class="w">    </span><span class="nt">CC_COMPS</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;ZZ&#39;</span><span class="p p-Indicator">,</span><span class="s">&#39;TT&#39;</span><span class="p p-Indicator">]</span><span class="w">  </span><span class="c1"># {SOURCE-COMP}{RECEIVER-COMP}</span>
 <span class="w">    </span><span class="nt">CH_CODE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">BX</span><span class="w">   </span><span class="c1"># CH_CODE</span>
 <span class="w">    </span><span class="nt">FILTER_BANDS</span><span class="p">:</span><span class="w">  </span><span class="c1"># filter bands used, in s, [T_min,Tmax]</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">20.</span><span class="p p-Indicator">,</span><span class="nv">40.</span><span class="p p-Indicator">]</span>
@@ -161,11 +171,14 @@
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">2.0</span><span class="p p-Indicator">,</span><span class="nv">5.</span><span class="p p-Indicator">]</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">2.0</span><span class="p p-Indicator">,</span><span class="nv">5.</span><span class="p p-Indicator">]</span>
 <span class="w">    </span><span class="nt">SNR_THRESHOLD</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">0.</span><span class="p p-Indicator">,</span><span class="nv">0.</span><span class="p p-Indicator">,</span><span class="nv">0.</span><span class="p p-Indicator">,</span><span class="nv">0.</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="c1"># exclude data when SNR &lt; SNR_THRESHOLD in a each band </span>
+<span class="w">    </span><span class="nt">TSHIFT_MAX</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">4.5</span><span class="p p-Indicator">,</span><span class="nv">4.5</span><span class="p p-Indicator">,</span><span class="nv">4.5</span><span class="p p-Indicator">,</span><span class="nv">4.5</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="c1"># exclude data when ABS(TSHIFT) &gt; TSHIFT_MAX in a each band</span>
+<span class="w">    </span><span class="nt">DLNA_MAX</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">1.5</span><span class="p p-Indicator">,</span><span class="nv">1.5</span><span class="p p-Indicator">,</span><span class="nv">1.5</span><span class="p p-Indicator">,</span><span class="nv">1.5</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="c1"># exclude data when ABS(DLNA) &gt; DLNA_MAX in a each band</span>
+<span class="w">    </span><span class="nt">CC_MIN</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">0.8</span><span class="p p-Indicator">,</span><span class="nv">0.8</span><span class="p p-Indicator">,</span><span class="nv">0.8</span><span class="p p-Indicator">,</span><span class="nv">0.8</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="c1"># exclude data when CC_COEF &lt; CC_MIN in a each band</span>
 <span class="w">    </span><span class="nt">USE_EGF</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">True</span><span class="w">   </span><span class="c1"># if False, the input data is Cross-correlation, a negative derivative will be applied</span>
 <span class="w">    </span><span class="nt">ADJ_SRC_NORM</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">False</span><span class="w">  </span><span class="c1"># if true, the adjoint source will be normalized</span>
 <span class="w">    </span><span class="nt">USE_NEAR_OFFSET</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">True</span><span class="w"> </span><span class="c1"># if FALSE, reset tstart</span>
 <span class="w">    </span><span class="nt">VERBOSE_MODE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">True</span>
-<span class="w">    </span><span class="nt">ADJSRC_TYPE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span><span class="w"> </span><span class="c1"># 5/7/exp_phase/cc_time</span>
+<span class="w">    </span><span class="nt">ADJSRC_TYPE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span><span class="w"> </span><span class="c1"># 5/7/exp_phase/cc_time/cc_time_dd</span>
 
 <span class="w">  </span><span class="c1"># sks </span>
 <span class="w">  </span><span class="nt">sks</span><span class="p">:</span>
@@ -195,7 +208,7 @@
 <span class="nt">optimize</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">SMOOTHING</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">16000.</span><span class="p p-Indicator">,</span><span class="nv">8000.</span><span class="p p-Indicator">]</span><span class="w">  </span><span class="c1"># gaussian smoothing in horizontal/vertical direction, in m</span>
 <span class="w">  </span><span class="nt">OPT_METHOD</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LBFGS</span><span class="w">  </span><span class="c1"># GD/ LBFGS</span>
-<span class="w">  </span><span class="nt">PRECOND_TYPE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">z_precond</span><span class="w"> </span><span class="c1"># default / z_precond /z2_precond</span>
+<span class="w">  </span><span class="nt">PRECOND_TYPE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">none</span><span class="w"> </span><span class="c1"># default / z_precond /z2_precond/ z_sqrt_precond/ none</span>
 <span class="w">  </span><span class="nt">MAX_PER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.02</span><span class="w"> </span><span class="c1"># maximum relative perturbation</span>
 
 <span class="w">  </span><span class="c1"># model/kernel type</span>
@@ -207,8 +220,7 @@
 <span class="w">  </span><span class="c1">#     0: c11-c66,rho</span>
 <span class="w">  </span><span class="c1">#     1: vp,vs,rho,gcp,gsp</span>
 <span class="w">  </span><span class="c1">#     2. vph,vpv,vsh,vsv,rho,eta,gcp,gsp</span>
-<span class="w">  </span><span class="c1">#     3. vp,vs,rho,kappaa,kappab,eta,gcp,gsp  where kappaa = (vph/vpv) / vpv, vp = sqrt((2*vph**2+vpv**2)/3), kappab = (vsh - vsv) / vsv, vs = sqrt((2*vsh**2 + vsv**2) / 3)</span>
-
+<span class="w">  </span><span class="c1">#     3. vp,vs,rho,kappaa,kappab,eta,gcp,gsp  where kappaa = (vph-vpv)/vpv, vp = sqrt((2*vsh^2 + vsv^2)/3)</span>
 <span class="w">  </span><span class="nt">MODEL_TYPE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">iso</span><span class="w"> </span>
 <span class="w">  </span><span class="nt">KERNEL_SET</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
 <span class="w">  </span><span class="nt">MASK_VARS</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span><span class="w"> </span><span class="c1"># set all the gradients related to index in it to 0</span>
@@ -230,6 +242,18 @@ In this mode, the full wavefield from the forward simulation is saved and later 
 <ul class="simple">
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">KERNEL_SPP</span></code></strong> – Number of sampling points per period.</p></li>
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">KERNEL_T0</span></code></strong> – Minimum period used in your simulation (can be found in <code class="docutils literal notranslate"><span class="pre">output_generate_databases.txt</span></code>).</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">types</span></code></strong> – List of simulation types to run.<br />
+Options: <code class="docutils literal notranslate"><span class="pre">noise</span></code>, <code class="docutils literal notranslate"><span class="pre">tele</span></code>, <code class="docutils literal notranslate"><span class="pre">sks</span></code>, <code class="docutils literal notranslate"><span class="pre">rf</span></code>.<br />
+Example: <code class="docutils literal notranslate"><span class="pre">[&quot;noise&quot;]</span></code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">weights</span></code></strong> – User defined Weight for each simulation type, used when multiple types are combined.<br />
+Example: <code class="docutils literal notranslate"><span class="pre">[0.5,</span> <span class="pre">0.5]</span></code> for <code class="docutils literal notranslate"><span class="pre">[&quot;noise&quot;,</span> <span class="pre">&quot;tele&quot;]</span></code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">iter_wts</span></code></strong> – Controls adaptive weighting. If <code class="docutils literal notranslate"><span class="pre">&lt;</span> <span class="pre">0</span></code>, adaptive weights are disabled. If <code class="docutils literal notranslate"><span class="pre">&gt;=</span> <span class="pre">0</span></code>, the misfit at this iteration is used to compute weights as:<br />
+$\chi = \sum_i L_i(x) \cdot w_i$<br />
+and the weights are rewritten as $w_i * norm_i$, where $norm_i$ is the normalization factor<br />
+Example: <code class="docutils literal notranslate"><span class="pre">0</span></code></p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">norm_type</span></code></strong> – Normalization strategy when adaptive weights are enabled (<code class="docutils literal notranslate"><span class="pre">iter_wts</span> <span class="pre">&gt;=</span> <span class="pre">0</span></code>). Controls whether the weight normalization factor is computed from the gradient norm or the misfit value.<br />
+Options: <code class="docutils literal notranslate"><span class="pre">gradient</span></code>, <code class="docutils literal notranslate"><span class="pre">misfit</span></code><br />
+Example: <code class="docutils literal notranslate"><span class="pre">'misfit'</span></code></p></li>
 </ul>
 </section>
 <section id="measurement-block">
@@ -271,13 +295,16 @@ Example:
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">GROUPVEL_WIN</span></code></strong> – Time window determined by group velocity in km/s, <code class="docutils literal notranslate"><span class="pre">[v_min,</span> <span class="pre">v_max]</span></code>.<br />
 Example:
 <code class="docutils literal notranslate"><span class="pre">[[2.5,</span> <span class="pre">4.5],</span> <span class="pre">[2.5,</span> <span class="pre">4.5],</span> <span class="pre">[2.5,</span> <span class="pre">4.5],</span> <span class="pre">[2.5,</span> <span class="pre">4.5]]</span></code></p></li>
-<li><p><strong><code class="docutils literal notranslate"><span class="pre">SNR_THRESHOLD</span></code></strong> - SNR threshold for each frequency band</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">SNR_THRESHOLD</span></code></strong> – SNR threshold for each frequency band; data are excluded when SNR &lt; <code class="docutils literal notranslate"><span class="pre">SNR_THRESHOLD</span></code>.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">TSHIFT_MAX</span></code></strong> – Maximum allowed absolute time shift (in seconds) per frequency band; data are excluded when |TSHIFT| &gt; <code class="docutils literal notranslate"><span class="pre">TSHIFT_MAX</span></code>.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">DLNA_MAX</span></code></strong> – Maximum allowed absolute amplitude ratio (dlna) per frequency band; data are excluded when |DLNA| &gt; <code class="docutils literal notranslate"><span class="pre">DLNA_MAX</span></code>.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">CC_MIN</span></code></strong> – Minimum cross-correlation coefficient per frequency band; data are excluded when CC_COEF &lt; <code class="docutils literal notranslate"><span class="pre">CC_MIN</span></code>.</p></li>
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">USE_EGF</span></code></strong> – If <code class="docutils literal notranslate"><span class="pre">false</span></code>, the input data is cross-correlation; a negative derivative will be applied.</p></li>
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">ADJ_SRC_NORM</span></code></strong> – If <code class="docutils literal notranslate"><span class="pre">true</span></code>, normalizes the adjoint source.</p></li>
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">USE_NEAR_OFFSET</span></code></strong> – If <code class="docutils literal notranslate"><span class="pre">false</span></code>, resets <code class="docutils literal notranslate"><span class="pre">tstart</span></code>.</p></li>
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">VERBOSE_MODE</span></code></strong> – If <code class="docutils literal notranslate"><span class="pre">true</span></code>, enables verbose output.</p></li>
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">ADJSRC_TYPE</span></code></strong> – Measurement type code (<code class="docutils literal notranslate"><span class="pre">5</span></code> = cross-correlation, or <code class="docutils literal notranslate"><span class="pre">7</span></code> = multitaper, <code class="docutils literal notranslate"><span class="pre">exp_phase</span></code> = exponentiated phase), <code class="docutils literal notranslate"><span class="pre">cc_time</span></code> =
-cross-correlation time misfit</p></li>
+cross-correlation time misfit, <code class="docutils literal notranslate"><span class="pre">cc_time_dd</span></code> = double difference cc time misfit.</p></li>
 </ul>
 </section>
 <section id="sks-si-splitting-fwi-sks">
@@ -335,6 +362,8 @@ Options:</p>
 <li><p><code class="docutils literal notranslate"><span class="pre">default</span></code> – No special preconditioning</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">z_precond</span></code> – Depth-based preconditioning</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">z2_precond</span></code> – <code class="docutils literal notranslate"><span class="pre">z^2</span></code> depth-based preconditioning</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">z_sqrt_precond</span></code> – Square-root depth-based preconditioning</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">none</span></code> – No preconditioning</p></li>
 </ul>
 </li>
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">MAX_PER</span></code></strong> – Maximum relative perturbation allowed during model updates.<br />
@@ -611,46 +640,55 @@ For multi-channel noise simulation, provide the following files:</p>
 <section id="cluster-parameters">
 <h2>Cluster Parameters<a class="headerlink" href="#cluster-parameters" title="Link to this heading"></a></h2>
 <p>All of the following files are stored in <code class="docutils literal notranslate"><span class="pre">INSTALL_DIR</span></code> during installation.</p>
-<section id="module-env">
-<h3><code class="docutils literal notranslate"><span class="pre">module_env</span></code><a class="headerlink" href="#module-env" title="Link to this heading"></a></h3>
-<p>Contains the environment module commands required to load dependencies on the cluster.</p>
-</section>
-<section id="parameters-sh">
-<h3><code class="docutils literal notranslate"><span class="pre">parameters.sh</span></code><a class="headerlink" href="#parameters-sh" title="Link to this heading"></a></h3>
+<section id="config-env">
+<h3><code class="docutils literal notranslate"><span class="pre">config.env</span></code><a class="headerlink" href="#config-env" title="Link to this heading"></a></h3>
+<p>Contains the shell environment setup and runtime options used by the workflow scripts.</p>
 <ul>
-<li><p><strong><code class="docutils literal notranslate"><span class="pre">SEM_PATH</span></code></strong> – Path to the solver binary directory.<br />
-Example:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">SEM_PATH</span><span class="o">=</span>~/specfem3d-cube2sph
+<li><p>Shell setup lines at the top of this file are executed before the workflow starts. Use them to load modules, source site-specific environment scripts, and export MPI or OpenMP variables required on your system.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">SEM_PATH</span></code></strong> – Path to the SPECFEM solver directory. The scripts expect solver binaries such as <code class="docutils literal notranslate"><span class="pre">xspecfem3D</span></code>, <code class="docutils literal notranslate"><span class="pre">xsmooth_sem_sph_pde</span></code>, and <code class="docutils literal notranslate"><span class="pre">xgenerate_databases</span></code> under <code class="docutils literal notranslate"><span class="pre">$SEM_PATH/bin</span></code>.</p>
+<p>Example:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">SEM_PATH</span><span class="o">=</span>~/software/specfem3d-cube2sph
 </pre></div>
 </div>
 </li>
-<li><p><strong><code class="docutils literal notranslate"><span class="pre">MPIRUN</span></code></strong> – Command for running MPI jobs.<br />
-Example:</p>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">MPIRUN</span></code></strong> – Command used to launch MPI jobs.</p>
+<p>Example:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">MPIRUN</span><span class="o">=</span>mpirun
 </pre></div>
 </div>
 </li>
-<li><p><strong><code class="docutils literal notranslate"><span class="pre">PLATFORM</span></code></strong> – Execution platform.<br />
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">NPROC_MEASURE</span></code></strong> – Number of MPI ranks used by the measurement step (<code class="docutils literal notranslate"><span class="pre">fwat-main</span> <span class="pre">measure</span></code>). This may differ from the number of solver ranks used by SPECFEM.</p>
+<p>Example:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">NPROC_MEASURE</span><span class="o">=</span><span class="m">16</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">PLATFORM</span></code></strong> – Execution platform.
 Options:</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">local</span></code> – Run locally.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">slurm</span></code> – Run on a SLURM-based cluster.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pbs</span></code> – Run on a PBS-based cluster.</p></li>
 </ul>
-</li>
-<li><p><strong><code class="docutils literal notranslate"><span class="pre">SIMU_TYPES</span></code></strong> – List of simulation types to run.<br />
-Example:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">SIMU_TYPES</span><span class="o">=(</span><span class="s2">&quot;noise&quot;</span><span class="o">)</span>
+<p>Example:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">PLATFORM</span><span class="o">=</span><span class="s2">&quot;slurm&quot;</span>
 </pre></div>
 </div>
 </li>
-<li><p><strong><code class="docutils literal notranslate"><span class="pre">SIMU_TYPES_USER_WEIGHT</span></code></strong> – User-defined weights for each simulation type.<br />
-Example:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">SIMU_TYPES_USER_WEIGHT</span><span class="o">=(</span><span class="m">1</span>.<span class="o">)</span>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">USE_IO_TMPDIR</span></code></strong> – If set to <code class="docutils literal notranslate"><span class="pre">1</span></code>, the measurement scripts stage temporary working files in node-local storage when available. Set it to <code class="docutils literal notranslate"><span class="pre">0</span></code> to keep all I/O in the run directory.</p>
+<p>Example:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">USE_IO_TMPDIR</span><span class="o">=</span><span class="m">1</span>
 </pre></div>
 </div>
 </li>
-<li><p><strong><code class="docutils literal notranslate"><span class="pre">NJOBS_PER_JOBARRAY</span></code></strong> – Number of jobs per job array for each simulation type.<br />
-Example:</p>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">IO_TMPDIR</span></code></strong> – Path to the node-local temporary directory used when <code class="docutils literal notranslate"><span class="pre">USE_IO_TMPDIR=1</span></code>. On SLURM systems this is commonly set to <code class="docutils literal notranslate"><span class="pre">$SLURM_TMPDIR</span></code>.</p>
+<p>Example:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">IO_TMPDIR</span><span class="o">=</span><span class="nv">$SLURM_TMPDIR</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">NJOBS_PER_JOBARRAY</span></code></strong> – Number of jobs per job array for each simulation type. Its length must match <code class="docutils literal notranslate"><span class="pre">simulation.types</span></code> in <code class="docutils literal notranslate"><span class="pre">fwat.yaml</span></code> when running on <code class="docutils literal notranslate"><span class="pre">slurm</span></code> or <code class="docutils literal notranslate"><span class="pre">pbs</span></code>.</p>
+<p>Example:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">NJOBS_PER_JOBARRAY</span><span class="o">=(</span><span class="m">1</span><span class="o">)</span>
 </pre></div>
 </div>

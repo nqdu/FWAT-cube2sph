@@ -4,11 +4,9 @@
 
 # Installation 
 
-1. **Compilers:** C++/Fortran compilers which support c++17 (tested on `GCC >=7.5`), `cmake >= 3.12`
+1. Create Python environment 
 
-2. Python environment 
-
-we recommend the users to install a new python environment for this package by using `conda`:
+we recommend the users to install a new python environment for this package by using `conda` or `mamba`:
 ```bash
 conda create -n fwat python=3.10
 conda activate fwat
@@ -19,8 +17,7 @@ python -m venv fwat
 source fwat/bin/activate
 ```
 
-4. Install
-change `CXX` and `F90` in `INSTALL`, and run it like
+2. Install to target directory
 ```bash
 ./INSTALL INSTALL_DIR
 ```

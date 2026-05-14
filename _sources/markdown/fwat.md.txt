@@ -14,6 +14,17 @@ Here is a template of `fwat.yaml`:
 simulation:
   DUMP_WAVEFIELDS: True
 
+  types: ["noise"] # simulation types: noise/tele/sks/rf
+  weights: [1.] # weight for each simu type, used for multiple simu types, e.g., ["noise","tele"], [0.5,0.5]
+
+  # # < 0 NO ADAPTIVE WEIGHTS, >=0 use this iteration misfit to compute weights chi = \sum chi_i * w_i
+  # chi = \sum_i L_i(x) / L_i(x0) / |g_i(x0)| * w_i, and weights will be re-written as (w_i / L_i(x0) / |g_i(x0)|)
+  iter_wts: 0 
+
+  # Normalization by gradient norm or misfit at iter_wts, if iter_wts >= 0
+  norm_type: 'misfit' # gradient or misfit
+
+
 # Measurements block, for computing adjoint source
 measure:
   # tele seismic
@@ -23,11 +34,11 @@ measure:
     FILTER_BANDS: 
       - [5.,50.]
     TIME_WINDOW: [5.,45.] # before and after first arrival
-    VERBOSE_MODE: True
-    ADJSRC_TYPE: 2 # 2,cross-conv
+    VERBOSE_MODE: False
+    ADJSRC_TYPE: 2 # 2 (l2),cross-conv,cc_time_dd
 
   noise: # multichannel noise 
-    CC_COMPS: ['ZZ']  # {SOURCE-COMP}{RECEIVER-COMP}
+    CC_COMPS: ['ZZ','TT']  # {SOURCE-COMP}{RECEIVER-COMP}
     CH_CODE: BX   # CH_CODE
     FILTER_BANDS:  # filter bands used, in s, [T_min,Tmax]
       - [20.,40.]
@@ -40,11 +51,14 @@ measure:
       - [2.0,5.]
       - [2.0,5.]
     SNR_THRESHOLD: [0.,0.,0.,0.] # exclude data when SNR < SNR_THRESHOLD in a each band 
+    TSHIFT_MAX: [4.5,4.5,4.5,4.5] # exclude data when ABS(TSHIFT) > TSHIFT_MAX in a each band
+    DLNA_MAX: [1.5,1.5,1.5,1.5] # exclude data when ABS(DLNA) > DLNA_MAX in a each band
+    CC_MIN: [0.8,0.8,0.8,0.8] # exclude data when CC_COEF < CC_MIN in a each band
     USE_EGF: True   # if False, the input data is Cross-correlation, a negative derivative will be applied
     ADJ_SRC_NORM: False  # if true, the adjoint source will be normalized
     USE_NEAR_OFFSET: True # if FALSE, reset tstart
     VERBOSE_MODE: True
-    ADJSRC_TYPE: 5 # 5/7/exp_phase/cc_time
+    ADJSRC_TYPE: 5 # 5/7/exp_phase/cc_time/cc_time_dd
 
   # sks 
   sks:
@@ -74,7 +88,7 @@ measure:
 optimize:
   SMOOTHING: [16000.,8000.]  # gaussian smoothing in horizontal/vertical direction, in m
   OPT_METHOD: LBFGS  # GD/ LBFGS
-  PRECOND_TYPE: z_precond # default / z_precond /z2_precond
+  PRECOND_TYPE: none # default / z_precond /z2_precond/ z_sqrt_precond/ none
   MAX_PER: 0.02 # maximum relative perturbation
 
   # model/kernel type
@@ -86,8 +100,7 @@ optimize:
   #     0: c11-c66,rho
   #     1: vp,vs,rho,gcp,gsp
   #     2. vph,vpv,vsh,vsv,rho,eta,gcp,gsp
-  #     3. vp,vs,rho,kappaa,kappab,eta,gcp,gsp  where kappaa = (vph/vpv) / vpv, vp = sqrt((2*vph**2+vpv**2)/3), kappab = (vsh - vsv) / vsv, vs = sqrt((2*vsh**2 + vsv**2) / 3)
-
+  #     3. vp,vs,rho,kappaa,kappab,eta,gcp,gsp  where kappaa = (vph-vpv)/vpv, vp = sqrt((2*vsh^2 + vsv^2)/3)
   MODEL_TYPE: iso 
   KERNEL_SET: 2
   MASK_VARS: [] # set all the gradients related to index in it to 0
@@ -109,6 +122,19 @@ KERNEL_T0  = 5.0
 ```
 - **`KERNEL_SPP`** – Number of sampling points per period.  
 - **`KERNEL_T0`** – Minimum period used in your simulation (can be found in `output_generate_databases.txt`).
+
+- **`types`** – List of simulation types to run.  
+  Options: `noise`, `tele`, `sks`, `rf`.  
+  Example: `["noise"]`
+- **`weights`** – User defined Weight for each simulation type, used when multiple types are combined.  
+  Example: `[0.5, 0.5]` for `["noise", "tele"]`
+- **`iter_wts`** – Controls adaptive weighting. If `< 0`, adaptive weights are disabled. If `>= 0`, the misfit at this iteration is used to compute weights as:  
+  $\chi = \sum_i L_i(x) \cdot w_i$  
+  and the weights are rewritten as $w_i * norm_i$, where $norm_i$ is the normalization factor  
+  Example: `0`
+- **`norm_type`** – Normalization strategy when adaptive weights are enabled (`iter_wts >= 0`). Controls whether the weight normalization factor is computed from the gradient norm or the misfit value.  
+  Options: `gradient`, `misfit`  
+  Example: `'misfit'`
 
 (measurement-block)=
 ### Measurement block
@@ -155,13 +181,16 @@ Example:
 [2.5, 4.5],
 [2.5, 4.5]]
 `
-- **`SNR_THRESHOLD`** - SNR threshold for each frequency band
+- **`SNR_THRESHOLD`** – SNR threshold for each frequency band; data are excluded when SNR < `SNR_THRESHOLD`.
+- **`TSHIFT_MAX`** – Maximum allowed absolute time shift (in seconds) per frequency band; data are excluded when |TSHIFT| > `TSHIFT_MAX`.
+- **`DLNA_MAX`** – Maximum allowed absolute amplitude ratio (dlna) per frequency band; data are excluded when |DLNA| > `DLNA_MAX`.
+- **`CC_MIN`** – Minimum cross-correlation coefficient per frequency band; data are excluded when CC_COEF < `CC_MIN`.
 - **`USE_EGF`** – If `false`, the input data is cross-correlation; a negative derivative will be applied.
 - **`ADJ_SRC_NORM`** – If `true`, normalizes the adjoint source.
 - **`USE_NEAR_OFFSET`** – If `false`, resets `tstart`.
 - **`VERBOSE_MODE`** – If `true`, enables verbose output.
 - **`ADJSRC_TYPE`** – Measurement type code (`5` = cross-correlation, or `7` = multitaper, `exp_phase` = exponentiated phase), `cc_time` = 
-cross-correlation time misfit
+cross-correlation time misfit, `cc_time_dd` = double difference cc time misfit.
 
 #### SKS SI-Splitting FWI (`sks`)
 - **`COMPS`** – List of components used.  
@@ -205,7 +234,9 @@ The `optimize` block defines parameters for the optimization process in FWI.
   Options:  
   - `default` – No special preconditioning  
   - `z_precond` – Depth-based preconditioning  
-  - `z2_precond` – `z^2` depth-based preconditioning
+  - `z2_precond` – `z^2` depth-based preconditioning  
+  - `z_sqrt_precond` – Square-root depth-based preconditioning  
+  - `none` – No preconditioning
 - **`MAX_PER`** – Maximum relative perturbation allowed during model updates.  
   Example: `0.02` (2% maximum change per iteration)
 
@@ -461,43 +492,53 @@ fwat_data/$NAME_[RTZ]
 
 All of the following files are stored in `INSTALL_DIR` during installation.
 
-### `module_env`
-Contains the environment module commands required to load dependencies on the cluster.
+### `config.env`
+Contains the shell environment setup and runtime options used by the workflow scripts.
 
+- Shell setup lines at the top of this file are executed before the workflow starts. Use them to load modules, source site-specific environment scripts, and export MPI or OpenMP variables required on your system.
+- **`SEM_PATH`** – Path to the SPECFEM solver directory. The scripts expect solver binaries such as `xspecfem3D`, `xsmooth_sem_sph_pde`, and `xgenerate_databases` under `$SEM_PATH/bin`.
 
-### `parameters.sh`
-
-- **`SEM_PATH`** – Path to the solver binary directory.  
-  Example:  
+  Example:
   ```bash
-  SEM_PATH=~/specfem3d-cube2sph
+  SEM_PATH=~/software/specfem3d-cube2sph
   ```
+- **`MPIRUN`** – Command used to launch MPI jobs.
 
-- **`MPIRUN`** – Command for running MPI jobs.  
-  Example:  
+  Example:
   ```bash
   MPIRUN=mpirun
   ```
+- **`NPROC_MEASURE`** – Number of MPI ranks used by the measurement step (`fwat-main measure`). This may differ from the number of solver ranks used by SPECFEM.
 
-- **`PLATFORM`** – Execution platform.  
-  Options:  
-  - `local` – Run locally.  
-  - `slurm` – Run on a SLURM-based cluster.  
-
-- **`SIMU_TYPES`** – List of simulation types to run.  
-  Example:  
+  Example:
   ```bash
-  SIMU_TYPES=("noise")
+  NPROC_MEASURE=16
   ```
+- **`PLATFORM`** – Execution platform.
+  Options:
+  - `local` – Run locally.
+  - `slurm` – Run on a SLURM-based cluster.
+  - `pbs` – Run on a PBS-based cluster.
 
-- **`SIMU_TYPES_USER_WEIGHT`** – User-defined weights for each simulation type.  
-  Example:  
+  Example:
   ```bash
-  SIMU_TYPES_USER_WEIGHT=(1.)
+  PLATFORM="slurm"
   ```
+- **`USE_IO_TMPDIR`** – If set to `1`, the measurement scripts stage temporary working files in node-local storage when available. Set it to `0` to keep all I/O in the run directory.
 
-- **`NJOBS_PER_JOBARRAY`** – Number of jobs per job array for each simulation type.  
-  Example:  
+  Example:
+  ```bash
+  USE_IO_TMPDIR=1
+  ```
+- **`IO_TMPDIR`** – Path to the node-local temporary directory used when `USE_IO_TMPDIR=1`. On SLURM systems this is commonly set to `$SLURM_TMPDIR`.
+
+  Example:
+  ```bash
+  IO_TMPDIR=$SLURM_TMPDIR
+  ```
+- **`NJOBS_PER_JOBARRAY`** – Number of jobs per job array for each simulation type. Its length must match `simulation.types` in `fwat.yaml` when running on `slurm` or `pbs`.
+
+  Example:
   ```bash
   NJOBS_PER_JOBARRAY=(1)
   ```

@@ -82,10 +82,9 @@
 <section id="installation">
 <h1>Installation<a class="headerlink" href="#installation" title="Link to this heading"></a></h1>
 <ol class="arabic simple">
-<li><p><strong>Compilers:</strong> C++/Fortran compilers which support c++17 (tested on <code class="docutils literal notranslate"><span class="pre">GCC</span> <span class="pre">&gt;=7.5</span></code>), <code class="docutils literal notranslate"><span class="pre">cmake</span> <span class="pre">&gt;=</span> <span class="pre">3.12</span></code></p></li>
-<li><p>Python environment</p></li>
+<li><p>Create Python environment</p></li>
 </ol>
-<p>we recommend the users to install a new python environment for this package by using <code class="docutils literal notranslate"><span class="pre">conda</span></code>:</p>
+<p>we recommend the users to install a new python environment for this package by using <code class="docutils literal notranslate"><span class="pre">conda</span></code> or <code class="docutils literal notranslate"><span class="pre">mamba</span></code>:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>fwat<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.10
 conda<span class="w"> </span>activate<span class="w"> </span>fwat
 </pre></div>
@@ -95,9 +94,8 @@ conda<span class="w"> </span>activate<span class="w"> </span>fwat
 <span class="nb">source</span><span class="w"> </span>fwat/bin/activate
 </pre></div>
 </div>
-<ol class="arabic simple" start="4">
-<li><p>Install
-change <code class="docutils literal notranslate"><span class="pre">CXX</span></code> and <code class="docutils literal notranslate"><span class="pre">F90</span></code> in <code class="docutils literal notranslate"><span class="pre">INSTALL</span></code>, and run it like</p></li>
+<ol class="arabic simple" start="2">
+<li><p>Install to target directory</p></li>
 </ol>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>./INSTALL<span class="w"> </span>INSTALL_DIR
 </pre></div>
