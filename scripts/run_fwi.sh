@@ -132,7 +132,11 @@ RUN_SEM()
 
     # build script
     local fwd=tmp.adj.$simu_type.sh
-    SHELL_HEADER_SEM $narray $simu_type 00:25:00 > $fwd
+    if [  "$simu_type" == "noise" ]; then
+      SHELL_HEADER_SEM $narray $simu_type 00:45:00 > $fwd
+    else
+      SHELL_HEADER_SEM $narray $simu_type 00:25:00 > $fwd
+    fi
     cat sbash_measure.sh >>  $fwd
 
     # substitute
@@ -321,6 +325,7 @@ for ii in `seq 1 4`;do
   # check flag type and run
   if [ $flag == "INIT" ]; then
     RUN_SEM $iter
+    echo " "
 
     # sum kernels, get search direction, generate trial model
     RUN_POST
@@ -331,9 +336,12 @@ for ii in `seq 1 4`;do
 
   else  # line search
     RUN_SEM $iter
+    echo " "
 
     RUN_WOLFE
   fi
+
+  echo ""
 
   WAIT_FINISH
 done

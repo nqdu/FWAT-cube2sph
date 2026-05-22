@@ -74,7 +74,7 @@ class Backend:
         """
         Return:
           {
-            'status'      : 'PENDING'|'RUNNING'|'COMPLETED'|'FAILED'|'UNKNOWN',
+            'status'      : 'PENDING'|'RUNNING'|'COMPLETED'|'FAILED'|'CANCELLED'|'UNKNOWN',
             'failed_tasks': [int, ...]      # only for arrays; empty otherwise
           }
         """
@@ -130,34 +130,44 @@ class SlurmBackend(Backend):
         # If no task rows exist (non-array job), use the master row.
         task_rows, master_state = [], None
         for r in rows:
-            jid, st, _ = (r.split("|") + ["", ""])[:3]
-            st = st.split()[0]                          # strip "CANCELLED by ..."
+            jid, raw_state, _ = (r.split("|") + ["", ""])[:3]
+            user_cancelled = raw_state.startswith("CANCELLED by ")
+            st = raw_state.split()[0]
             if "." in jid:                              # .batch / .extern
                 continue
             if "_" in jid:
                 m = re.match(rf"{re.escape(jobid)}_(\d+)$", jid)
                 if m:
-                    task_rows.append((int(m.group(1)), st))
+                    task_rows.append((int(m.group(1)), st, user_cancelled))
             else:
-                master_state = st
+                master_state = (st, user_cancelled)
 
         if task_rows:
-            failed = sorted({i for i, s in task_rows if s in self.BAD})
-            active = [s for _, s in task_rows if s in self.ACTIVE]
+            cancelled = sorted({i for i, _, cancelled in task_rows if cancelled})
+            failed = sorted({i for i, s, _ in task_rows if s in self.BAD})
+            active = [s for _, s, _ in task_rows if s in self.ACTIVE]
             if active:
                 return {"status": "RUNNING", "failed_tasks": []}
+            if cancelled:
+                return {"status": "CANCELLED", "failed_tasks": cancelled}
             if failed:
                 return {"status": "FAILED", "failed_tasks": failed}
-            if all(s in self.OK for _, s in task_rows):
+            if all(s in self.OK for _, s, _ in task_rows):
                 return {"status": "COMPLETED", "failed_tasks": []}
             return {"status": "UNKNOWN", "failed_tasks": failed}
 
         # Single (non-array) job
-        if master_state in self.ACTIVE:
+        if master_state is None:
+            return {"status": "UNKNOWN", "failed_tasks": []}
+
+        state_name, user_cancelled = master_state
+        if state_name in self.ACTIVE:
             return {"status": "RUNNING", "failed_tasks": []}
-        if master_state in self.BAD:
+        if user_cancelled:
+            return {"status": "CANCELLED", "failed_tasks": []}
+        if state_name in self.BAD:
             return {"status": "FAILED", "failed_tasks": []}
-        if master_state in self.OK:
+        if state_name in self.OK:
             return {"status": "COMPLETED", "failed_tasks": []}
         return {"status": "UNKNOWN", "failed_tasks": []}
 
@@ -200,6 +210,27 @@ class PBSBackend(Backend):
     def cancel(self, jobid):
         subprocess.run(["qdel", jobid], check=False)
 
+    @staticmethod
+    def was_user_cancelled(info: dict) -> bool:
+        text_fields = [
+            info.get("comment"),
+            info.get("Comment"),
+            info.get("obit_comment"),
+            info.get("Obit_comment"),
+            info.get("Submit_arguments"),
+        ]
+        combined = " ".join(str(value).lower() for value in text_fields if value)
+        return any(
+            phrase in combined
+            for phrase in (
+                "deleted as requested",
+                "job deleted",
+                "requestor=user",
+                "cancelled",
+                "canceled",
+            )
+        )
+
     def state(self, jobid):
         # -x includes completed jobs; -f -F json for structured output if avail.
         try:
@@ -224,30 +255,39 @@ class PBSBackend(Backend):
         for key, info in jobs.items():
             st = info.get("job_state", "?")          # Q,R,H,E,F,X
             exit_status = info.get("Exit_status")
+            user_cancelled = self.was_user_cancelled(info)
             ms = sub_pattern.match(key.split(".")[0] + "." + key.split(".",1)[1]
                                    if "." in key else key)
             if ms:
                 idx = int(ms.group(1))
-                sub_states[idx] = (st, exit_status)
+                sub_states[idx] = (st, exit_status, user_cancelled)
             elif master_pattern.match(key) or key.startswith(jobid):
-                master_state = (st, exit_status)
+                master_state = (st, exit_status, user_cancelled)
 
-        def classify(st, exit_status):
+        def classify(st, exit_status, user_cancelled):
             if st in ("Q", "H", "W"):
                 return "PENDING"
             if st in ("R", "E", "B"):                # B = array begun
                 return "RUNNING"
             if st in ("F", "X"):                      # finished / exited
+                if user_cancelled:
+                    return "CANCELLED"
                 if exit_status in (0, "0", None):
                     return "COMPLETED" if exit_status == 0 else "UNKNOWN"
                 return "FAILED"
             return "UNKNOWN"
 
         if sub_states:
-            classified = {i: classify(s, x) for i, (s, x) in sub_states.items()}
+            classified = {
+                i: classify(s, x, cancelled)
+                for i, (s, x, cancelled) in sub_states.items()
+            }
+            cancelled = sorted(i for i, c in classified.items() if c == "CANCELLED")
             failed = sorted(i for i, c in classified.items() if c == "FAILED")
             if any(c in ("PENDING", "RUNNING") for c in classified.values()):
                 return {"status": "RUNNING", "failed_tasks": []}
+            if cancelled:
+                return {"status": "CANCELLED", "failed_tasks": cancelled}
             if failed:
                 return {"status": "FAILED", "failed_tasks": failed}
             if all(c == "COMPLETED" for c in classified.values()):
@@ -255,8 +295,8 @@ class PBSBackend(Backend):
             return {"status": "UNKNOWN", "failed_tasks": failed}
 
         if master_state:
-            st, x = master_state
-            return {"status": classify(st, x), "failed_tasks": []}
+            st, x, cancelled = master_state
+            return {"status": classify(st, x, cancelled), "failed_tasks": []}
         return {"status": "UNKNOWN", "failed_tasks": []}
 
 
@@ -419,6 +459,11 @@ def poll_once(backend: Backend, state: State) -> bool:
             rewire_children(backend, rec, state)
             all_done = False
             changed = True
+        elif new_status == "CANCELLED":
+            rec.failed_tasks = info["failed_tasks"]
+            log(f"ABORT: {name} was cancelled by user. jobid={rec.jobid}")
+            state.save()
+            sys.exit(3)
         elif new_status != "COMPLETED":
             all_done = False
 
