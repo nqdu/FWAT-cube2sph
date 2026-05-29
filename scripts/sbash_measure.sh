@@ -55,12 +55,12 @@ if [  "$FLAG" == "LS" ]; then
   MODEL=$MODEL.ls
 fi
 :> $fwd
+echo " " >> $fwd
 
 # working dir is IO_TMPDIR when enabled and available
 MYDIR=$curr_dir
 if [ "$USE_IO_TMPDIR" == "1" ];  then
   if [ -d "$IO_TMPDIR" ]; then
-    echo "working directory is $IO_TMPDIR"
     if [ "$PLATFORM"  == "slurm" ];  then 
       MYDIR=$IO_TMPDIR/$SLURM_JOB_ID
     elif [ "$PLATFORM"  == "pbs" ];  then 
@@ -68,11 +68,11 @@ if [ "$USE_IO_TMPDIR" == "1" ];  then
     fi
     mkdir -p $MYDIR
   else
-    echo "IO_TMPDIR is not available, disable USE_IO_TMPDIR"
     USE_IO_TMPDIR=0
-    echo "working directory is current dir"
   fi
 fi
+echo "working directory is $MYDIR" 
+echo "working directory is $MYDIR" >> $fwd
 
 for i in `seq 1 $NJOBS`; do
   cd $curr_dir
@@ -97,6 +97,11 @@ for i in `seq 1 $NJOBS`; do
   # copy fwat_params to MYDIR if using IO_TMPDIR
   if [ "$USE_IO_TMPDIR" == "1" ]; then
     cp -r $curr_dir/fwat_params $MYDIR/fwat_params
+
+    # if MOVE_DATABASE is enabled and i == 1, copy model to MYDIR
+    if [ "$i" -eq 1 ] && [ "$MOVE_DATABASE" == "1" ]; then
+      cp -r $curr_dir/$FWAT_OPT_DIR/MODEL_${MODEL} $MYDIR/$MODEL
+    fi
   fi
 
   # run forward simulation
@@ -106,6 +111,18 @@ for i in `seq 1 $NJOBS`; do
     if [ "$USE_IO_TMPDIR" == "1" ]; then
       mkdir -p $MYDIR/$evtdir
       cp -r $evtdir/* $MYDIR/$evtdir/
+
+      # remove DATABASES_MPI soft link and link $MYDIR/$MODEL instead
+      if [ "$MOVE_DATABASE" == "1" ]; then
+        \rm -rf $MYDIR/$evtdir/DATABASES_MPI
+        mkdir -p $MYDIR/$evtdir/DATABASES_MPI
+        ln -s $MYDIR/${MODEL}/* $MYDIR/$evtdir/DATABASES_MPI/
+
+        # copy axisem data
+        if [ -d "$curr_dir/DATA/axisem/$evtid_wk" ]; then
+          cp -r $curr_dir/DATA/axisem/$evtid_wk/* $MYDIR/$evtdir/DATABASES_MPI/
+        fi
+      fi
     fi
 
     # go to working directory
@@ -194,4 +211,9 @@ for i in `seq 1 $NJOBS`; do
   echo "finish event $ievt of $nevts, pair $ievt - $ievt_ed" >> $fwd 
   echo " " >> $fwd
 done
+
+# remove
+if [ "$USE_IO_TMPDIR" == "1" ]; then
+  \rm -rf $MYDIR
+fi
 
