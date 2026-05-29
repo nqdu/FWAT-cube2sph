@@ -461,7 +461,36 @@ def poll_once(backend: Backend, state: State) -> bool:
             changed = True
         elif new_status == "CANCELLED":
             rec.failed_tasks = info["failed_tasks"]
-            log(f"ABORT: {name} was cancelled by user. jobid={rec.jobid}")
+            # If this is a child job, cancellation can be transient while a
+            # failed parent is being retried; recover by resubmitting child.
+            if rec.parents:
+                parents = [state.jobs[p] for p in rec.parents if p in state.jobs]
+
+                # User explicitly requested abort when parent is cancelled,
+                # including the case where both parent and child are cancelled.
+                if any(p.status == "CANCELLED" for p in parents):
+                    cancelled_parents = [p.name for p in parents if p.status == "CANCELLED"]
+                    log(f"ABORT: {name} cancelled and parent(s) cancelled: "
+                        f"{','.join(cancelled_parents)}")
+                    state.save()
+                    sys.exit(3)
+
+                # Parent chain is still resolving (e.g., a parent failed and was
+                # resubmitted). Resubmit child with fresh dependencies.
+                if parents and any(p.status != "COMPLETED" for p in parents):
+                    if rec.retries >= MAX_RETRIES:
+                        log(f"ABORT: {name} exceeded MAX_RETRIES={MAX_RETRIES}. "
+                            f"jobid={rec.jobid}")
+                        state.save()
+                        sys.exit(2)
+                    log(f"{name} ({rec.jobid}) cancelled while parent chain is "
+                        f"still resolving; resubmitting")
+                    resubmit_single(backend, rec, state)
+                    all_done = False
+                    changed = True
+                    continue
+
+            log(f"ABORT: {name} was cancelled. jobid={rec.jobid}")
             state.save()
             sys.exit(3)
         elif new_status != "COMPLETED":
