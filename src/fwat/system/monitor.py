@@ -457,6 +457,20 @@ def poll_once(backend: Backend, state: State) -> bool:
                 state.save()
                 sys.exit(2)
 
+            if rec.parents:
+                parents = [state.jobs[p] for p in rec.parents if p in state.jobs]
+                if any(p.status != "COMPLETED" for p in parents):
+                    if any(p.status == "FAILED" and p.retries < MAX_RETRIES for p in parents):
+                        log(f"{name} ({rec.jobid}) failed while parent retrying; "
+                            "deferring resubmission")
+                        all_done = False
+                        continue
+                    if any(p.status in ("PENDING", "RUNNING", "UNKNOWN") for p in parents):
+                        log(f"{name} ({rec.jobid}) failed while parent in-progress; "
+                            "deferring resubmission")
+                        all_done = False
+                        continue
+
             if rec.failed_tasks:                         # array job
                 resubmit_failed_array(backend, rec)
             else:                                        # single job
