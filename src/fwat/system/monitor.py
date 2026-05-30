@@ -405,12 +405,17 @@ def resubmit_single(backend: Backend, rec: JobRecord,
 
 
 def rewire_children(backend: Backend, parent: JobRecord,
-                    state: State) -> None:
+                    state: State,
+                    allow_cancel: bool = True) -> None:
     """
     When `parent` was just resubmitted (new jobid), any child whose dependency
     referred to the old jobid is now broken. Cancel and resubmit each pending
     child with a dependency on the NEW parent jobid.
     """
+    if not allow_cancel:
+        log(f"  skipping child rewiring for {parent.name}: parent retry in progress")
+        return
+
     for child in state.children_of(parent.name):
         if child.status in ("COMPLETED",):
             continue
@@ -456,18 +461,14 @@ def poll_once(backend: Backend, state: State) -> bool:
                 resubmit_failed_array(backend, rec)
             else:                                        # single job
                 resubmit_single(backend, rec, state)
-            rewire_children(backend, rec, state)
+            rewire_children(backend, rec, state, allow_cancel=False)
             all_done = False
             changed = True
         elif new_status == "CANCELLED":
             rec.failed_tasks = info["failed_tasks"]
-            # If this is a child job, cancellation can be transient while a
-            # failed parent is being retried; recover by resubmitting child.
             if rec.parents:
                 parents = [state.jobs[p] for p in rec.parents if p in state.jobs]
 
-                # User explicitly requested abort when parent is cancelled,
-                # including the case where both parent and child are cancelled.
                 if any(p.status == "CANCELLED" for p in parents):
                     cancelled_parents = [p.name for p in parents if p.status == "CANCELLED"]
                     log(f"ABORT: {name} cancelled and parent(s) cancelled: "
@@ -475,8 +476,12 @@ def poll_once(backend: Backend, state: State) -> bool:
                     state.save()
                     sys.exit(3)
 
-                # Parent chain is still resolving (e.g., a parent failed and was
-                # resubmitted). Resubmit child with fresh dependencies.
+                if any(p.status == "FAILED" and p.retries < MAX_RETRIES for p in parents):
+                    log(f"{name} ({rec.jobid}) cancelled while parent retrying; "
+                        "waiting for parent resubmission")
+                    all_done = False
+                    continue
+
                 if parents and any(p.status != "COMPLETED" for p in parents):
                     if rec.retries >= MAX_RETRIES:
                         log(f"ABORT: {name} exceeded MAX_RETRIES={MAX_RETRIES}. "
