@@ -392,7 +392,16 @@ def resubmit_failed_array(backend: Backend, rec: JobRecord) -> None:
 def resubmit_single(backend: Backend, rec: JobRecord,
                     state: State) -> None:
     """Resubmit a non-array job (POST/WOLFE)."""
-    parent_ids = state.parent_ids(rec.parents)
+    # Only depend on parents that have NOT completed yet. A parent that already
+    # COMPLETED satisfies `afterok` trivially, and Slurm purges finished jobs
+    # from the controller after MinJobAge (default 300s). Referencing such a
+    # purged job ID in a new dependency makes sbatch fail with
+    # "Job dependency problem", which would abort the whole monitor.
+    parent_ids = [
+        state.jobs[p].jobid
+        for p in rec.parents
+        if p in state.jobs and state.jobs[p].status != "COMPLETED"
+    ]
     log(f"resubmitting {rec.name} "
         f"(retry {rec.retries + 1}/{MAX_RETRIES}) "
         f"deps={parent_ids or '-'}")
