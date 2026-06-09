@@ -967,13 +967,17 @@ def mt_measure(
 
     wtr_use_unw = ampmax_unw * params.wtr
     i_right = fnum
-    if fnum > i_pmax_syn:
-        mags = np.abs(syn_dtwo)
-        tail = mags[i_pmax_syn:fnum]
-        if tail.size > 0:
-            below = tail <= abs(wtr_use_unw)
-            if np.any(below):
-                i_right = i_pmax_syn + int(np.argmax(below)) + 1
+    i_right_stop = 0
+    mags = np.abs(syn_dtwo)
+    wtr_abs = abs(wtr_use_unw)
+    for i in range(1, fnum + 1):
+        mi = mags[i - 1]
+        if mi <= wtr_abs and i_right_stop == 0 and i > i_pmax_syn:
+            i_right_stop = 1
+            i_right = i
+        if mi >= 10.0 * wtr_abs and i_right_stop == 1 and i > i_pmax_syn:
+            i_right_stop = 0
+            i_right = i
 
     if params.is_mtm == 1:
         ntaper = int(params.npi * 2.0)
@@ -1002,7 +1006,8 @@ def mt_measure(
         ampmax = float(np.max(np.abs(syn_dtw_ho)))
         wtr_use = ampmax * params.wtr
         denom = np.where(np.abs(syn_dtw_ho) > abs(wtr_use), syn_dtw_ho, syn_dtw_ho + wtr_use)
-        trans_w = dat_dtw_ho / denom
+        nz = np.abs(denom) > 0
+        trans_w[nz] = dat_dtw_ho[nz] / denom[nz]
 
     if params.is_mtm != 1:
         phi_wt, abs_wt, dtau_w, dlnA_w, dtau_wa, dlnA_wa = write_trans(
@@ -1039,7 +1044,9 @@ def mt_measure(
     ampmax = np.max(np.abs(bot_mtm))
     wtr_use = ampmax * wtr_mtm ** 2
     denom = np.where(np.abs(bot_mtm) > abs(wtr_use), bot_mtm, bot_mtm + wtr_use)
-    trans_mtm = top_mtm / denom
+    trans_mtm = np.zeros(fnum, dtype=np.complex128)
+    nz = np.abs(denom) > 0
+    trans_mtm[nz] = top_mtm[nz] / denom[nz]
 
     phi_wt, abs_wt, dtau_w, dlnA_w, dtau_wa, dlnA_wa = write_trans(
         trans_mtm, wvec, i_right, idf_new, df, tshift, dlnA
@@ -1066,11 +1073,10 @@ def mt_measure(
             bot_mtm_jk = bot_leave[:, iom]
             ampmax = np.max(np.abs(bot_mtm_jk))
             wtr_use = ampmax * wtr_mtm ** 2
-            trans_mtm_jk = np.where(
-                np.abs(bot_mtm_jk) > abs(wtr_use),
-                top_mtm_jk / bot_mtm_jk,
-                top_mtm_jk / (bot_mtm_jk + wtr_use),
-            )
+            denom_jk = np.where(np.abs(bot_mtm_jk) > abs(wtr_use), bot_mtm_jk, bot_mtm_jk + wtr_use)
+            trans_mtm_jk = np.zeros(fnum, dtype=np.complex128)
+            nz = np.abs(denom_jk) > 0
+            trans_mtm_jk[nz] = top_mtm_jk[nz] / denom_jk[nz]
             phi_mul[:, iom], abs_mul[:, iom], dtau_mul[:, iom], dlnA_mul[:, iom], _, _ = write_trans(
                 trans_mtm_jk, wvec, i_right, idf_new, df, tshift, dlnA
             )
@@ -1571,13 +1577,14 @@ def measure_adj(t0_inp: float,dt_inp: float,npt_inp: int,
     fstart0 = 1.0 / params.tlong
     fend0 = 1.0 / params.tshort
 
-    # sanity check for input data
-    empty_data = np.sum(obs_data**2) == 0.0
-    if empty_data:
-        # If the observed data is empty, we can skip the actual measurement and return a default misfit and zero adjoint source.
-        obs_data = np.ones_like(syn_data)
-        syn_data = np.ones_like(syn_data)
-    
+    # sanity check for input data: return zeros immediately to avoid NaN from 0/0
+    if np.sum(obs_data**2) == 0.0 or np.sum(syn_data**2) == 0.0:
+        empty_stats = MeasureStats(
+            adj_type=str(imeas), misfit=0.0, tstart=tstart, tend=tend,
+            tr_chi=0.0, am_chi=0.0, tshift=0.0,
+        )
+        return empty_stats, np.zeros(npt_inp)
+
     _, tr_chi_out, am_chi_out, tshift, adj =  \
         measure_adj_impl(
         obs_data,
