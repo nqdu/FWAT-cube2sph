@@ -1,3 +1,5 @@
+import sys
+
 import yaml 
 from functools import reduce
 from fwat.const import PARAM_FILE
@@ -17,24 +19,29 @@ def get_nested_value(d, path):
 def help_function():
     print("Usage fwat-utils [module_name] [args]\n")
     print()
-    print("fwat clean MODEL evtid (deepclean) ")
+    print("fwat-utils clean MODEL evtid (deepclean) ")
     print("\tclean temporary diretories")
-    print("\texample: fwat clean M00 XZ.FAF")
+    print("\texample: fwat-utils clean M00 XZ.FAF")
 
     print()
     print("fwat-utils setparam paramloc value file=[fwat_params/fwat.yaml] ")
     print("\tset parameters with value in the file")
-    print("\texample: fwat-param set measure/tele/CH_CODE 'BH' ")
+    print("\texample: fwat-utils setparam measure/tele/CH_CODE 'BH' ")
 
     print()
     print("fwat-utils getparam paramloc file=[fwat_params/fwat.yaml] ")
     print("\tget parameters in the file")
-    print("\texample: fwat-param get measure/tele/CH_CODE ")
+    print("\texample: fwat-utils getparam measure/tele/CH_CODE ")
 
     print()
     print("fwat-utils install install-dir")
     print("\tinstall FWAT to the specified directory")
     print("\texample: fwat-utils install /path/to/install/dir")
+
+    print()
+    print("fwat-utils monitor --cmd [register|wait|show|reset] [...]")
+    print("\trun the pipeline monitor CLI")
+    print("\texample: fwat-utils monitor --cmd show")
 
 def set_param(argv):
     if len(argv) !=3 and len(argv) != 2:
@@ -140,12 +147,10 @@ def param_sanity_check():
 
 
 def main():
-    import sys
     if len(sys.argv) < 2:
         help_function()
         sys.exit(1)
 
-    # get cmd
     cmd = sys.argv[1]
     args = sys.argv[2:]
 
@@ -159,6 +164,9 @@ def main():
         clean.run(args)
     elif cmd == "install":
         install(args)
+    elif cmd == "monitor":
+        from fwat.system import monitor
+        monitor.main(args)
     else:
         print(f"module {cmd} not exist")
         help_function()

@@ -1,5 +1,6 @@
 #!/bin/bash 
 set -e 
+
 run_wolfe () { # run wolfe line search
   # compute misfit
   if [ "$nsimtypes" == "1" ]; then 
@@ -31,11 +32,12 @@ run_wolfe () { # run wolfe line search
     done 
   fi 
 
-  echo "misfit current/next = $chi $chi1"
-  echo " "
-
   logfile=LOG/output_fwat4_log_$MODEL.txt
   echo "******************************************************" > $logfile
+  echo "misfit current/next = $chi $chi1"
+  echo "misfit current/next = $chi $chi1" >> $logfile
+  echo " "
+  echo " " >> $logfile
   
   # get smooth parameters
   GPU_MODE=`grep ^"GPU_MODE" DATA/Par_file | cut -d'=' -f2`
@@ -48,6 +50,7 @@ run_wolfe () { # run wolfe line search
 
   # sum kernels for line search, save to optimize/sum_kernels_$MODEL.ls
   echo "sum kernels for new model ..."
+  echo "sum kernels for new model ..." >> $logfile
   $MPIRUN $hostfile -np $NPROC fwat-main sum_kernel $MODEL.ls
   echo " " >> $logfile
 
@@ -67,22 +70,28 @@ run_wolfe () { # run wolfe line search
     done
 
     echo "converting $param to hdf5 ..."
+    echo "converting $param to hdf5 ..." >> $logfile
     fwat-main bin2h5 ${FWAT_OPT_DIR}/SUM_KERNELS_${MODEL}.ls/ $param $NPROC 1
     \rm ${FWAT_OPT_DIR}/SUM_KERNELS_${MODEL}.ls/*_${param}.bin
   done 
+  echo " " >> $logfile
 
   for param in hess_kernel;
   do 
     echo "converting $param to hdf5 ..."
+    echo "converting $param to hdf5 ..." >> $logfile
     fwat-main bin2h5 ${FWAT_OPT_DIR}/SUM_KERNELS_${MODEL}.ls/ $param $NPROC 1
     \rm ${FWAT_OPT_DIR}/SUM_KERNELS_${MODEL}.ls/*_${param}.bin
   done
   echo " " 
+  echo " " >> $logfile
 
   # check wolfe condition
   echo "line search ..."
-  $MPIRUN $hostfile -np $NPROC  fwat-main linesearch $MODEL $chi $chi1 
-
+  echo "line search ..." >> $logfile
+  $MPIRUN $hostfile -np $NPROC  fwat-main linesearch $MODEL $chi $chi1  >> $logfile
+  echo " " >> $logfile
+  
   # check if this line search is accepted
   LSDIR=./${FWAT_OPT_DIR}/MODEL_${MODEL}.ls
   flag=`fwat-utils getparam flag ${LBFGS_FILE}`
@@ -144,6 +153,7 @@ run_wolfe () { # run wolfe line search
     echo " Finish line search direction  here!!!" >> $logfile 
   else 
     echo "$MPIRUN $hostfile -np $NPROC fwat-main update $MODEL $LSDIR"
+    echo "$MPIRUN $hostfile -np $NPROC fwat-main update $MODEL $LSDIR" >> $logfile
     $MPIRUN $hostfile -np $NPROC fwat-main update $MODEL $LSDIR >> $logfile
 
     # generate new model database
@@ -188,7 +198,9 @@ run_post () { # run post-processing
   # sum kernels
   if [ $FLAG != "GRAD" ]; then 
     echo "sum kernels ..."
+    echo "sum kernels ..." >> $logfile
     echo "CMD: fwat-main sum_kernel  $MODEL"
+    echo "CMD: fwat-main sum_kernel  $MODEL" >> $logfile
     $MPIRUN $hostfile -np $NPROC fwat-main sum_kernel $MODEL >> $logfile
     echo " " >> $logfile
 
@@ -208,12 +220,14 @@ run_post () { # run post-processing
       done
 
       echo "converting $param to hdf5 ..."
+      echo "converting $param to hdf5 ..." >> $logfile
       fwat-main bin2h5 ${FWAT_OPT_DIR}/SUM_KERNELS_${MODEL}/ $param $NPROC 1
       \rm ${FWAT_OPT_DIR}/SUM_KERNELS_${MODEL}/*_${param}.bin
     done
   fi 
 
   echo " "
+  echo " " >> $logfile
 
   # smooth hess kernel if required
   if [ $PRECOND == "default" ] && [ $MODEL == "M00"  ];then 
@@ -238,12 +252,14 @@ run_post () { # run post-processing
   # get search direction
   $MPIRUN -np $NPROC fwat-main direc 
   echo " "
+  echo " " >> $logfile
 
   # get search direction
   kl_list=`fwat-model name direc`
   for param in $kl_list; 
   do 
     echo "converting $param to hdf5 ..."
+    echo "converting $param to hdf5 ..." >> $logfile
     fwat-main bin2h5 ${FWAT_OPT_DIR}/SUM_KERNELS_${MODEL}/ $param $NPROC 1
     \rm ${FWAT_OPT_DIR}/SUM_KERNELS_${MODEL}/*_${param}.bin
   done
@@ -252,7 +268,9 @@ run_post () { # run post-processing
   LSDIR=./${FWAT_OPT_DIR}/MODEL_${MODEL}.ls
   mkdir -p $LSDIR
   echo " "
+  echo " " >> $logfile
   echo "$MPIRUN -np $NPROC fwat-main update $MODEL $LSDIR"
+  echo "$MPIRUN -np $NPROC fwat-main update $MODEL $LSDIR" >> $logfile
   $MPIRUN -np $NPROC fwat-main update $MODEL $LSDIR >> $logfile
 
   # generate new model database
