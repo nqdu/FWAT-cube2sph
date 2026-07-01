@@ -9,5 +9,6 @@ Welcome to FWAT
    markdown/cube2sph.md
    markdown/fwat.md
    markdown/visual.md 
+   markdown/example.md
 ..    markdown/gallery.md
 ..    python/index
