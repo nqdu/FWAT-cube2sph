@@ -32,7 +32,7 @@ These flags should remain as shown:
   This is required because part of the workflow—specifically the conversion from an 8-point mesh to a 27-point mesh—depends on the `CUBIT` files.
 
 ### `Mesh_Par_file`
-This file can be found in utils/cube2sph/EXAMPLES/NED-MODEL.
+This file can be found in utils/cube2sph/EXAMPLES/NED.iso.
 
 #### Mesh Size
 
@@ -97,6 +97,14 @@ Note we only support input when `material_id < 0`, the the program will read tom
   ```
   NEX_XI_BEGIN  NEX_XI_END  NEX_ETA_BEGIN  NEX_ETA_END  NZ_BEGIN  NZ_END  material_id
   ```
+
+
+## Anisotropic Model Support
+You should provide `c21` model with density in `tomography.xyz`.
+1. Anisotropic models in `proc*_external_mesh.bin` are in cartesian coordinates, i.e. $C_{xxxx}, C_{xyzx}$ 
+2. Anisotropic models in `proc*_c11-c66.bin`, `tomography.xyz` are in radial coordinates,i.e. $C_{rrrr}, C_{r\theta \phi r}$. The notation rule for $c_{ijkl}$ is : $C_{1232} = C_{\theta \phi r \phi}$. 
+
+
 
 ### **`DATA/Par_file.init`**
 This file can be found in `utils/cube2sph/EXAMPLES/NED-MODEL`. Please note the mesh generation program will automatically generate a new `Par_file`, so the user should only edit parameters in this file. 

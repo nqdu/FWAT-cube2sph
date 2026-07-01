@@ -1,0 +1,334 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Examples &mdash; FWAT  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="prev" title="Visualization for Model" href="visual.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            FWAT
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="install.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="install.html#installation">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cube2sph.html">Cube2sph Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="fwat.html">Full Waveform Inversion Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="visual.html">Visualization for Model</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Examples</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#example-fwi-with-a-checkerboard-model-ned-based">Example: FWI with a Checkerboard Model (NED-based)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#prerequisites">Prerequisites</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#step-1-mesh-generation">Step 1: Mesh Generation</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#a-create-the-checkerboard-model">1a. Create the Checkerboard Model</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#b-create-tag-specific-models">1b. Create Tag-specific Models</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#step-2-customize-source-and-station-configuration">Step 2: Customize Source and Station Configuration</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#a-source-definitions">2a. Source Definitions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#b-station-definitions">2b. Station Definitions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#c-source-time-functions">2c. Source Time Functions</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#step-3-configure-fwi-parameters">Step 3: Configure FWI Parameters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#step-4-set-up-cluster-configuration">Step 4: Set Up Cluster Configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#step-5-forward-simulation">Step 5: Forward Simulation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#step-6-run-fwi">Step 6: Run FWI</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#step-7-monitor-and-analyze-results">Step 7: Monitor and Analyze Results</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#check-inversion-progress">Check Inversion Progress</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#plot-results">Plot Results</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#practical-tips">Practical Tips</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#next-steps">Next Steps</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">FWAT</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Examples</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/markdown/example.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="examples">
+<h1>Examples<a class="headerlink" href="#examples" title="Link to this heading"></a></h1>
+<p>This section provides step-by-step examples for using the <strong>FWAT-cube2sph</strong> package, including mesh generation, forward simulation, and full-waveform inversion (FWI).</p>
+<section id="example-fwi-with-a-checkerboard-model-ned-based">
+<h2>Example: FWI with a Checkerboard Model (NED-based)<a class="headerlink" href="#example-fwi-with-a-checkerboard-model-ned-based" title="Link to this heading"></a></h2>
+<p>This example demonstrates how to set up a complete FWI workflow using a checkerboard velocity model based on the NED (National Elevation Data) dataset. The workflow includes mesh generation, forward simulation to create synthetic data, and FWI inversion.</p>
+<section id="prerequisites">
+<h3>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading"></a></h3>
+<p>Ensure you have completed the installation steps from the <a class="reference internal" href="install.html"><span class="std std-doc">Installation</span></a> guide. The FWI workflow is typically set up in a dedicated project directory (e.g., <code class="docutils literal notranslate"><span class="pre">NED/fwi/</span></code>):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>NED/fwi/
+├──<span class="w"> </span>DATA/<span class="w">                          </span><span class="c1"># SPECFEM input data directory</span>
+├──<span class="w"> </span>src_rec/<span class="w">                       </span><span class="c1"># Source and station definitions</span>
+├──<span class="w"> </span>fwat_data/<span class="w">                     </span><span class="c1"># Observed/synthetic seismic data</span>
+├──<span class="w"> </span>optimize/<span class="w">                      </span><span class="c1"># Initial model and optimization outputs</span>
+├──<span class="w"> </span>config.env<span class="w">                     </span><span class="c1"># Environment configuration</span>
+├──<span class="w"> </span>fwat_params/
+│<span class="w">   </span>├──<span class="w"> </span>fwat.yaml<span class="w">                 </span><span class="c1"># FWI parameters</span>
+│<span class="w">   </span>└──<span class="w"> </span>lbfgs.yaml<span class="w">                </span><span class="c1"># Optimization parameters</span>
+├──<span class="w"> </span>run_forward.sh<span class="w">                 </span><span class="c1"># Forward simulation script</span>
+└──<span class="w"> </span>run_fwi.sh<span class="w">                     </span><span class="c1"># FWI workflow script</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">src_rec/</span></code> and <code class="docutils literal notranslate"><span class="pre">fwat_params/</span></code> directories are pre-configured in your project directory. Customize them as needed for your inversion.</p>
+</section>
+<section id="step-1-mesh-generation">
+<h3>Step 1: Mesh Generation<a class="headerlink" href="#step-1-mesh-generation" title="Link to this heading"></a></h3>
+<p>The first step is to create a structured mesh based on your velocity model.</p>
+<section id="a-create-the-checkerboard-model">
+<h4>1a. Create the Checkerboard Model<a class="headerlink" href="#a-create-the-checkerboard-model" title="Link to this heading"></a></h4>
+<p>Generate a checkerboard velocity model using the provided utilities:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>mesh/create_model
+python<span class="w"> </span>tomo.py<span class="w">        </span><span class="c1"># Create background tomography model</span>
+python<span class="w"> </span>add_ckbd_model.py<span class="w">  </span><span class="c1"># Add checkerboard perturbations</span>
+</pre></div>
+</div>
+<p>This produces a <code class="docutils literal notranslate"><span class="pre">tomography_model.xyz</span></code> file that defines the velocity model.</p>
+</section>
+<section id="b-create-tag-specific-models">
+<h4>1b. Create Tag-specific Models<a class="headerlink" href="#b-create-tag-specific-models" title="Link to this heading"></a></h4>
+<p>For each simulation type (e.g., <code class="docutils literal notranslate"><span class="pre">1d</span></code>, <code class="docutils literal notranslate"><span class="pre">ckbd</span></code>), prepare separate model files and generate corresponding mesh databases:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>../..
+mkdir<span class="w"> </span>-p<span class="w"> </span>optimize/tomo.1d
+mkdir<span class="w"> </span>-p<span class="w"> </span>optimize/tomo.ckbd
+
+<span class="c1"># Process 1D model</span>
+cp<span class="w"> </span>mesh/create_model/tomography_model.xyz.1d<span class="w"> </span>mesh/DATA/tomo_files/tomography_model.xyz
+<span class="nb">cd</span><span class="w"> </span>mesh
+bash<span class="w"> </span>step1-step2<span class="w">     </span><span class="c1"># Generate mesh and databases</span>
+cp<span class="w"> </span>-r<span class="w"> </span>DATABASES_MPI<span class="w"> </span>OUTPUT_FILES<span class="w"> </span>../optimize/tomo.1d/
+
+<span class="c1"># Process checkerboard model</span>
+<span class="nb">cd</span><span class="w"> </span>create_model
+cp<span class="w"> </span>tomography_model.xyz.ckbd<span class="w"> </span>../DATA/tomo_files/tomography_model.xyz
+<span class="nb">cd</span><span class="w"> </span>..
+bash<span class="w"> </span>step1-step2
+cp<span class="w"> </span>-r<span class="w"> </span>DATABASES_MPI<span class="w"> </span>OUTPUT_FILES<span class="w"> </span>../optimize/tomo.ckbd/
+<span class="nb">cd</span><span class="w"> </span>..
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">step1-step2</span></code> script performs:</p>
+<ul class="simple">
+<li><p>Step 1: Generate mesh (<code class="docutils literal notranslate"><span class="pre">xgenerate_databases</span></code>)</p></li>
+<li><p>Step 2: Prepare mesh for FWI</p></li>
+</ul>
+<p>After completion:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">DATABASES_MPI</span></code> – Contains the mesh database files</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">OUTPUT_FILES</span></code> – Contains mesh and simulation configuration outputs</p></li>
+</ul>
+</section>
+</section>
+<section id="step-2-customize-source-and-station-configuration">
+<h3>Step 2: Customize Source and Station Configuration<a class="headerlink" href="#step-2-customize-source-and-station-configuration" title="Link to this heading"></a></h3>
+<p>Source and station definitions are pre-configured in the <code class="docutils literal notranslate"><span class="pre">src_rec/</span></code> directory. Customize them for your inversion setup.</p>
+<section id="a-source-definitions">
+<h4>2a. Source Definitions<a class="headerlink" href="#a-source-definitions" title="Link to this heading"></a></h4>
+<p>Edit <code class="docutils literal notranslate"><span class="pre">src_rec/sources.dat.noise</span></code> to define your sources:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>NOISE1<span class="w">  </span><span class="m">35</span>.0<span class="w">  </span><span class="m">120</span>.0<span class="w">  </span><span class="m">10</span>.0<span class="w">  </span><span class="m">0</span>.0
+</pre></div>
+</div>
+<p>Format: <code class="docutils literal notranslate"><span class="pre">NAME</span>&#160; <span class="pre">latitude</span>&#160; <span class="pre">longitude</span>&#160; <span class="pre">depth</span>&#160; <span class="pre">burial_depth</span></code></p>
+</section>
+<section id="b-station-definitions">
+<h4>2b. Station Definitions<a class="headerlink" href="#b-station-definitions" title="Link to this heading"></a></h4>
+<p>Create station files in geographic coordinates (e.g., <code class="docutils literal notranslate"><span class="pre">src_rec/STATIONS_NOISE1_globe</span></code>) and convert to cube coordinates:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>utils/cube2sph/bin/write_station_file
+</pre></div>
+</div>
+<p>This generates <code class="docutils literal notranslate"><span class="pre">src_rec/STATIONS_NOISE1</span></code> and <code class="docutils literal notranslate"><span class="pre">src_rec/rot_NOISE1</span></code>.</p>
+</section>
+<section id="c-source-time-functions">
+<h4>2c. Source Time Functions<a class="headerlink" href="#c-source-time-functions" title="Link to this heading"></a></h4>
+<p>Define force solution files in geographic coordinates (e.g., <code class="docutils literal notranslate"><span class="pre">src_rec/FORCESOLUTION_NOISE1_Z_globe</span></code>) and convert to cube coordinates:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>utils/cube2sph/bin/write_force_solution_file
+</pre></div>
+</div>
+<p>Create files for each component (Z, N, E).</p>
+</section>
+</section>
+<section id="step-3-configure-fwi-parameters">
+<h3>Step 3: Configure FWI Parameters<a class="headerlink" href="#step-3-configure-fwi-parameters" title="Link to this heading"></a></h3>
+<p>Edit <code class="docutils literal notranslate"><span class="pre">fwat_params/fwat.yaml</span></code> to configure the inversion. Refer to the <a class="reference internal" href="fwat.html"><span class="std std-doc">Full Waveform Inversion Tutorial</span></a> for detailed parameter descriptions.</p>
+</section>
+<section id="step-4-set-up-cluster-configuration">
+<h3>Step 4: Set Up Cluster Configuration<a class="headerlink" href="#step-4-set-up-cluster-configuration" title="Link to this heading"></a></h3>
+<p>Edit <code class="docutils literal notranslate"><span class="pre">config.env</span></code> with your system environment:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Module loading (if needed)</span>
+<span class="c1"># module load gcc/9.3</span>
+<span class="c1"># module load openmpi/4.0</span>
+
+<span class="c1"># Path to SPECFEM solver</span>
+<span class="nv">SEM_PATH</span><span class="o">=</span>/path/to/specfem3d-cube2sph
+
+<span class="c1"># MPI command</span>
+<span class="nv">MPIRUN</span><span class="o">=</span>mpirun
+
+<span class="c1"># Number of processes for measurement</span>
+<span class="nv">NPROC_MEASURE</span><span class="o">=</span><span class="m">16</span>
+
+<span class="c1"># Platform: local, slurm, or pbs</span>
+<span class="nv">PLATFORM</span><span class="o">=</span><span class="s2">&quot;local&quot;</span>
+
+<span class="c1"># Local execution settings</span>
+<span class="nv">USE_IO_TMPDIR</span><span class="o">=</span><span class="m">0</span>
+</pre></div>
+</div>
+</section>
+<section id="step-5-forward-simulation">
+<h3>Step 5: Forward Simulation<a class="headerlink" href="#step-5-forward-simulation" title="Link to this heading"></a></h3>
+<p>Generate synthetic data using the checkerboard model (approximately 10 seconds on RTX 4070):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bash<span class="w"> </span>run_forward.sh
+</pre></div>
+</div>
+<p>This step:</p>
+<ol class="arabic simple">
+<li><p>Runs the forward simulation for each source</p></li>
+<li><p>Produces synthetic seismic data (wavefields, seismograms)</p></li>
+<li><p>Saves data to <code class="docutils literal notranslate"><span class="pre">fwat_data/</span></code></p></li>
+</ol>
+</section>
+<section id="step-6-run-fwi">
+<h3>Step 6: Run FWI<a class="headerlink" href="#step-6-run-fwi" title="Link to this heading"></a></h3>
+<p>Once synthetic data is ready, start the inversion (approximately 4 hours with 1 node and 2 processes per node):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bash<span class="w"> </span>run_fwi_big_job.sh<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="m">35</span>
+</pre></div>
+</div>
+<p>The FWI workflow will:</p>
+<ol class="arabic simple">
+<li><p>Run forward simulations for each source with the current model</p></li>
+<li><p>Compare synthetic data with observations</p></li>
+<li><p>Compute misfit and gradients</p></li>
+<li><p>Update the model using L-BFGS optimization</p></li>
+<li><p>Repeat for each iteration</p></li>
+</ol>
+</section>
+<section id="step-7-monitor-and-analyze-results">
+<h3>Step 7: Monitor and Analyze Results<a class="headerlink" href="#step-7-monitor-and-analyze-results" title="Link to this heading"></a></h3>
+<section id="check-inversion-progress">
+<h4>Check Inversion Progress<a class="headerlink" href="#check-inversion-progress" title="Link to this heading"></a></h4>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># View misfit values</span>
+cat<span class="w"> </span>misfits.log
+
+<span class="c1"># Examine model updates</span>
+ls<span class="w"> </span>optimize/MODEL_M*/
+</pre></div>
+</div>
+</section>
+<section id="plot-results">
+<h4>Plot Results<a class="headerlink" href="#plot-results" title="Link to this heading"></a></h4>
+<p>To visualize waveforms and model updates, use the plotting utilities:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Plot misfit traces</span>
+<span class="nb">cd</span><span class="w"> </span>plots/plot_traces
+<span class="c1"># Run relevant plotting scripts</span>
+
+<span class="c1"># Plot model evolution</span>
+<span class="nb">cd</span><span class="w"> </span>plots/plot_model
+<span class="c1"># Run step0-3 to visualize model updates across iterations</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="practical-tips">
+<h3>Practical Tips<a class="headerlink" href="#practical-tips" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Start with coarse resolution</strong>: Begin with a checkerboard model at low frequency bands to test the workflow before running full-resolution inversions.</p></li>
+<li><p><strong>Monitor runtime</strong>: Check the first iteration’s runtime to estimate total inversion time. Adjust <code class="docutils literal notranslate"><span class="pre">NPROC_MEASURE</span></code> or number of nodes if jobs are slow.</p></li>
+<li><p><strong>Adjust smoothing parameters</strong>: If the inversion produces oscillatory models, increase <code class="docutils literal notranslate"><span class="pre">SMOOTHING</span></code> in <code class="docutils literal notranslate"><span class="pre">fwat.yaml</span></code>.</p></li>
+<li><p><strong>Data quality</strong>: Ensure input seismic data are in SAC format with correct headers.</p></li>
+<li><p><strong>Restart from checkpoint</strong>: If an inversion is interrupted, simply rerun <code class="docutils literal notranslate"><span class="pre">bash</span> <span class="pre">run_fwi.sh</span></code> to resume from the last saved iteration.</p></li>
+</ul>
+</section>
+</section>
+<section id="next-steps">
+<h2>Next Steps<a class="headerlink" href="#next-steps" title="Link to this heading"></a></h2>
+<p>For more details on FWI parameters, data preparation, and optimization algorithms, refer to the <a class="reference internal" href="fwat.html"><span class="std std-doc">Full Waveform Inversion Tutorial</span></a>.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="visual.html" class="btn btn-neutral float-left" title="Visualization for Model" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

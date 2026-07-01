@@ -62,6 +62,9 @@
 <li class="toctree-l4"><a class="reference internal" href="#domain-regions">Domain Regions</a></li>
 </ul>
 </li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#anisotropic-model-support">Anisotropic Model Support</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#data-par-file-init"><strong><code class="docutils literal notranslate"><span class="pre">DATA/Par_file.init</span></code></strong></a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#pml-parameters">PML parameters</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#injection-parameters">Injection Parameters</a></li>
@@ -76,6 +79,7 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="fwat.html">Full Waveform Inversion Tutorial</a></li>
 <li class="toctree-l1"><a class="reference internal" href="visual.html">Visualization for Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="example.html">Examples</a></li>
 </ul>
 
         </div>
@@ -138,7 +142,7 @@ This is required because part of the workflow—specifically the conversion from
 </section>
 <section id="mesh-par-file">
 <h3><code class="docutils literal notranslate"><span class="pre">Mesh_Par_file</span></code><a class="headerlink" href="#mesh-par-file" title="Link to this heading"></a></h3>
-<p>This file can be found in utils/cube2sph/EXAMPLES/NED-MODEL.</p>
+<p>This file can be found in utils/cube2sph/EXAMPLES/NED.iso.</p>
 <section id="mesh-size">
 <h4>Mesh Size<a class="headerlink" href="#mesh-size" title="Link to this heading"></a></h4>
 <ul class="simple">
@@ -225,6 +229,14 @@ Example:</p></li>
 </ul>
 </section>
 </section>
+</section>
+<section id="anisotropic-model-support">
+<h2>Anisotropic Model Support<a class="headerlink" href="#anisotropic-model-support" title="Link to this heading"></a></h2>
+<p>You should provide <code class="docutils literal notranslate"><span class="pre">c21</span></code> model with density in <code class="docutils literal notranslate"><span class="pre">tomography.xyz</span></code>.</p>
+<ol class="arabic simple">
+<li><p>Anisotropic models in <code class="docutils literal notranslate"><span class="pre">proc*_external_mesh.bin</span></code> are in cartesian coordinates, i.e. $C_{xxxx}, C_{xyzx}$</p></li>
+<li><p>Anisotropic models in <code class="docutils literal notranslate"><span class="pre">proc*_c11-c66.bin</span></code>, <code class="docutils literal notranslate"><span class="pre">tomography.xyz</span></code> are in radial coordinates,i.e. $C_{rrrr}, C_{r\theta \phi r}$. The notation rule for $c_{ijkl}$ is : $C_{1232} = C_{\theta \phi r \phi}$.</p></li>
+</ol>
 <section id="data-par-file-init">
 <h3><strong><code class="docutils literal notranslate"><span class="pre">DATA/Par_file.init</span></code></strong><a class="headerlink" href="#data-par-file-init" title="Link to this heading"></a></h3>
 <p>This file can be found in <code class="docutils literal notranslate"><span class="pre">utils/cube2sph/EXAMPLES/NED-MODEL</span></code>. Please note the mesh generation program will automatically generate a new <code class="docutils literal notranslate"><span class="pre">Par_file</span></code>, so the user should only edit parameters in this file.</p>

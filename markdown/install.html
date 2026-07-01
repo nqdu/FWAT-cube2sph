@@ -49,6 +49,7 @@
 <li class="toctree-l1"><a class="reference internal" href="cube2sph.html">Cube2sph Tutorial</a></li>
 <li class="toctree-l1"><a class="reference internal" href="fwat.html">Full Waveform Inversion Tutorial</a></li>
 <li class="toctree-l1"><a class="reference internal" href="visual.html">Visualization for Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="example.html">Examples</a></li>
 </ul>
 
         </div>
@@ -77,14 +78,15 @@
              
   <section id="introduction">
 <h1>Introduction<a class="headerlink" href="#introduction" title="Link to this heading"></a></h1>
-<p><strong>FWAT-cube2sph</strong> (<strong>F</strong>ull <strong>W</strong>aveform <strong>A</strong>djoint <strong>T</strong>omography) is a package designed for full waveform inversion based on the <strong>specfem3d-cube2sph</strong> solver.</p>
+<p><strong>FWAT-cube2sph</strong> (<strong>F</strong>ull <strong>W</strong>aveform <strong>A</strong>djoint <strong>T</strong>omography) is a package for full-waveform inversion based on the <strong>specfem3d-cube2sph</strong> solver.</p>
 </section>
 <section id="installation">
 <h1>Installation<a class="headerlink" href="#installation" title="Link to this heading"></a></h1>
+<p>This package has three parts: a spectral-element solver, the cube2sph toolkit, and the full-waveform inversion (FWI) framework.</p>
 <ol class="arabic simple">
 <li><p>Create Python environment</p></li>
 </ol>
-<p>we recommend the users to install a new python environment for this package by using <code class="docutils literal notranslate"><span class="pre">conda</span></code> or <code class="docutils literal notranslate"><span class="pre">mamba</span></code>:</p>
+<p>We recommend creating a dedicated Python environment for this package using <code class="docutils literal notranslate"><span class="pre">conda</span></code> or <code class="docutils literal notranslate"><span class="pre">mamba</span></code>:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>fwat<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.10
 conda<span class="w"> </span>activate<span class="w"> </span>fwat
 </pre></div>
@@ -95,12 +97,50 @@ conda<span class="w"> </span>activate<span class="w"> </span>fwat
 </pre></div>
 </div>
 <ol class="arabic simple" start="2">
-<li><p>Install to target directory</p></li>
+<li><p>Compile the spectral-element solver</p></li>
 </ol>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>./INSTALL<span class="w"> </span>INSTALL_DIR
+<p>First, clone the repo to your installation path:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">nqdu</span><span class="o">/</span><span class="n">specfem3d</span><span class="o">-</span><span class="n">cube2sph</span><span class="o">.</span><span class="n">git</span>
+<span class="n">cd</span> <span class="n">specfem3d</span><span class="o">-</span><span class="n">cube2sph</span>
 </pre></div>
 </div>
-<p>where <code class="docutils literal notranslate"><span class="pre">INSTALL_DIR</span></code> is the absolute path to install your package.</p>
+<p>Then compile it like:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mkdir<span class="w"> </span>-p<span class="w"> </span>build
+<span class="nb">cd</span><span class="w"> </span>build
+cmake<span class="w"> </span>..<span class="w"> </span>-DCC<span class="o">=</span>gcc<span class="w"> </span>-DMPIFC<span class="o">=</span>mpif90<span class="w"> </span>
+make<span class="w"> </span>-j8
+</pre></div>
+</div>
+<p>If you want to build the CUDA-accelerated version, please use:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>cmake<span class="w"> </span>..<span class="w"> </span>-DCC<span class="o">=</span>gcc<span class="w"> </span>-DMPIFC<span class="o">=</span>mpif90<span class="w">  </span>-DENABLE_CUDA<span class="o">=</span>ON
+</pre></div>
+</div>
+<p>By default, the CUDA architecture is set to <code class="docutils literal notranslate"><span class="pre">native</span></code>. To target a specific <a class="reference external" href="https://developer.nvidia.com/cuda-gpus">compute capability</a>, open <code class="docutils literal notranslate"><span class="pre">CMakeLists.txt</span></code>, find <code class="docutils literal notranslate"><span class="pre">set_target_properties(cuda</span> <span class="pre">PROPERTIES</span> <span class="pre">CUDA_ARCHITECTURES</span> <span class="pre">native)</span></code>, and replace <code class="docutils literal notranslate"><span class="pre">native</span></code> with your target architecture.</p>
+<p>The CUDA-Aware MPI technique would facilitate communications. If you want to enable CUDA-aware MPI, please use:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>cmake<span class="w"> </span>..<span class="w"> </span>-DCC<span class="o">=</span>gcc<span class="w"> </span>-DMPIFC<span class="o">=</span>mpif90<span class="w"> </span>-DENABLE_CUDA<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
+<span class="w">        </span>-DENABLE_CUDA_AWARE<span class="o">=</span>ON
+</pre></div>
+</div>
+<ol class="arabic simple" start="3">
+<li><p>Compile the cube2sph toolkit</p></li>
+</ol>
+<p>Ensure <a class="reference external" href="https://docs.unidata.ucar.edu/netcdf-fortran/current/">netcdf-fortran</a> is installed on your machine. Then navigate to <code class="docutils literal notranslate"><span class="pre">utils/cube2sph</span></code> (inside the <code class="docutils literal notranslate"><span class="pre">specfem3d-cube2sph</span></code> repo cloned above) and run:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mkdir<span class="w"> </span>-p<span class="w"> </span>build
+<span class="nb">cd</span><span class="w"> </span>build
+cmake<span class="w"> </span>..<span class="w"> </span>-DCC<span class="o">=</span>gcc<span class="w"> </span>-DMPIFC<span class="o">=</span>mpif90<span class="w"> </span>
+make<span class="w"> </span>-j8
+</pre></div>
+</div>
+<ol class="arabic simple" start="4">
+<li><p>Install the full-waveform inversion scripts</p></li>
+</ol>
+<p>Clone the repo and run the installer:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/nqdu/FWAT-cube2sph.git
+<span class="nb">cd</span><span class="w"> </span>FWAT-cube2sph
+./INSTALL<span class="w"> </span>INSTALL_DIR
+</pre></div>
+</div>
+<p>where <code class="docutils literal notranslate"><span class="pre">INSTALL_DIR</span></code> is the absolute path where you want to run FWI.</p>
 </section>
 
 
