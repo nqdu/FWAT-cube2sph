@@ -148,7 +148,7 @@ bash run_forward.sh
 This step:
 1. Runs the forward simulation for each source
 2. Produces synthetic seismic data (wavefields, seismograms)
-3. Saves data to `fwat_data/NOISE1/`
+3. Saves data to `fwat_data/`
 
 ### Step 6: Run FWI
 
@@ -171,7 +171,7 @@ The FWI workflow will:
 
 ```bash
 # View misfit values
-cat optimize/misfit_iter.txt
+cat misfits.log
 
 # Examine model updates
 ls optimize/MODEL_M*/
