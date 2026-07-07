@@ -15,8 +15,8 @@ def get_model_grad(iter:int,nspec:int,M:FwatModel):
     myrank = comm.Get_rank()
 
     # initialize
-    grad_list = M.get_grad_names(base=False)
-    mod_list = M.get_model_names()
+    grad_list = M.grad_names(base=False)
+    mod_list = M.model_names()
     nmod = len(mod_list)
     nkers = len(grad_list)
     mod_vec = np.zeros((nmod,nspec,NGLL3),'f4')
@@ -46,7 +46,7 @@ def get_model_grad(iter:int,nspec:int,M:FwatModel):
     mod_vec1 = M.convert_model(mod_vec,False)
 
     # convert model to required optimzed type
-    mod_vec1 = np.asarray(M.get_opt_model(mod_vec1),dtype='f4')
+    mod_vec1 = np.asarray(M.user2opt(mod_vec1),dtype='f4')
 
     return mod_vec1,ker_vec
 
@@ -316,7 +316,7 @@ def get_search_direction(iter:int,paramfile:str):
         direc = get_lbfgs_direc(iter,paramfile,M)
 
     # get min/max
-    direc_list =  M.get_direc_names()
+    direc_list =  M.direc_names()
     if myrank == 0:
         print("")
     for i in range(len(direc_list)):

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fwat"
-version = "0.13.0"
+version = "0.16.0"
 description = "A CLI for fwat program"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -33,4 +33,4 @@ fwat-utils = "fwat.scripts.utils:main"
 where = ["src/"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests/test_utils.py"]
+testpaths = ["tests/test_utils.py","tests/test_grad_check.py"]

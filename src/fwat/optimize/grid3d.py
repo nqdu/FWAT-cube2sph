@@ -173,7 +173,7 @@ class Grid3D:
         self._model = FwatModel(mdtype=model_type,kltype=kernel_set)
 
         # get model names and allocate model spaces
-        names = [x[1:] for x in self._model.get_direc_names()]
+        names = [x[1:] for x in self._model.direc_names()]
         self.model_usr = np.zeros((len(names),self.nz,self.ny,self.nx),dtype=np.float32)  # (nm,nz,ny,nx)
     
     def read_model(self,filename:str):
@@ -210,7 +210,7 @@ class Grid3D:
         self.setup_model(x0,y0,z0,dx,dy,dz,nx,ny,nz,model_type,kernel_set)
 
         # read model from file 
-        names = [x[1:] for x in self._model.get_direc_names()]
+        names = [x[1:] for x in self._model.direc_names()]
         for i,name in enumerate(names):
             data:np.ndarray = fio[name][:] # type: ignore
             self.model_usr[i,:,:,:] = data.reshape((self.nz,self.ny,self.nx))
@@ -252,7 +252,7 @@ class Grid3D:
             fio.create_dataset('z',data=self.z,dtype=np.float32)
 
             # get model names and write model spaces
-            names = self._model.get_model_names()
+            names = self._model.model_names()
             for ivar,name in enumerate(names):
                 data = self.model_usr[ivar,:,:,:]  # flatten the model grid to 1D array for easy writing
                 fio.create_dataset(name,data=data,dtype=np.float32)
@@ -326,7 +326,7 @@ class Grid3D:
             nspec_all_ranks = np.asarray(nspec_all_ranks, dtype=int)
 
         # get model names
-        names = [x[1:] for x in self._model.get_direc_names()]
+        names = [x[1:] for x in self._model.direc_names()]
         nm = len(names)
 
         # allocate arrays to store the interpolated model values at the SEM mesh points
@@ -345,7 +345,7 @@ class Grid3D:
         model_base = self._model.convert_model(model_user,True)
 
         # write the interpolated model values at the SEM mesh points to a file
-        base_names = self._model.get_model_names()
+        base_names = self._model.model_names()
         nm = len(base_names)
         for im in range(nm):
             filename = f'{OPT_DIR}/MODEL_M%02d'%(iter0) + '/proc%06d'%(myrank) + f'_{base_names[im]}.bin'
@@ -430,7 +430,7 @@ class Grid3D:
         f.close()
 
         # get gradients
-        names_grad = self._model.get_grad_names(False)
+        names_grad = self._model.grad_names(False)
         nm = len(names_grad)
         
         model_grad = np.zeros((nm,nspec,NGLL3),dtype=np.float32)  # (nm,nspec,NGLL3)
@@ -446,7 +446,7 @@ class Grid3D:
         MPI.COMM_WORLD.Allreduce(MPI.IN_PLACE, grad, op=MPI.SUM)  # sum the contributions from all ranks
 
         # write the interpolated gradient values at the model grid points to a file
-        names = self._model.get_model_names()
+        names = self._model.model_names()
         filename = f'{OPT_DIR}/grad_%02d.h5' % (iter0)
         if myrank == 0:
             fio = h5py.File(filename,'w')
