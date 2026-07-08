@@ -12,11 +12,14 @@ never drift apart:
 * kernels (base cijkl kernels -> optimization space) : chain rule
                                            ``K_p = sum_ij (dC_ij/dp) * md_kl[k]``
 
-We differentiate with sympy and write plain numpy code. Expressions are emitted
-fully inlined (no common-subexpression elimination): CSE would hoist every shared
-subexpression into a named temporary that stays alive across all output
-assignments, so peak memory would hold many full grid-sized arrays at once.
-Inlining lets each intermediate be freed right after use.
+We differentiate with sympy and emit each converter as a numba ``nopython``
+scalar loop over grid points, with common-subexpression elimination (CSE)
+re-enabled. Because the loop body works on one gridpoint at a time, the CSE
+temporaries are scalar floats in registers -- not full grid-sized numpy arrays --
+so peak memory is just the output array while the compiled single-pass loop is
+several times faster than vectorized numpy (CSE also removes redundant flops).
+Each generated converter is a thin numpy wrapper (flatten trailing dims ->
+call the njit core -> reshape back) around a ``@jit(nopython=True)`` core.
 
 Usage
 -----
@@ -162,28 +165,32 @@ def _forward_exprs(kltype):
 
 
 _PRINTER = sp.printing.numpy.NumPyPrinter()
+_IDX = re.compile(r'\b(md_kl|md_usr|model)\[(-?\d+)\]')
+
+# decorator for the generated njit cores; nopython + on-disk cache, single
+# threaded and no fastmath so results are bit-reproducible.
+_DECOR = "@jit(nopython=True, cache=True)"
 
 
 def _fmt(e):
-    code = _PRINTER.doprint(e)
-    code = code.replace('numpy.', 'np.')
-    # md_kl[3] / model[5] -> md_kl[3,...] / model[5,...]  (broadcast over gridpoints)
-    return re.sub(r'\b(md_kl|model)\[(-?\d+)\]', r'\1[\2,...]', code)
+    """Scalar numba code for one gridpoint ``g``: ``md_kl[3]`` -> ``md_kl[3, g]``."""
+    code = _PRINTER.doprint(e).replace('numpy.', 'np.')
+    return _IDX.sub(r'\1[\2, g]', code)
 
 
-def _emit_block(exprs, pad):
-    """Emit a list of expressions inline (no CSE); return (temp_lines, exprs).
-
-    We deliberately skip common-subexpression elimination: its named temporaries
-    would each hold a full grid-sized array alive across every output
-    assignment. Emitting inline keeps peak memory low. The empty temp-line list
-    keeps the call sites symmetric with the previous CSE-based helper.
-    """
-    return [], exprs
+def _cse_lines(exprs, pad):
+    """CSE a list of expressions; return (scalar_temp_lines, reduced_exprs)."""
+    replacements, reduced = sp.cse(exprs)
+    lines = [f"{pad}{sym} = {_fmt(sub)}" for sym, sub in replacements]
+    return lines, reduced
 
 
-def build_kernel_body(kltype, indent=4):
-    """numpy source lines for the base-kernel -> optimization-space conversion."""
+_P = ' ' * 8   # loop-body indent inside `for g in range(n):`
+
+
+def build_kernel_body(kltype):
+    """Full numba source (njit core + numpy wrapper) for the base-kernel ->
+    optimization-space conversion."""
     params, C0, rho, n_log = _case(kltype)
     md_kl = sp.IndexedBase('md_kl')
 
@@ -198,53 +205,76 @@ def build_kernel_body(kltype, indent=4):
                 k += 1
         exprs.append(expr)
 
-    pad = ' ' * indent
-    lines = [f"{pad}{p.name} = md_usr[{i},...]" for i, p in enumerate(params)]
-    lines.append(f"{pad}kl_opt = md_usr * 0")
-
-    temps, reduced = _emit_block(exprs, pad)
-    lines += temps
+    core = [_DECOR,
+            f"def _kl_core_kltype{kltype}(md_usr, md_kl, kl_opt):",
+            "    n = md_usr.shape[1]",
+            "    for g in range(n):"]
+    core += [f"{_P}{p.name} = md_usr[{i}, g]" for i, p in enumerate(params)]
+    temps, reduced = _cse_lines(exprs, _P)
+    core += temps
     for i, r in enumerate(reduced):
-        lines.append(f"{pad}kl_opt[{i},...] = {_fmt(r)}")
-
+        core.append(f"{_P}kl_opt[{i}, g] = {_fmt(r)}")
     # chain rule to kernels w.r.t. log parameters (velocities and rho)
-    lines.append(f"{pad}kl_opt[0:{n_log},...] *= md_usr[0:{n_log},...]")
-    lines.append(f"{pad}return kl_opt")
-    return lines
+    core.append(f"{_P}for j in range({n_log}):")
+    core.append(f"{_P}    kl_opt[j, g] *= md_usr[j, g]")
+
+    wrap = ["",
+            f"def kl2dtti_kltype{kltype}(md_usr, md_kl):",
+            "    shp = md_usr.shape",
+            "    mu = np.ascontiguousarray(md_usr).reshape(shp[0], -1)",
+            "    mk = np.ascontiguousarray(md_kl).reshape(md_kl.shape[0], -1)",
+            "    kl_opt = np.zeros_like(mu)",
+            f"    _kl_core_kltype{kltype}(mu, mk, kl_opt)",
+            "    return kl_opt.reshape(shp)"]
+    return core + wrap
 
 
-def build_model_body(kltype, indent=4):
-    """numpy source lines for the cijkl <-> user model conversion (both directions)."""
+def build_model_body(kltype):
+    """Full numba source (fwd njit core + bwd njit core + numpy wrapper) for the
+    cijkl <-> user model conversion (both directions)."""
     params, C0, rho, n_log = _case(kltype)
     n = len(params)
-    pad = ' ' * indent
-    pad2 = ' ' * (indent + 4)
-    lines = []
 
-    # ---- forward: cijkl -> user params ----
-    lines.append(f"{pad}if not backward:")
-    lines.append(f"{pad2}model_new = np.zeros(({n},) + model.shape[1:])")
-    temps, reduced = _emit_block(_forward_exprs(kltype), pad2)
-    lines += temps
+    # ---- forward core: cijkl -> user params ----
+    fwd = [_DECOR,
+           f"def _model_fwd_kltype{kltype}(model, out):",
+           "    n = model.shape[1]",
+           "    for g in range(n):"]
+    temps, reduced = _cse_lines(_forward_exprs(kltype), _P)
+    fwd += temps
     for i, r in enumerate(reduced):
-        lines.append(f"{pad2}model_new[{i},...] = {_fmt(r)}")
+        fwd.append(f"{_P}out[{i}, g] = {_fmt(r)}")
 
-    # ---- backward: user params -> cijkl (length 22) ----
-    lines.append(f"{pad}else:")
-    for i, p in enumerate(params):
-        lines.append(f"{pad2}{p.name} = model[{i},...]")
-    lines.append(f"{pad2}model_new = np.zeros((22,) + model.shape[1:])")
+    # ---- backward core: user params -> cijkl (length 22) ----
+    bwd = ["", _DECOR,
+           f"def _model_bwd_kltype{kltype}(model, out):",
+           "    n = model.shape[1]",
+           "    for g in range(n):"]
+    bwd += [f"{_P}{p.name} = model[{i}, g]" for i, p in enumerate(params)]
     # only the nonzero upper-triangle stiffnesses, plus rho at index 21
+    # (out is pre-zeroed, so the zero entries are left untouched)
     entries = [(_index(i, j), C0[i, j])
                for i in range(6) for j in range(i, 6) if C0[i, j] != 0]
     entries.append((21, rho))
-    temps, reduced = _emit_block([e for _, e in entries], pad2)
-    lines += temps
+    temps, reduced = _cse_lines([e for _, e in entries], _P)
+    bwd += temps
     for (idx, _), r in zip(entries, reduced):
-        lines.append(f"{pad2}model_new[{idx},...] = {_fmt(r)}")
+        bwd.append(f"{_P}out[{idx}, g] = {_fmt(r)}")
 
-    lines.append(f"{pad}return model_new")
-    return lines
+    wrap = ["",
+            f"def cijkl2dtti_kltype{kltype}(model, backward=False):",
+            "    shp = model.shape",
+            "    m2 = np.ascontiguousarray(model).reshape(shp[0], -1)",
+            "    ncol = m2.shape[1]",
+            "    if not backward:",
+            f"        out = np.zeros(({n}, ncol), dtype=np.float64)",
+            f"        _model_fwd_kltype{kltype}(m2, out)",
+            f"        return out.reshape(({n},) + shp[1:])",
+            "    else:",
+            "        out = np.zeros((22, ncol), dtype=np.float64)",
+            f"        _model_bwd_kltype{kltype}(m2, out)",
+            "        return out.reshape((22,) + shp[1:])"]
+    return fwd + bwd + wrap
 
 
 def write_module(path):
@@ -255,17 +285,21 @@ def write_module(path):
         "Regenerate with:  python auto_kergen.py --write",
         "",
         "Base <-> user model and kernel conversions for the dtti model type.",
+        "",
+        "Each converter is a numba nopython scalar loop over grid points with CSE:",
+        "shared subexpressions are scalar floats (near-zero memory) and the compiled",
+        "single-pass loop is several times faster than vectorized numpy. Single",
+        "threaded, no fastmath -- results are bit-reproducible.",
         '"""',
         "import numpy as np",
+        "from numba import jit",
         "",
         "",
     ]
 
     for kltype in (1, 2, 3):
-        out.append(f"def cijkl2dtti_kltype{kltype}(model, backward=False):")
         out.extend(build_model_body(kltype))
         out += ["", ""]
-        out.append(f"def kl2dtti_kltype{kltype}(md_usr, md_kl):")
         out.extend(build_kernel_body(kltype))
         out += ["", ""]
 
