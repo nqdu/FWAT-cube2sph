@@ -12,8 +12,11 @@ never drift apart:
 * kernels (base cijkl kernels -> optimization space) : chain rule
                                            ``K_p = sum_ij (dC_ij/dp) * md_kl[k]``
 
-We differentiate with sympy, run common-subexpression elimination (CSE), and
-write plain numpy code.
+We differentiate with sympy and write plain numpy code. Expressions are emitted
+fully inlined (no common-subexpression elimination): CSE would hoist every shared
+subexpression into a named temporary that stays alive across all output
+assignments, so peak memory would hold many full grid-sized arrays at once.
+Inlining lets each intermediate be freed right after use.
 
 Usage
 -----
@@ -168,11 +171,15 @@ def _fmt(e):
     return re.sub(r'\b(md_kl|model)\[(-?\d+)\]', r'\1[\2,...]', code)
 
 
-def _cse_block(exprs, pad):
-    """CSE a list of expressions; return (temp_lines, reduced_exprs)."""
-    replacements, reduced = sp.cse(exprs)
-    lines = [f"{pad}{sym} = {_fmt(sub)}" for sym, sub in replacements]
-    return lines, reduced
+def _emit_block(exprs, pad):
+    """Emit a list of expressions inline (no CSE); return (temp_lines, exprs).
+
+    We deliberately skip common-subexpression elimination: its named temporaries
+    would each hold a full grid-sized array alive across every output
+    assignment. Emitting inline keeps peak memory low. The empty temp-line list
+    keeps the call sites symmetric with the previous CSE-based helper.
+    """
+    return [], exprs
 
 
 def build_kernel_body(kltype, indent=4):
@@ -195,7 +202,7 @@ def build_kernel_body(kltype, indent=4):
     lines = [f"{pad}{p.name} = md_usr[{i},...]" for i, p in enumerate(params)]
     lines.append(f"{pad}kl_opt = md_usr * 0")
 
-    temps, reduced = _cse_block(exprs, pad)
+    temps, reduced = _emit_block(exprs, pad)
     lines += temps
     for i, r in enumerate(reduced):
         lines.append(f"{pad}kl_opt[{i},...] = {_fmt(r)}")
@@ -217,7 +224,7 @@ def build_model_body(kltype, indent=4):
     # ---- forward: cijkl -> user params ----
     lines.append(f"{pad}if not backward:")
     lines.append(f"{pad2}model_new = np.zeros(({n},) + model.shape[1:])")
-    temps, reduced = _cse_block(_forward_exprs(kltype), pad2)
+    temps, reduced = _emit_block(_forward_exprs(kltype), pad2)
     lines += temps
     for i, r in enumerate(reduced):
         lines.append(f"{pad2}model_new[{i},...] = {_fmt(r)}")
@@ -231,7 +238,7 @@ def build_model_body(kltype, indent=4):
     entries = [(_index(i, j), C0[i, j])
                for i in range(6) for j in range(i, 6) if C0[i, j] != 0]
     entries.append((21, rho))
-    temps, reduced = _cse_block([e for _, e in entries], pad2)
+    temps, reduced = _emit_block([e for _, e in entries], pad2)
     lines += temps
     for (idx, _), r in zip(entries, reduced):
         lines.append(f"{pad2}model_new[{idx},...] = {_fmt(r)}")
