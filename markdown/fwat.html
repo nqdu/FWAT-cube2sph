@@ -89,7 +89,10 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#checklist">Checklist</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#user-defined-parameter-set">User-Defined Parameter Set</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#user-defined-parameter-set">User-Defined Parameter Set</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#auto-generating-the-dtti-conversions-with-auto-kergen-py">Auto-generating the <code class="docutils literal notranslate"><span class="pre">dtti</span></code> conversions with <code class="docutils literal notranslate"><span class="pre">auto_kergen.py</span></code></a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="visual.html">Visualization for Model</a></li>
@@ -751,13 +754,44 @@ Be sure to modify these functions according to your working environment. This ma
 <p>If you want to define your own type of elastic model, you can modify <code class="docutils literal notranslate"><span class="pre">fwat/optimize/model.py</span></code> by defining your own <code class="docutils literal notranslate"><span class="pre">mdtype</span></code> and <code class="docutils literal notranslate"><span class="pre">kltype</span></code>. Here are several important notes:</p>
 <ul class="simple">
 <li><p><strong>Do not change the base model</strong>: For the isotropic case, stick to the parameters <code class="docutils literal notranslate"><span class="pre">['vp',</span> <span class="pre">'vs',</span> <span class="pre">'rho']</span></code>, and for the anisotropic case, the base model should be <code class="docutils literal notranslate"><span class="pre">[c11-c66,</span> <span class="pre">rho]</span></code>.</p></li>
-<li><p><strong>Define your parameter set</strong>: Set the search direction names in the function <code class="docutils literal notranslate"><span class="pre">get_direc_names</span></code> by adding a prefix <code class="docutils literal notranslate"><span class="pre">d</span></code> to each of your parameters.</p></li>
+<li><p><strong>Define your parameter set</strong>: Set the search direction names in the function <code class="docutils literal notranslate"><span class="pre">direc_names</span></code> by adding a prefix <code class="docutils literal notranslate"><span class="pre">d</span></code> to each of your parameters.</p></li>
 <li><p><strong>Implement your own <code class="docutils literal notranslate"><span class="pre">convert_model</span></code></strong>: This function should convert the base model to your parameter set and vice versa.</p></li>
 <li><p><strong>Implement <code class="docutils literal notranslate"><span class="pre">convert_to_visual</span></code></strong>: This function will return the visualization model for plotting. It can differ from your parameter set. For example, you may include <code class="docutils literal notranslate"><span class="pre">gcp</span></code> and <code class="docutils literal notranslate"><span class="pre">gsp</span></code> in your parameter set, but for visualization, it is preferable to use <code class="docutils literal notranslate"><span class="pre">G0</span></code> and <code class="docutils literal notranslate"><span class="pre">phi</span></code>.</p></li>
-<li><p><strong>Implement your <code class="docutils literal notranslate"><span class="pre">get_opt_model</span></code></strong>: This function will convert your user-defined model to a dimensionless model (e.g., changing <code class="docutils literal notranslate"><span class="pre">vs</span></code> to <code class="docutils literal notranslate"><span class="pre">log(vs)</span></code>) used for gradient-based optimization.</p></li>
+<li><p><strong>Implement your <code class="docutils literal notranslate"><span class="pre">user2opt</span></code></strong>: This function maps your user-defined model into the optimization parameter space used by the gradient-based optimizer (e.g., taking <code class="docutils literal notranslate"><span class="pre">log(vs)</span></code> for parameters with physical units, while leaving dimensionless parameters unchanged).</p></li>
 <li><p><strong>Implement <code class="docutils literal notranslate"><span class="pre">model_update</span></code></strong>: This function guides you in updating your model. For dimensionless parameters, you will directly add the search direction, and for parameters with physical units, you will apply an exponential factor based on the search direction.</p></li>
-<li><p><strong>Implement <code class="docutils literal notranslate"><span class="pre">convert_kl</span></code></strong>: This function handles the derivative conversion between the base model and your model. Do not re-derive everything yourself; instead, use <code class="docutils literal notranslate"><span class="pre">fwat/optimize/auto_kergen.py</span></code> to auto-generate the required conversions.</p></li>
+<li><p><strong>Implement <code class="docutils literal notranslate"><span class="pre">convert_kl</span></code></strong>: This function converts the base-model kernels into kernels in the optimization parameter space (consistent with <code class="docutils literal notranslate"><span class="pre">user2opt</span></code>). Do not re-derive these derivatives by hand — for the <code class="docutils literal notranslate"><span class="pre">dtti</span></code> model type they are auto-generated (see the guide below).</p></li>
 </ul>
+<section id="auto-generating-the-dtti-conversions-with-auto-kergen-py">
+<h3>Auto-generating the <code class="docutils literal notranslate"><span class="pre">dtti</span></code> conversions with <code class="docutils literal notranslate"><span class="pre">auto_kergen.py</span></code><a class="headerlink" href="#auto-generating-the-dtti-conversions-with-auto-kergen-py" title="Link to this heading"></a></h3>
+<p>For the <code class="docutils literal notranslate"><span class="pre">dtti</span></code> model type you do <strong>not</strong> hand-write the parameter/kernel conversions. They are generated by <code class="docutils literal notranslate"><span class="pre">fwat/optimize/auto_kergen.py</span></code> into <code class="docutils literal notranslate"><span class="pre">fwat/optimize/dtti_generated.py</span></code>, which <code class="docutils literal notranslate"><span class="pre">model.py</span></code> imports; <code class="docutils literal notranslate"><span class="pre">convert_model</span></code> and <code class="docutils literal notranslate"><span class="pre">convert_kl</span></code> are only thin dispatchers into that generated module.</p>
+<p>Everything is derived from a single symbolic stiffness matrix $C_{ij}(\text{params})$ per <code class="docutils literal notranslate"><span class="pre">kltype</span></code>, so the model transform and its kernel chain rule can never drift apart. For each <code class="docutils literal notranslate"><span class="pre">kltype</span></code> the generator emits three things:</p>
+<ul class="simple">
+<li><p><strong>backward model</strong> (user params → <code class="docutils literal notranslate"><span class="pre">cijkl</span></code>): evaluate $C_{ij}(\text{params})$;</p></li>
+<li><p><strong>forward model</strong> (<code class="docutils literal notranslate"><span class="pre">cijkl</span></code> → user params): the analytic inverse/projection (a modelling choice, e.g. $L = (c_{44}+c_{55})/2$);</p></li>
+<li><p><strong>kernels</strong> (base <code class="docutils literal notranslate"><span class="pre">cijkl</span></code> kernels → optimization space): the chain rule $K_p = \sum_{ij} \dfrac{\partial C_{ij}}{\partial p}, K_{c_{ij}}$.</p></li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">sympy</span></code> performs the differentiation and common-subexpression elimination (CSE), and plain <code class="docutils literal notranslate"><span class="pre">numpy</span></code> code is written out.</p>
+<p><strong>Commands</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>src/fwat/optimize
+<span class="c1"># (re)generate dtti_generated.py -- run this after editing auto_kergen.py</span>
+python<span class="w"> </span>auto_kergen.py<span class="w"> </span>--write
+<span class="c1"># print one kltype kernel body to stdout, just to inspect it</span>
+python<span class="w"> </span>auto_kergen.py<span class="w"> </span>dtti<span class="w"> </span><span class="m">3</span>
+</pre></div>
+</div>
+<p><strong>To add a new <code class="docutils literal notranslate"><span class="pre">kltype</span></code></strong> (all edits are in <code class="docutils literal notranslate"><span class="pre">auto_kergen.py</span></code>):</p>
+<ol class="arabic simple">
+<li><p>In <code class="docutils literal notranslate"><span class="pre">_case</span></code>, add a branch that names your parameters, builds the 6×6 Voigt stiffness <code class="docutils literal notranslate"><span class="pre">C0</span></code> from them (helper <code class="docutils literal notranslate"><span class="pre">_c66mat</span></code>), and sets <code class="docutils literal notranslate"><span class="pre">n_log</span></code> — the number of leading parameters carried in log space (velocities and density).</p></li>
+<li><p>In <code class="docutils literal notranslate"><span class="pre">_forward_exprs</span></code>, add the matching inverse that recovers your parameters from the base <code class="docutils literal notranslate"><span class="pre">cijkl</span></code> vector.</p></li>
+<li><p>Run <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">auto_kergen.py</span> <span class="pre">--write</span></code> to regenerate <code class="docutils literal notranslate"><span class="pre">dtti_generated.py</span></code>.</p></li>
+<li><p>Add the new <code class="docutils literal notranslate"><span class="pre">kltype</span></code>’s names to <code class="docutils literal notranslate"><span class="pre">direc_names</span></code>, and adjust <code class="docutils literal notranslate"><span class="pre">user2opt</span></code> / <code class="docutils literal notranslate"><span class="pre">model_update</span></code> if your log-space split differs.</p></li>
+</ol>
+<p><strong>Important</strong></p>
+<ul class="simple">
+<li><p>Do <strong>not</strong> edit <code class="docutils literal notranslate"><span class="pre">dtti_generated.py</span></code> by hand — your changes are overwritten on the next <code class="docutils literal notranslate"><span class="pre">--write</span></code>.</p></li>
+<li><p>Validate with <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">tests/test_grad_check.py</span></code> (run from the repository root), which finite-difference-checks the analytic kernels against the misfit. A maximum relative error at the ~0.05% level is finite-difference truncation error, not a bug (the dimensionless parameters, which do not depend on the step size, agree to ~1e-6%).</p></li>
+</ul>
+</section>
 </section>
 </section>
 
