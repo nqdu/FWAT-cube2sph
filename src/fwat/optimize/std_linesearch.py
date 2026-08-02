@@ -56,9 +56,9 @@ def run(argv):
     _ = f.read_record('i4')
     for _ in range(3):
         f.read_record('f4')
-        f.read_record('i4') # irregular_element_number
-        f.read_record('f4')
-        f.read_record('f4')
+    f.read_record('i4') # irregular_element_number
+    f.read_record('f4')
+    f.read_record('f4')
     for _ in range(9):
         f.read_record('f4')
     jaco = f.read_record('f4').reshape(nspec,NGLL3)
