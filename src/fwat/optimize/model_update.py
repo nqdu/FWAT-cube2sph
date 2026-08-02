@@ -41,8 +41,8 @@ def run(argv):
         print(f"OUTPUT_DIR = {OUT_DIR}")
 
     # get name list
-    mname_list = M.get_model_names()
-    dname_list = M.get_direc_names()
+    mname_list = M.model_names()
+    dname_list = M.direc_names()
     nker = len(dname_list)
     nmod = len(mname_list)
     mname_user = dname_list.copy()

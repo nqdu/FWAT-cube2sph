@@ -76,50 +76,42 @@ def get_summed_kernel(MODEL:str,simu_type:str) -> np.ndarray:
 
     # init FwatModel
     M = FwatModel()
-    grad_list_base = M.get_grad_names(base=True)
+    grad_list_user = M.grad_names(base=False)
 
     # init grad_base
-    nkers = len(grad_list_base)
+    nkers = len(grad_list_user)
     ksize = _get_database_size(MODEL)
-    grad_base = np.zeros((nkers,ksize),dtype=float)
-
-    # read current base model
-    nmod = len(M.get_model_names())
-    vec0 = np.zeros((nmod,ksize))
-    for i in range(nmod):
-        filename = f'{OPT_DIR}/MODEL_{MODEL}/proc%06d'%(myrank) + '_' + M.get_model_names()[i] + '.bin'
-        fio = FortranIO(filename,"r")
-        vec0[i,...] = fio.read_record('f4')
-        fio.close()
+    grad_user = np.zeros((nkers,ksize),dtype=float)
 
     # read source list
     srctxt = np.loadtxt(f'{SRC_REC}/sources.dat.{simu_type}',dtype=str,ndmin=2,usecols=[0])
     nevts = srctxt.shape[0]
 
-    for i in range(nkers):
-        if myrank == 0: print(f'sum {simu_type}: {grad_list_base[i]} for {MODEL}')
-        for ievt in range(nevts):
-            # check if it's noise source
-            if simu_type == 'noise':
-                filenames = glob.glob(f'./{SOLVER}/{MODEL}/{srctxt[ievt,0]}_[NEZRT]')
-            else:
-                filenames = []
-            filenames.append(f'./{SOLVER}/{MODEL}/{srctxt[ievt,0]}')
-                
+    # loop all events and sum kernels
+    for ievt in range(nevts):
+        # check if it's noise source
+        if simu_type == 'noise':
+            filenames = glob.glob(f'./{SOLVER}/{MODEL}/{srctxt[ievt,0]}_[NEZRT]')
+        else:
+            filenames = []
+        filenames.append(f'./{SOLVER}/{MODEL}/{srctxt[ievt,0]}')
+        if myrank == 0:
+            print(f"sum kernels for event {srctxt[ievt,0]} in simu type {simu_type}, filenames = {filenames}")
+            print("nkernels = %d, ksize = %d" %(nkers,ksize))
+
+        for i in range(nkers):                
             for f in filenames:
-                filename = f + '/GRADIENT/' + grad_list_base[i] + '.h5'
+                filename = f + '/GRADIENT/' + grad_list_user[i] + '.h5'
                 if not os.path.exists(filename): continue
 
                 # read 
                 fio = h5py.File(filename,"r")
-                arr = np.array(fio[str(myrank)])[:]
+                #arr = np.array(fio[str(myrank)])[:]
+                arr = np.array(fio[str(myrank)][:])
                 fio.close()
 
                 # sum kernel
-                grad_base[i,:] += arr
-
-    # convert base gradient to user defined gradient
-    _,grad_user = M.convert_kl(vec0,grad_base)
+                grad_user[i,:] += arr
 
     return grad_user
 
@@ -418,7 +410,7 @@ def run(argv):
     M = FwatModel()
 
     # get summed user defined kernels 
-    grad_user_names = M.get_grad_names(base=False)
+    grad_user_names = M.grad_names(base=False)
     ksize = _get_database_size(MODEL)
     nsims = len(SIMU_TYPES)
     nkers = len(grad_user_names)
@@ -450,7 +442,7 @@ def run(argv):
         grad_user_weighted[...] += grad_user[i,...] * weights_type[i]
     
     # write weighted summed kernel to file
-    grad_user_names = M.get_grad_names(base=False)
+    grad_user_names = M.grad_names(base=False)
     for i in range(nkers):
         outname = KERNEL_DIR + "/proc%06d"%myrank + '_' + grad_user_names[i] + '.bin'
         f = FortranIO(outname,"w")

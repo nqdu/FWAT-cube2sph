@@ -5,63 +5,9 @@ from fwat.measure.FwatPreOP import FwatPreOP
 from ..adjoint.MeasureStats import MeasureStats
 from .tele.deconit import deconit,myconvolve,nextpow2
 from .tele.deconit import gauss_filter,apply_gaussian
+from .utils import taper_window
 
-def rf_adj_src_time(rf_obs,rf_syn,synr,synz,
-                dt,tshift,f0,maxit):
-
-
-    def shift_data(a,dt,t0):
-        a1 = np.fft.rfft(a)
-        om = 2 * np.pi * np.fft.rfftfreq(len(a),dt)
-        a1 = a1 * np.exp(-1j * om * t0)
-
-        return np.fft.irfft(a1)
-    
-    # append to avoid aliasing
-    nfft = nextpow2(len(rf_obs)*2)
-
-    rf_o_flt = np.zeros((nfft))
-    rf_o_flt[:len(rf_obs)] = rf_obs.copy()
-    rf_s_flt = np.zeros((nfft))
-    rf_s_flt[:len(rf_syn)] = rf_syn.copy()
-    synr_flt = np.zeros((nfft))
-    synr_flt[:len(synr)] = synr.copy()
-    synz_flt = np.zeros((nfft))
-    synz_flt[:len(synz)] = synz.copy()
-
-    # band pass
-    gauss = gauss_filter(nfft,dt,f0)
-    # rf_o_flt = apply_gaussian(rf_o_flt,gauss,dt)
-    # rf_s_flt = apply_gaussian(rf_s_flt,gauss,dt)
-    synr_flt = apply_gaussian(synr_flt,gauss,dt)
-    synz_flt = apply_gaussian(synz_flt,gauss,dt)
-
-    # get negative shifted data, then reverse
-    r_rev = shift_data(synr_flt,dt,-tshift)[::-1]
-    z_rev = shift_data(synz_flt,dt,-tshift)[::-1]
-   
-    
-    # adjoint source
-    dR = rf_s_flt- rf_o_flt
-    adj_r_flt = deconit(dR,z_rev,dt,0,f0,1,maxit)
-    tmp = myconvolve(-dR,r_rev)
-    tmp1 = myconvolve(z_rev,z_rev)
-    adj_z_flt = deconit(tmp,tmp1,dt,0,f0,1,maxit)
-
-    # filter
-    adj_r_flt = apply_gaussian(adj_r_flt,gauss,dt)
-    adj_z_flt = apply_gaussian(adj_z_flt,gauss,dt)
-
-    nt = len(rf_obs)
-    adj_r = adj_r_flt[:nt]
-    adj_z = adj_z_flt[:nt]
-
-    #print(len(rf_obs),len(rf_syn),len(synr),len(synz),len(tmp),len(adj_r))
-
-    return adj_r,adj_z
-
-
-def rf_adj_src_freq(rf_obs,rf_syn,synr,synz,
+def _rf_adj_src_freq(rf_obs,rf_syn,synr,synz,
                 dt,tshift,f0):
     
     # append to avoid aliasing
@@ -79,90 +25,33 @@ def rf_adj_src_freq(rf_obs,rf_syn,synr,synz,
     gauss = gauss_filter(nfft,dt,f0)
 
     # go to frequency domain
-    RFo = np.fft.rfft(rf_o_flt) * dt 
-    RFs = np.fft.rfft(rf_s_flt) * dt
-    SYNr = np.fft.rfft(synr_flt) * dt
-    SYNz = np.fft.rfft(synz_flt) * dt
+    RFo = np.fft.fft(rf_o_flt) * dt 
+    RFs = np.fft.fft(rf_s_flt) * dt
+    SYNr = np.fft.fft(synr_flt) * dt
+    SYNz = np.fft.fft(synz_flt) * dt
     dR = RFs - RFo
 
     # shift factor 
-    om = 2 * np.pi * np.fft.rfftfreq(nfft,dt)
+    om = 2 * np.pi * np.fft.fftfreq(nfft,dt)
     shift_factor = np.exp(1j * om * tshift)
 
     # compute H componet
     deno = abs(SYNz * SYNz.conj())
-    eps = np.max(np.abs(deno)) * 1.0e-2
+    eps = np.max(np.abs(deno)) * 1.0e-4
     deno[deno < eps] = eps
     adj_h_fq = dR * SYNz / deno * shift_factor * gauss
 
     # Z component
     deno1 = np.abs(SYNz * SYNz.conj())**2 
-    eps = np.max(np.abs(deno1)) * 1.0e-2
+    eps = np.max(np.abs(deno1)) * 1.0e-4
     deno1[deno1 < eps] = eps
     adj_z_fq = -dR * SYNr.conj() * SYNz**2 / deno1 * shift_factor * gauss
 
     # go back to time domain
-    adj_r = np.fft.irfft(adj_h_fq)[:len(rf_obs)] / dt
-    adj_z = np.fft.irfft(adj_z_fq)[:len(rf_obs)] / dt 
+    adj_r = np.fft.ifft(adj_h_fq).real[:len(rf_obs)] / dt
+    adj_z = np.fft.ifft(adj_z_fq).real[:len(rf_obs)] / dt 
 
     return adj_r,adj_z
-
-
-
-# def _rf_adj_src(rf_obs,rf_syn,synr,synz,
-#                 dt,tshift,f0,maxit):
-#     from .tele.deconit import deconit,myconvolve,nextpow2
-#     from .tele.deconit import gauss_filter,apply_gaussian
-
-#     def shift_data(a,dt,t0):
-#         a1 = np.fft.fft(a)
-#         om = 2 * np.pi * np.fft.fftfreq(len(a),dt)
-#         a1 = a1 * np.exp(-1j * om * t0)
-
-#         return np.fft.ifft(a1).real
-    
-#     # get a filte
-#     nft = nextpow2(len(rf_obs)* 2)
-#     synr_filt = np.pad(synr,(0,nft - len(synr)),'constant')
-#     synz_filt = np.pad(synz,(0,nft - len(synz)),'constant')
-#     rf_o_filt = np.pad(rf_obs,(0,nft - len(rf_obs)),'constant')
-#     rf_s_filt = np.pad(rf_syn,(0,nft - len(rf_syn)),'constant')
-
-#     # gaussian filter
-#     gauss = gauss_filter(nft,dt,f0)
-#     synr_filt = apply_gaussian(synr_filt,gauss,dt)
-#     synz_filt = apply_gaussian(synz_filt,gauss,dt)
-
-#     # normalize
-#     zrf = deconit(
-#         synz_filt,synz_filt,dt,0.,
-#         f0,0,maxit
-#     )
-#     amp = np.max(abs(zrf))
-#     dobs_norm = rf_o_filt / amp
-#     dsyn_norm = rf_s_filt / amp
-
-#     # get negative shifted data, then reverse
-#     r_rev = shift_data(synr_filt,dt,-tshift)[::-1]
-#     z_rev = shift_data(synz_filt,dt,-tshift)[::-1]
-    
-#     # adjoint source
-#     dR = dsyn_norm - dobs_norm
-#     adj_r_filt = deconit(dR,z_rev,dt,0,f0,1,maxit)
-#     tmp = myconvolve(-dR,r_rev)
-#     tmp1 = myconvolve(z_rev,z_rev)
-#     adj_z_filt = deconit(tmp,tmp1,dt,0,f0,1,maxit)
-
-#     # filter
-#     adj_r_filt = apply_gaussian(adj_r_filt,gauss,dt)
-#     adj_z_filt = apply_gaussian(adj_z_filt,gauss,dt)
-
-#     # copy to original length
-#     nt = len(rf_obs)
-#     adj_r = adj_r_filt[:nt]
-#     adj_z = adj_z_filt[:nt]
-
-#     return adj_r,adj_z,amp
 
 class RF_PreOP(FwatPreOP):
     def __init__(self, measure_type, iter, evtid, run_opt):
@@ -275,13 +164,20 @@ class RF_PreOP(FwatPreOP):
                 f0 = self._f0[ib]
                 name = self._get_rf_code(i,ib)
 
+                # get window used for RF
+                pad = max(5.0,2.0 / self._f0[ib])
+                tb = self.t_ref[i] - self.t_inj - win_tb - pad
+                te = self.t_ref[i] - self.t_inj + win_te + pad
+                lpt,rpt,taper0 = taper_window(0,dt_syn,npt_syn,tb,te)
+                taper_p = np.zeros((npt_syn))
+                taper_p[lpt:rpt] = taper0
+
                 # bandpass
                 idx_r = self.components.index('R')
                 idx_z = self.components.index('Z')
-                gauss = gauss_filter(npt_syn,dt_syn,f0)
-                R = apply_gaussian(syn_data[idx_r,:],gauss,dt_syn)
-                Z = apply_gaussian(syn_data[idx_z,:],gauss,dt_syn)
-                
+                R = syn_data[idx_r,:] * taper_p
+                Z = syn_data[idx_z,:] * taper_p
+
                 # compute rf
                 rf = deconit(
                     R,Z,
@@ -346,19 +242,36 @@ class RF_PreOP(FwatPreOP):
         self.seismo_win['t0'] = -self._tshift
         self.seismo_win['npts'] = npt_syn
 
+        # get average amplitude of rf_obs
+        amp = 0.
+        for ir in range(nsta_loc):
+            i = ir + self._istart
+            rfname = self._get_rf_code(i,ib)
+            obs_tr = SACTrace.read(f"{self.DATA_DIR}/{self.evtid}/{rfname}.rf.sac")
+            amp += np.max(np.abs(obs_tr.data))
+
+        # sync
+        amp = MPI.COMM_WORLD.allreduce(amp,op=MPI.SUM)
+        amp /= self.nsta
+        
         # loop each station
         for ir in range(nsta_loc):
             i = ir + self._istart
-        
+
+            # get window used for RF
+            pad = max(5.0,2.0 / self._f0[ib])
+            tb = self.t_ref[i] - self.t_inj - win_tb - pad
+            te = self.t_ref[i] - self.t_inj + win_te + pad
+            lpt,rpt,taper0 = taper_window(0,dt_syn,npt_syn,tb,te)
+            taper_p = np.zeros((npt_syn))
+            taper_p[lpt:rpt] = taper0
+
             # read synthetic data
             syn_data = np.zeros((2,npt_syn))
             for ic in range(self.ncomp):
                 name = self._get_station_code(i,ic)
                 syn_data[ic,:] = self.seismogram[f"{out_dir}/{name}.sem.npy"][:,1]
-                #syn_data[ic,:] = np.load(f"{out_dir}/{name}.sem.npy")[:,1]
-
-                # filter
-                syn_data[ic,:] = apply_gaussian(syn_data[ic,:],gauss,dt_syn)
+                syn_data[ic,:] *= taper_p # taper synthetic data
             
             # compute rf 
             idx_r = self.components.index('R')
@@ -387,29 +300,34 @@ class RF_PreOP(FwatPreOP):
             )
 
             # get time window 
-            lpt,rpt,taper0 = taper_window(
+            lpt,rpt,taper1 = taper_window(
                 -self._tshift,dt_syn,npt_syn,
                 -win_tb,win_te
             )
             taper = rf_syn * 0
-            taper[lpt:rpt] = taper0 
+            taper[lpt:rpt] = taper1 
 
             # taper rf 
             rf_obs *= taper
             rf_syn *= taper
 
             # compute adjoint source
-            adj_r,adj_z = rf_adj_src_time(
-                rf_obs,rf_syn,
+            adj_r,adj_z  = \
+            _rf_adj_src_freq(
+                rf_obs*taper,rf_syn*taper,
                 syn_data[idx_r,:],
                 syn_data[idx_z,:],
-                dt_syn,self._tshift,
-                self._f0[ib],
-                self._maxit
+                dt_syn,
+                self._tshift,
+                self._f0[ib]
             )
 
+            # taper again and apply amp
+            adj_r *= taper_p / amp**2 
+            adj_z *= taper_p / amp**2
+
             # misfit 
-            chi = 0.5 * trapezoid((rf_obs - rf_syn)**2, dx=dt_syn)
+            chi = 0.5 * trapezoid((rf_obs - rf_syn)**2 / amp**2, dx=dt_syn)
             stats = MeasureStats(
                 adj_type=self.adjsrc_type,
                 misfit=chi,

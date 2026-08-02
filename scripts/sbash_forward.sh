@@ -23,8 +23,8 @@ SIMU_TYPES=(`fwat-utils getparam simulation/types| tr -d '[]",'\'`)
 # mod
 MODEL=M`printf %02d $iter`
 
-# working directory
-work_dir=`pwd`
+# current directory
+curr_dir=`pwd`
 
 # assign job id
 TASK_ID=1
@@ -49,7 +49,8 @@ fwd=LOG/output_fwat0_log.$MODEL.$simu_type.job$TASK_ID.txt
 :> $fwd
 
 # working dir is IO_TMPDIR when enabled and available
-MYDIR=$work_dir
+MYDIR=$curr_dir
+PRUN=""
 if [ "$USE_IO_TMPDIR" == "1" ];  then
   if [ -d "$IO_TMPDIR" ]; then
     if [ "$PLATFORM"  == "slurm" ];  then
@@ -57,7 +58,8 @@ if [ "$USE_IO_TMPDIR" == "1" ];  then
     elif [ "$PLATFORM"  == "pbs" ];  then
       MYDIR=$IO_TMPDIR/$PBS_JOBID
     fi
-    mkdir -p $MYDIR
+    PRUN="mpirun --map-by ppr:1:node" 
+    $PRUN mkdir -p $MYDIR
   else
     USE_IO_TMPDIR=0
   fi
@@ -66,7 +68,7 @@ echo "working directory is $MYDIR"
 echo "working directory is $MYDIR" >> $fwd
 
 for i in `seq 1 $NJOBS`; do
-  cd $work_dir
+  cd $curr_dir
   ievt=`echo "($TASK_ID-1) * $NJOBS + $i" |bc`
   ievt_ed=`echo "($TASK_ID-1) * $NJOBS + $NJOBS" |bc`
 
@@ -88,11 +90,11 @@ for i in `seq 1 $NJOBS`; do
 
   # copy fwat_params to MYDIR if using IO_TMPDIR
   if [ "$USE_IO_TMPDIR" == "1" ]; then
-    cp -r $work_dir/fwat_params $MYDIR/fwat_params
+    $PRUN \cp -r $curr_dir/fwat_params $MYDIR/fwat_params
 
     # if MOVE_DATABASE is enabled and i == 1, copy model to MYDIR
     if [ "$i" -eq 1 ] && [ "$MOVE_DATABASE" == "1" ]; then
-      cp -r $work_dir/$FWAT_OPT_DIR/MODEL_${MODEL} $MYDIR/$MODEL
+      $PRUN \cp -r $curr_dir/$FWAT_OPT_DIR/MODEL_${MODEL} $MYDIR/$MODEL
     fi
   fi
 
@@ -101,8 +103,8 @@ for i in `seq 1 $NJOBS`; do
   do
     evtdir=${FWAT_SOLVER}/$MODEL/$evtid_wk
     if [ "$USE_IO_TMPDIR" == "1" ]; then
-      mkdir -p $MYDIR/$evtdir
-      cp -r $evtdir/* $MYDIR/$evtdir/
+      $PRUN mkdir -p $MYDIR/$evtdir
+      $PRUN \cp -r $evtdir/* $MYDIR/$evtdir/
 
       # remove DATABASES_MPI soft link and link $MYDIR/$MODEL instead
       if [ "$MOVE_DATABASE" == "1" ]; then
@@ -111,8 +113,8 @@ for i in `seq 1 $NJOBS`; do
         ln -s $MYDIR/${MODEL}/* $MYDIR/$evtdir/DATABASES_MPI/
 
         # copy axisem data
-        if [ -d "$work_dir/DATA/axisem/$evtid_wk" ]; then
-          cp -r $work_dir/DATA/axisem/$evtid_wk/* $MYDIR/$evtdir/DATABASES_MPI/
+        if [ -d "$curr_dir/DATA/axisem/$evtid_wk" ]; then
+          $PRUN \cp -r $curr_dir/DATA/axisem/$evtid_wk/* $MYDIR/$evtdir/DATABASES_MPI/
         fi
       fi
     fi
@@ -130,15 +132,15 @@ for i in `seq 1 $NJOBS`; do
     fwat-main pack OUTPUT_FILES/seismograms.h5 OUTPUT_FILES/all_seismograms.*
     \rm -rf OUTPUT_FILES/all_seismograms.*
     if [ "$USE_IO_TMPDIR" == "1" ]; then
-      \cp -r OUTPUT_FILES/seismograms.h5 $work_dir/$evtdir/OUTPUT_FILES/
+      \cp -r OUTPUT_FILES/seismograms.h5 $curr_dir/$evtdir/OUTPUT_FILES/
     fi
-    cd $work_dir
+    cd $curr_dir
   done
 
   # run measure
   echo ""
   echo "saving forward seismograms for $evtid ..."
-  cd $work_dir
+  cd $curr_dir
   date
   $MPIRUN -np $NPROC_MEASURE fwat-main measure $simu_type $iter $evtid 1 >> $fwd 
   date
@@ -148,9 +150,9 @@ for i in `seq 1 $NJOBS`; do
   do
     if [ "$USE_IO_TMPDIR" == "1" ]; then
       cd $MYDIR
-      fwat-utils clean $MODEL $evtid_wk
+      $PRUN fwat-utils clean $MODEL $evtid_wk
     fi
-    cd $work_dir
+    cd $curr_dir
     fwat-utils clean $MODEL $evtid_wk
   done
 
@@ -163,6 +165,6 @@ done
 
 # remove
 if [ "$USE_IO_TMPDIR" == "1" ]; then
-  \rm -rf $MYDIR
+  $PRUN \rm -rf $MYDIR
 fi
 

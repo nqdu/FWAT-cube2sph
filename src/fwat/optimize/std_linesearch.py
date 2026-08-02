@@ -56,17 +56,17 @@ def run(argv):
     _ = f.read_record('i4')
     for _ in range(3):
         f.read_record('f4')
-        f.read_record('i4') # irregular_element_number
-        f.read_record('f4')
-        f.read_record('f4')
+    f.read_record('i4') # irregular_element_number
+    f.read_record('f4')
+    f.read_record('f4')
     for _ in range(9):
         f.read_record('f4')
     jaco = f.read_record('f4').reshape(nspec,NGLL3)
     f.close()
 
     # read search direction, grad, grad for linesearch
-    grad_list_user = M.get_grad_names(base=False)
-    direc_list = M.get_direc_names()
+    grad_list_user = M.grad_names(base=False)
+    direc_list = M.direc_names()
     nkers = len(grad_list_user)
     assert nkers == len(direc_list), "number of kernels for gradient and search direction should be the same"
 

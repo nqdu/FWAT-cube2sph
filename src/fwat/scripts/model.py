@@ -21,6 +21,13 @@ def help_function():
     print("\tmpi should be enabled")
     print("\tusage: mpirun -np 4 fwat-model kernel M06 GRADIENT mdtype kltype")
 
+
+    print()
+    print("fwat-model combine_kl MODEL_DIR KERNEL_DIR")
+    print("\tcombine base binary kernels to user defined h5 kernel")
+    print("\tmpi should be enabled")
+    print("\tusage: mpirun -np 4 fwat-model combine_kl M06 GRADIENT")
+
     print()
     print("fwat-model reslice input_dir output_dir param")
     print("\treslice the model from nprocs1 mpi slices to nprocs2 slices")
@@ -53,6 +60,10 @@ def main():
     elif cmd == "kernel":
         from fwat.optimize import write_event_kernels
         write_event_kernels.run(args)
+        pass
+    elif cmd == "combine_kl":
+        from fwat.optimize import combine_kernels
+        combine_kernels.run(args)
         pass
     else:
         print(f"{cmd} is not a function in fwat!")

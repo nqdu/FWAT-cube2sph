@@ -11,7 +11,7 @@ run_one_simu_() {
 
   # check if we are in slurm
   local hostfile=""
-  local my_hostfile="$work_dir/hostfile_${evtid}.txt"
+  local my_hostfile="$curr_dir/hostfile_${evtid}.txt"
   if [ -n "$SLURM_JOB_ID" ] || [ -n "$PBS_JOBID" ]; then
     hostfile="--hostfile $my_hostfile"
 
@@ -30,13 +30,12 @@ run_one_simu_() {
   \rm LOG/.$simu_type-$iter-$evtid-$run_opt
 
   # run forward simulation and count stations used
-  local nsta_used=0
   for evtid_wk in $evtlist;
   do 
     evtdir=${FWAT_SOLVER}/$MODEL/$evtid_wk
     if [ "$USE_IO_TMPDIR" == "1" ]; then
-      mkdir -p $MYDIR/$evtdir
-      cp -r $evtdir/* $MYDIR/$evtdir/
+      $PRUN mkdir -p $MYDIR/$evtdir
+      $PRUN cp -r $evtdir/* $MYDIR/$evtdir/
     fi
 
     cd $MYDIR/$evtdir/
@@ -47,8 +46,8 @@ run_one_simu_() {
 
     # copy output_solver.txt to output_solver.fwd.txt 
     if [ "$USE_IO_TMPDIR" == "1" ]; then
-      \cp OUTPUT_FILES/seismograms.h5 $work_dir/$evtdir/OUTPUT_FILES/
-      \cp OUTPUT_FILES/output_solver.txt $work_dir/$evtdir/OUTPUT_FILES/output_solver.fwd.txt
+      \cp OUTPUT_FILES/seismograms.h5 $curr_dir/$evtdir/OUTPUT_FILES/
+      \cp OUTPUT_FILES/output_solver.txt $curr_dir/$evtdir/OUTPUT_FILES/output_solver.fwd.txt
     else
       \cp OUTPUT_FILES/output_solver.txt OUTPUT_FILES/output_solver.fwd.txt
     fi
@@ -58,21 +57,14 @@ run_one_simu_() {
     echo "packing seismograms for $evtid_wk ..."
     fwat-main pack OUTPUT_FILES/seismograms.h5 OUTPUT_FILES/all_seismograms.*
     \rm -rf OUTPUT_FILES/all_seismograms.*
-    cd $work_dir
-
-    # count stations used
-    nsta_used=`awk 'END{print NR}' $evtdir/DATA/STATIONS`
+    cd $curr_dir
   done 
 
   # run measure
   echo ""
   echo "measure adjoint source for $evtid at `date` ..."
-  cd $work_dir
-  local nproc_run=$NPROC 
-  if [ $nsta_used -lt $NPROC ]; then
-    nproc_run=$nsta_used
-  fi
-  $MPIRUN $hostfile -np $nproc_run fwat-main measure $simu_type $iter $evtid $run_opt >> $fwd 
+  cd $curr_dir
+  $MPIRUN $hostfile -np $NPROC_MEASURE fwat-main measure $simu_type $iter $evtid $run_opt >> $fwd 
   echo "finished measure for $evtid at `date`"
 
   # adjoint simulation
@@ -82,8 +74,9 @@ run_one_simu_() {
     evtdir=${FWAT_SOLVER}/$MODEL/$evtid_wk
     if [ "$USE_IO_TMPDIR" == "1" ]; then
       \rm -rf $MYDIR/$evtdir/SEM
-      mv $work_dir/$evtdir/SEM $MYDIR/$evtdir/
-      \cp -r $work_dir/$evtdir/DATA/* $MYDIR/$evtdir/DATA/
+      $PRUN cp -r $curr_dir/$evtdir/SEM $MYDIR/$evtdir/
+      \rm -rf $curr_dir/$evtdir/SEM
+      $PRUN \cp -r $curr_dir/$evtdir/DATA/* $MYDIR/$evtdir/DATA/
     fi
 
     cd $MYDIR/$evtdir/
@@ -93,33 +86,27 @@ run_one_simu_() {
     echo "finished adjoint for $evtid_wk at `date`"
     echo " "
     cd $MYDIR
-
+    
     # combine kernels
-    mkdir -p $evtdir/GRADIENT
-    \rm -rf $evtdir/GRADIENT/*
-    mv $evtdir/DATABASES_MPI/*_kernel.bin $evtdir/GRADIENT
-    grad_list=`fwat-model name grad`
-    for grad in $grad_list hess_kernel;
-    do
-      echo "combine $NPROC $grad to hdf5 ..." 
-      fwat-main bin2h5 $evtdir/GRADIENT $grad $NPROC 1
-    done 
-    \rm $evtdir/GRADIENT/*.bin
+    cd $MYDIR
+    mkdir -p $curr_dir/$evtdir/GRADIENT
+    \rm -rf $curr_dir/$evtdir/GRADIENT/*
+    $PRUN bash -c "find $evtdir/DATABASES_MPI/ -maxdepth 1 -name 'proc*_kernel.bin' -print0 | xargs -0 cp -t $curr_dir/$evtdir/GRADIENT/"
+    mpirun -np $NPROC fwat-model combine_kl $evtdir/DATABASES_MPI/ $curr_dir/$evtdir/GRADIENT
+    \rm $curr_dir/$evtdir/GRADIENT/*.bin
     echo ""
 
     # delete useless information
     if [ "$USE_IO_TMPDIR" == "1" ]; then
-      fwat-utils clean $MODEL $evtid_wk
+      $PRUN fwat-utils clean $MODEL $evtid_wk
     fi
 
-    cd $work_dir
-    fwat-utils clean $MODEL $evtid_wk 
+    cd $curr_dir
+    fwat-utils clean $MODEL $evtid_wk
     if [ "$USE_IO_TMPDIR" == "1" ]; then
-      \rm -rf $evtdir/GRADIENT/
-      mv $MYDIR/$evtdir/GRADIENT $evtdir/
-      \cp $MYDIR/$evtdir/OUTPUT_FILES/output_solver.txt $work_dir/$evtdir/OUTPUT_FILES/output_solver.adj.txt
+      \cp $MYDIR/$evtdir/OUTPUT_FILES/output_solver.txt $curr_dir/$evtdir/OUTPUT_FILES/output_solver.adj.txt
     else
-      \cp $evtdir/OUTPUT_FILES/output_solver.txt $work_dir/$evtdir/OUTPUT_FILES/output_solver.adj.txt
+      \cp $evtdir/OUTPUT_FILES/output_solver.txt $curr_dir/$evtdir/OUTPUT_FILES/output_solver.adj.txt
     fi
   done
 
@@ -234,8 +221,9 @@ else
 fi
 
 # working directory
-work_dir=`pwd`
-MYDIR=$work_dir
+curr_dir=`pwd`      # shared filesystem root (persists across nodes)
+MYDIR=$curr_dir     # node-local scratch when USE_IO_TMPDIR (slurm/NLS), else same as curr_dir
+PRUN=""            # command to run one-node command on compute nodes, e.g. mpirun --map-by ppr:1:node for slurm/pbs with mpirun, works on Scinet, empty for local
 if [ "$USE_IO_TMPDIR" == "1" ]; then
   if [ -d "$IO_TMPDIR" ]; then
     echo "working directory is $IO_TMPDIR"
@@ -244,11 +232,11 @@ if [ "$USE_IO_TMPDIR" == "1" ]; then
       job_tmp_id=$$
     fi
     MYDIR=$IO_TMPDIR/$job_tmp_id
-    mkdir -p $MYDIR
+    PRUN="mpirun --map-by ppr:1:node" 
+    $PRUN mkdir -p $MYDIR
   else
     echo "IO_TMPDIR is not available, disable USE_IO_TMPDIR"
     USE_IO_TMPDIR=0
-    echo "working directory is current dir"
   fi
 fi
 

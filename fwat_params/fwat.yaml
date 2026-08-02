@@ -67,7 +67,7 @@ measure:
       - [1.0]
     MINDERR: 0.001
     MAXIT: 150
-    TIME_WINDOW: [5.,25.] # time window, before/after t= 0
+    TIME_WINDOW: [5.,25.] # time window for RF, before and after maximum amplitude
     TSHIFT: 5.
     VERBOSE_MODE: True
     ADJSRC_TYPE: 2   # only L2 norm

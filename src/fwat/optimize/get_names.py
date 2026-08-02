@@ -14,8 +14,8 @@ def run(argv):
     m = FwatModel(PARAM_FILE)
 
     if type_ == "grad":
-        print(' '.join(m.get_grad_names()))
+        print(' '.join(m.grad_names()))
     elif type_ == "direc":
-        print(' '.join(m.get_direc_names()))
+        print(' '.join(m.direc_names()))
     else:
-        print(' '.join(m.get_model_names()))
+        print(' '.join(m.model_names()))

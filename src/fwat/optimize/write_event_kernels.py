@@ -30,8 +30,8 @@ def run(argv):
     M = FwatModel(None,mdtype,kltype)
 
     # get name list
-    mname_list = M.get_model_names()
-    gname_list = M.get_grad_names()
+    mname_list = M.model_names()
+    gname_list = M.grad_names()
     nmod = len(mname_list)
 
     # get how many files in the MODEL_DIR
@@ -67,12 +67,12 @@ def run(argv):
             grad[im,:] = np.array(fh5[str(irank)])[:] * 1.
             fh5.close()
         
-        # convert to plotting kernels
-        _,direc = M.convert_kl(md,grad)
-        direc = np.asarray(-direc,dtype='f4') # we need search direction
+        # convert base kernels to optimization-space kernels
+        _,kl_opt = M.convert_kl(md,grad)
+        direc = np.asarray(-kl_opt,dtype='f4') # search direction = -gradient
 
         # get search direction names
-        dname_list = M.get_direc_names()
+        dname_list = M.direc_names()
         nker = len(dname_list)
 
         # write user model

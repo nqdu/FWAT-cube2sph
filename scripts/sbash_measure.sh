@@ -58,7 +58,13 @@ fi
 echo " " >> $fwd
 
 # working dir is IO_TMPDIR when enabled and available
+# command to run one-node command on compute nodes
+# e.g. pbsdsh -u for PBS
+# e.g. srun --ntasks-per-node=1 for slurm
+# e.g. mpirun --map-by ppr:1:node for slurm/pbs with mpirun, works on Scinet
+# e.g empty for local
 MYDIR=$curr_dir
+PRUN=""
 if [ "$USE_IO_TMPDIR" == "1" ];  then
   if [ -d "$IO_TMPDIR" ]; then
     if [ "$PLATFORM"  == "slurm" ];  then 
@@ -66,7 +72,8 @@ if [ "$USE_IO_TMPDIR" == "1" ];  then
     elif [ "$PLATFORM"  == "pbs" ];  then 
       MYDIR=$IO_TMPDIR/$PBS_JOBID
     fi
-    mkdir -p $MYDIR
+    PRUN="mpirun --map-by ppr:1:node" 
+    $PRUN mkdir -p $MYDIR
   else
     USE_IO_TMPDIR=0
   fi
@@ -96,11 +103,11 @@ for i in `seq 1 $NJOBS`; do
 
   # copy fwat_params to MYDIR if using IO_TMPDIR
   if [ "$USE_IO_TMPDIR" == "1" ]; then
-    cp -r $curr_dir/fwat_params $MYDIR/fwat_params
+    $PRUN \cp -r $curr_dir/fwat_params $MYDIR/fwat_params
 
     # if MOVE_DATABASE is enabled and i == 1, copy model to MYDIR
     if [ "$i" -eq 1 ] && [ "$MOVE_DATABASE" == "1" ]; then
-      cp -r $curr_dir/$FWAT_OPT_DIR/MODEL_${MODEL} $MYDIR/$MODEL
+      $PRUN \cp -r $curr_dir/$FWAT_OPT_DIR/MODEL_${MODEL} $MYDIR/$MODEL
     fi
   fi
 
@@ -109,8 +116,8 @@ for i in `seq 1 $NJOBS`; do
   do 
     evtdir=${FWAT_SOLVER}/$MODEL/$evtid_wk
     if [ "$USE_IO_TMPDIR" == "1" ]; then
-      mkdir -p $MYDIR/$evtdir
-      cp -r $evtdir/* $MYDIR/$evtdir/
+      $PRUN mkdir -p $MYDIR/$evtdir
+      $PRUN \cp -r $evtdir/* $MYDIR/$evtdir/
 
       # remove DATABASES_MPI soft link and link $MYDIR/$MODEL instead
       if [ "$MOVE_DATABASE" == "1" ]; then
@@ -120,7 +127,7 @@ for i in `seq 1 $NJOBS`; do
 
         # copy axisem data
         if [ -d "$curr_dir/DATA/axisem/$evtid_wk" ]; then
-          cp -r $curr_dir/DATA/axisem/$evtid_wk/* $MYDIR/$evtdir/DATABASES_MPI/
+          $PRUN \cp -r $curr_dir/DATA/axisem/$evtid_wk/* $MYDIR/$evtdir/DATABASES_MPI/
         fi
       fi
     fi
@@ -139,6 +146,7 @@ for i in `seq 1 $NJOBS`; do
     fwat-main pack OUTPUT_FILES/seismograms.h5 OUTPUT_FILES/all_seismograms.*
     \rm -rf OUTPUT_FILES/all_seismograms.*
     if [ "$USE_IO_TMPDIR" == "1" ]; then
+      # copy back to solver dir, as seismograms.h5 is on primary compute node.
       \cp -r OUTPUT_FILES/seismograms.h5 $curr_dir/$evtdir/OUTPUT_FILES/
     fi
     \cp $MYDIR/$evtdir/OUTPUT_FILES/output_solver.txt $curr_dir/$evtdir/OUTPUT_FILES/output_solver.fwd.txt
@@ -162,8 +170,9 @@ for i in `seq 1 $NJOBS`; do
     evtdir=${FWAT_SOLVER}/$MODEL/$evtid_wk
     if [ "$USE_IO_TMPDIR" == "1" ]; then
       \rm -rf $MYDIR/$evtdir/SEM
-      mv $curr_dir/$evtdir/SEM $MYDIR/$evtdir/
-      \cp -r $curr_dir/$evtdir/DATA/* $MYDIR/$evtdir/DATA/
+      $PRUN cp -r $curr_dir/$evtdir/SEM $MYDIR/$evtdir/
+      \rm -rf $curr_dir/$evtdir/SEM 
+      $PRUN \cp -r $curr_dir/$evtdir/DATA/* $MYDIR/$evtdir/DATA/
       cd $MYDIR/$evtdir
     fi
 
@@ -176,32 +185,23 @@ for i in `seq 1 $NJOBS`; do
     date
     echo " "
 
-    # combine kernels
+    # combine kernels, note we are on NLS
     cd $MYDIR
-    mkdir -p $evtdir/GRADIENT
-    \rm -rf $evtdir/GRADIENT/*
-    mv $evtdir/DATABASES_MPI/*_kernel.bin $evtdir/GRADIENT
-    grad_list=`fwat-model name grad`
-    for grad in $grad_list hess_kernel;
-    do
-      echo "combine $NPROC $grad to hdf5 ..." 
-      fwat-main bin2h5 $evtdir/GRADIENT $grad $NPROC 1
-    done 
-    \rm $evtdir/GRADIENT/*.bin
+    mkdir -p $curr_dir/$evtdir/GRADIENT
+    \rm -rf $curr_dir/$evtdir/GRADIENT/*
+    $PRUN bash -c "find $evtdir/DATABASES_MPI/ -maxdepth 1 -name 'proc*_kernel.bin' -print0 | xargs -0 cp -t $curr_dir/$evtdir/GRADIENT/"
+    mpirun -np $NPROC fwat-model combine_kl $evtdir/DATABASES_MPI/ $curr_dir/$evtdir/GRADIENT
+    \rm $curr_dir/$evtdir/GRADIENT/*.bin
     echo ""
 
     # delete useless information
     if [ "$USE_IO_TMPDIR" == "1" ]; then
-      fwat-utils clean $MODEL $evtid_wk 
+      $PRUN fwat-utils clean $MODEL $evtid_wk 
     fi
 
     # copy back to solver dir
     cd $curr_dir
     fwat-utils clean $MODEL $evtid_wk 
-    if [ "$USE_IO_TMPDIR" == "1" ]; then
-      \rm -rf $evtdir/GRADIENT/
-      mv $MYDIR/$evtdir/GRADIENT $evtdir/
-    fi
     \cp $MYDIR/$evtdir/OUTPUT_FILES/output_solver.txt $curr_dir/$evtdir/OUTPUT_FILES/output_solver.adj.txt
   done
 
@@ -214,6 +214,6 @@ done
 
 # remove
 if [ "$USE_IO_TMPDIR" == "1" ]; then
-  \rm -rf $MYDIR
+  $PRUN \rm -rf $MYDIR
 fi
 

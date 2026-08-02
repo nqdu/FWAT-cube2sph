@@ -23,7 +23,7 @@ def run(argv):
     M = FwatModel(None,mdtype,kltype)
 
     # get name list
-    mname_list = M.get_model_names()
+    mname_list = M.model_names()
     nmod = len(mname_list)
 
     # get how many files in the MODEL_DIR
