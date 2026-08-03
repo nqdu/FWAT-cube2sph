@@ -97,9 +97,11 @@ def get_summed_kernel(MODEL:str,simu_type:str) -> np.ndarray:
         filenames.append(f'./{SOLVER}/{MODEL}/{srctxt[ievt,0]}')
         if myrank == 0:
             print(f"sum kernels for event {srctxt[ievt,0]} in simu type {simu_type}, filenames = {filenames}")
-            print("nkernels = %d, ksize = %d" %(nkers,ksize))
+            #print("nkernels = %d, ksize = %d" %(nkers,ksize))
 
-        for i in range(nkers):                
+        for i in range(nkers):
+            # sanity check
+            has_kernel = False             
             for f in filenames:
                 filename = f + '/GRADIENT/' + grad_list_user[i] + '.h5'
                 if not os.path.exists(filename): continue
@@ -110,8 +112,17 @@ def get_summed_kernel(MODEL:str,simu_type:str) -> np.ndarray:
                 arr = np.array(fio[str(myrank)][:])
                 fio.close()
 
+                # reset has_kernel
+                has_kernel = True
+
                 # sum kernel
                 grad_user[i,:] += arr
+
+            if not has_kernel:
+                if myrank == 0:
+                    print(f"WARNING! kernel {grad_list_user[i]} not found for event {srctxt[ievt,0]} in simu type {simu_type}, skip it")
+                exit(1)
+                
 
     return grad_user
 
