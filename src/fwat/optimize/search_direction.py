@@ -222,11 +222,13 @@ def get_lbfgs_direc(iter:int,paramfile:str,M:FwatModel):
             print("The search direction is accepted!")
             print(f"angle between search direction and -grad  = {theta}")
     else:
+        direc = -grad_bak * hess
+        
         if myrank == 0: 
             print("The search direction is not accepted!")
             print("clear previous information !")
             print("use negative grad as search direction")
-            direc = -grad_bak * hess
+
 
             # write new info 
             pdict['iter_start'] = iter
