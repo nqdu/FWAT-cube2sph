@@ -4,11 +4,17 @@ from scipy.signal import hilbert
 from .MeasureStats import MeasureStats
 from fwat.measure.utils import bandpass,taper_window
 from scipy.integrate import trapezoid
+from .cc_misfit import cc_measure
 
 def measure_adj_exphase(obs,syn,t0,dt,nt,
                min_period,max_period,
                tstart,tend,water=0.05,
-               taper_ratio = 0.1):
+               taper_ratio = 0.1,
+               tshift_min = -4.5,
+               tshift_max = 4.5,
+               dlna_min = -1.5,
+               dlna_max = 1.5,
+               cc_min = 0.8):
     """
     Parameters
     ------------
@@ -26,6 +32,16 @@ def measure_adj_exphase(obs,syn,t0,dt,nt,
         waterlevel for synthetic envelope, default = 0.1
     taper_ratio: float
         taper of the window, default = 0.1
+    tshift_min: float
+        minimum cross-correlation time shift
+    tshift_max: float
+        maximum cross-correlation time shift
+    dlna_min: float
+        minimum log amplitude shift
+    dlna_max: float
+        maximum log amplitude shift
+    cc_min: float
+        minimum cross-correlation coefficient to do measurement
 
     Returns
     ----------------
@@ -43,7 +59,15 @@ def measure_adj_exphase(obs,syn,t0,dt,nt,
 
     # compute hilbert transform
     s = syn[lpt:rpt] * taper0 
-    d = obs[lpt:rpt] * taper0 
+    d = obs[lpt:rpt] * taper0
+
+    # data selection, same rules as cc_misfit
+    tshift,dlna,_,_,cc_coef = cc_measure(d,s,dt,1.,0.5,False)
+    misfit_flag = 1.
+    if tshift < tshift_min or tshift > tshift_max or  \
+        cc_coef < cc_min or dlna < dlna_min or dlna > dlna_max:
+        misfit_flag = 0.
+
     syn_a = hilbert(s)
     obs_a = hilbert(d)
     Hsyn = np.imag(syn_a)
@@ -65,7 +89,7 @@ def measure_adj_exphase(obs,syn,t0,dt,nt,
 
     # compute misfit
     misfit = trapezoid(dR**2,dx=dt) + trapezoid(dI**2,dx=dt)
-    misfit = misfit * 0.5
+    misfit = misfit * 0.5 * misfit_flag
 
     # adjoint source 
     Es_wtr_cubic = Es_wtr**3 
@@ -81,7 +105,7 @@ def measure_adj_exphase(obs,syn,t0,dt,nt,
     # filter
     taper = adjsrc * 0 
     taper[lpt:rpt] = taper0 
-    adjsrc = bandpass(adjsrc,dt,1./max_period,1./min_period) * taper
+    adjsrc = bandpass(adjsrc,dt,1./max_period,1./min_period) * taper * misfit_flag
 
     # measure_adj arrays
     stats = MeasureStats(
@@ -91,7 +115,7 @@ def measure_adj_exphase(obs,syn,t0,dt,nt,
         tend=tend,
         tr_chi=misfit,
         am_chi=misfit,
-        tshift = 0.
+        tshift = tshift
     )
 
     return stats, adjsrc

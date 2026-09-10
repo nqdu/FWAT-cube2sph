@@ -404,7 +404,10 @@ class NoiseMC_PreOP():
                         dat_inp,syn_inp,
                         t0_inp,dt_inp,npt_cut,
                         self.Tmin[ib],self.Tmax[ib],
-                        tstart,tend)
+                        tstart,tend,
+                        tshift_min=-tshift,tshift_max=tshift,
+                        dlna_min=-dlna,dlna_max=dlna,
+                        cc_min=cc_coef)
         elif self.adjsrc_type == 'cc_time':
             from fwat.adjoint.cc_misfit import measure_adj_cc
 
