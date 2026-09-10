@@ -184,14 +184,17 @@ for i in `seq 1 $NJOBS`; do
     $MPIRUN -np $NPROC $SEM_PATH/bin/xspecfem3D
     date
     echo " "
-
+    
     # combine kernels, note we are on NLS
     cd $MYDIR
-    mkdir -p $curr_dir/$evtdir/GRADIENT
-    \rm -rf $curr_dir/$evtdir/GRADIENT/*
-    $PRUN bash -c "find $evtdir/DATABASES_MPI/ -maxdepth 1 -name 'proc*_kernel.bin' -print0 | xargs -0 cp -t $curr_dir/$evtdir/GRADIENT/"
-    mpirun -np $NPROC fwat-model combine_kl $evtdir/DATABASES_MPI/ $curr_dir/$evtdir/GRADIENT
-    \rm $curr_dir/$evtdir/GRADIENT/*.bin
+    $PRUN mkdir -p $evtdir/GRADIENT
+    $PRUN bash -c "find $evtdir/GRADIENT/ -maxdepth 1 -name 'proc*_kernel.bin' -print0 | xargs -0 rm -f"
+    find $evtdir/DATABASES_MPI/ -maxdepth 1 -name 'proc*_kernel.bin' -print0 | xargs -0 mv -t $evtdir/GRADIENT/
+    mpirun -np $NPROC fwat-model combine_kl $evtdir/DATABASES_MPI/ $evtdir/GRADIENT
+    find $evtdir/GRADIENT/ -maxdepth 1 -name 'proc*_kernel.bin' -print0 | xargs -0 rm -f
+    rm -rf $curr_dir/$evtdir/GRADIENT
+    \cp -r $MYDIR/$evtdir/GRADIENT $curr_dir/$evtdir/
+    $PRUN \rm -rf $MYDIR/$evtdir/GRADIENT
     echo ""
 
     # delete useless information
