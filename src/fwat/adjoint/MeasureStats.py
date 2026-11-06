@@ -1,6 +1,6 @@
 class MeasureStats():
     def __init__(self,adj_type:str,misfit:float=0.,tstart:float=0.,tend:float=0.,
-                 code:str='',tr_chi=0., am_chi=0.,tshift=0.):
+                 code:str='',tr_chi=0., am_chi=0.,tshift=0.,exclude:bool=False):
         self.misfit = misfit
         self.tstart = tstart
         self.tend = tend
@@ -9,6 +9,7 @@ class MeasureStats():
         self.tr_chi = tr_chi
         self.am_chi = am_chi
         self.tshift = tshift
+        self.exclude = exclude
 
     def __copy__(self):
         return MeasureStats(
@@ -19,8 +20,9 @@ class MeasureStats():
             code=self.code,
             tr_chi=self.tr_chi,
             am_chi=self.am_chi,
-            tshift=self.tshift
+            tshift=self.tshift,
+            exclude=self.exclude
         )
     
     def __str__(self) -> str:
-        return f"MeasureStats(adj_type={self.adj_type}, misfit={self.misfit}, tstart={self.tstart}, tend={self.tend}, code='{self.code}', tr_chi={self.tr_chi}, am_chi={self.am_chi}, tshift={self.tshift})"
+        return f"MeasureStats(adj_type={self.adj_type}, misfit={self.misfit}, tstart={self.tstart}, tend={self.tend}, code='{self.code}', tr_chi={self.tr_chi}, am_chi={self.am_chi}, tshift={self.tshift}, exclude={self.exclude})"

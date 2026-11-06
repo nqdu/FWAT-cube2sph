@@ -11,6 +11,7 @@ from scipy.signal import hilbert
 
 from fwat.measure.utils import bandpass
 from fwat.adjoint.MeasureStats import MeasureStats
+from .params import AdjointParams, expand_params
 
 # Constants (from ma_constants.f90)
 PI = np.pi
@@ -24,7 +25,12 @@ def nextpow2(n):
     return int(2 ** np.ceil(np.log2(n)))
 
 
-def measure_adj_mt(obs, syn, t0, dt, npts, 
+def measure_adj_mt(obs, syn, params: AdjointParams):
+    """Compute a multitaper adjoint source from grouped parameters."""
+    return measure_adj_mt_impl(obs, syn, **expand_params(params, "mt"))
+
+
+def measure_adj_mt_impl(obs, syn, t0, dt, npts,
                    tstart, tend,
                    min_period, max_period,
                    measure_type='cc',
@@ -37,7 +43,8 @@ def measure_adj_mt(obs, syn, t0, dt, npts,
                    dt_fac=2.0, err_fac=2.5,
                    dt_max_scale=3.5,
                    ncycle_in_window=1.5,
-                   error_type=1):
+                   error_type=1,
+                   check_excluded: bool = True):
     """
     High-level interface for multitaper adjoint source computation
     
@@ -129,8 +136,8 @@ def measure_adj_mt(obs, syn, t0, dt, npts,
     )
     
     # Check CC quality
-    if cc_max < cc_min or dlna < dlna_min or dlna > dlna_max  \
-        or tshift < tshift_min or tshift > tshift_max:
+    if check_excluded and (cc_max < cc_min or dlna < dlna_min or dlna > dlna_max
+                           or tshift < tshift_min or tshift > tshift_max):
         # Return zero adjoint if CC is too low
         window_chi = np.zeros(NCHI)
         window_chi[10] = sigma_dt_cc
@@ -139,7 +146,8 @@ def measure_adj_mt(obs, syn, t0, dt, npts,
         
         stats = MeasureStats(
             adj_type='cc',
-            tshift=tshift
+            tshift=tshift,
+            exclude=True
         )
         return stats, adj_src
     
@@ -195,13 +203,26 @@ def measure_adj_mt(obs, syn, t0, dt, npts,
     window_chi = np.zeros(NCHI)
     
     # Compute adjoint source if requested
+    trace = {
+        'istart': istart, 'dat_dtw': dat_dtw, 'syn_dtw': syn_dtw,
+        'nlen': nlen, 'dt': dt, 'npts_orig': npts,
+    }
+    cc = {
+        'tshift': tshift, 'dlnA': dlna,
+        'sigma_dt_cc': sigma_dt_cc, 'sigma_dlnA_cc': sigma_dlnA_cc,
+        'sigma_dt': sigma_dt, 'sigma_dlnA': sigma_dlnA,
+    }
+    frequency = {
+        'dtau_w': dtau_w, 'dlnA_w': dlnA_w,
+        'err_dtau': err_dtau, 'err_dlnA': err_dlnA,
+        'i_left': i_left, 'i_right': i_right,
+    }
+    mode = {
+        'imeas': imeas, 'is_mtm': is_mtm,
+        'error_type': error_type, 'npi': npi,
+    }
     tr_adj_src, am_adj_src, tr_chi, am_chi, window_chi = mt_adj_simplified(
-        istart, dat_dtw, syn_dtw, nlen, dt, tshift, dlna,
-        sigma_dt_cc, sigma_dlnA_cc, dtau_w, dlnA_w, 
-        err_dtau, err_dlnA, sigma_dt, sigma_dlnA,
-        i_left, i_right, window_chi, npts,
-        imeas=imeas, is_mtm=is_mtm, ERROR_TYPE=error_type, NPI=npi
-    )
+        trace, cc, frequency, mode, window_chi)
     
     # Extract adjoint source for appropriate measurement type
     misfit = 0.
@@ -361,57 +382,18 @@ def validate_mt_measurements(dtau_w, dlnA_w, i_left, i_right, dt, df, nlen,
     return True
 
 
-def mt_adj_simplified(istart: int, 
-                      dat_dtw: np.ndarray, 
-                      syn_dtw: np.ndarray, 
-                      nlen: int, 
-                      dt: float, 
-                      tshift: float, 
-                      dlnA: float, 
-                      sigma_dt_cc: float, 
-                      sigma_dlnA_cc: float, 
-                      dtau_w: np.ndarray, 
-                      dlnA_w: np.ndarray, 
-                      err_dtau: np.ndarray, 
-                      err_dlnA: np.ndarray, 
-                      sigma_dt: float, 
-                      sigma_dlnA: float, 
-                      i_left: int, 
-                      i_right: int, 
-                      window_chi: np.ndarray, 
-                      npts_orig: int,
-                      imeas: int = 7, 
-                      is_mtm: int = 1, 
-                      ERROR_TYPE: int = 1, 
-                      NPI: float = 2.5):
+def mt_adj_simplified(trace: dict, cc: dict, frequency: dict,
+                      mode: dict, window_chi: np.ndarray):
     """
     Simplified line-by-line translation of Fortran mt_adj subroutine
     Only supports imeas=5 (CC) and imeas=7 (MT)
     
-    Input:
-        istart: starting index of the windowed portion in original trace
-        dat_dtw: windowed data (nlen)
-        syn_dtw: windowed synthetic (nlen)
-        nlen: length of windowed data
-        dt: sampling rate
-        tshift: CC time shift measurement
-        dlnA: CC amplitude measurement
-        sigma_dt_cc: CC time shift uncertainty
-        sigma_dlnA_cc: CC amplitude uncertainty
-        dtau_w: frequency-dependent time shift (NPT)
-        dlnA_w: frequency-dependent amplitude (NPT)
-        err_dtau: error estimates for dtau (NPT)
-        err_dlnA: error estimates for dlnA (NPT)
-        sigma_dt: average time shift error
-        sigma_dlnA: average amplitude error
-        i_left: left frequency index
-        i_right: right frequency index
+    Input dictionaries:
+        trace: windowed waveforms, sampling, and output length
+        cc: cross-correlation measurements and uncertainties
+        frequency: frequency-dependent measurements, errors, and bounds
+        mode: measurement, taper, error type, and time-bandwidth product
         window_chi: measurement array (NCHI)
-        npts_orig: original number of points in full trace (for output sizing)
-        imeas: measurement type (5=CC, 7=MT)
-        is_mtm: multitaper flag (1 for MT, 2 for cosine taper)
-        ERROR_TYPE: error type (0=none, 1=CC, 2=jackknife)
-        NPI: time-bandwidth product
     
     Output:
         tr_adj_src: time shift adjoint source (npts)
@@ -421,6 +403,29 @@ def mt_adj_simplified(istart: int,
         window_chi: updated measurement array
     """
     
+    istart = trace['istart']
+    dat_dtw = trace['dat_dtw']
+    syn_dtw = trace['syn_dtw']
+    nlen = trace['nlen']
+    dt = trace['dt']
+    npts_orig = trace['npts_orig']
+    tshift = cc['tshift']
+    dlnA = cc['dlnA']
+    sigma_dt_cc = cc['sigma_dt_cc']
+    sigma_dlnA_cc = cc['sigma_dlnA_cc']
+    sigma_dt = cc['sigma_dt']
+    sigma_dlnA = cc['sigma_dlnA']
+    dtau_w = frequency['dtau_w']
+    dlnA_w = frequency['dlnA_w']
+    err_dtau = frequency['err_dtau']
+    err_dlnA = frequency['err_dlnA']
+    i_left = frequency['i_left']
+    i_right = frequency['i_right']
+    imeas = mode['imeas']
+    is_mtm = mode['is_mtm']
+    ERROR_TYPE = mode['error_type']
+    NPI = mode['npi']
+
     # Dynamic sizing based on actual data length
     # Use original npts for output array sizing to match input obs/syn
     NPT = nextpow2(npts_orig)

@@ -33,4 +33,4 @@ fwat-utils = "fwat.scripts.utils:main"
 where = ["src/"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests/test_utils.py","tests/test_grad_check.py"]
+testpaths = ["tests/test_utils.py","tests/test_grad_check.py","tests/test_exclusions.py"]

@@ -44,6 +44,8 @@ class MAParams:
     dlna_min: float = -LARGE_VAL
     dlna_max: float = LARGE_VAL
     cc_min: float = 0.0
+    check_excluded: bool = True
+    exclude: bool = False
     dt_sigma_min: float = 0.0
     dlna_sigma_min: float = 0.0
     ntaper: int = 0
@@ -410,6 +412,8 @@ def _bilin2(sn: np.ndarray, sd: np.ndarray, nsects: int) -> tuple[np.ndarray, np
 
 
 def cc_measure_select(params: MAParams, tshift: float, dlnA: float, cc_max: float) -> Tuple[float, float, float]:
+    if not params.check_excluded:
+        return tshift, dlnA, cc_max
     if (
         (cc_max < params.cc_min)
         or (tshift < params.tshift_min)
@@ -417,6 +421,7 @@ def cc_measure_select(params: MAParams, tshift: float, dlnA: float, cc_max: floa
         or (dlnA < params.dlna_min)
         or (dlnA > params.dlna_max)
     ):
+        params.exclude = True
         return 0.0, 0.0, cc_max
     return tshift, dlnA, cc_max
 
@@ -511,8 +516,10 @@ def _compute_cc_core(
 
 
 def _compute_cc_with_params(params: MAParams, syn: np.ndarray, data: np.ndarray, nlen: int, dt: float) -> Tuple[int, float, float, float]:
+    tshift_min = params.tshift_min if params.check_excluded else -LARGE_VAL
+    tshift_max = params.tshift_max if params.check_excluded else LARGE_VAL
     ishift, tshift, cc_max = _compute_cc_core(
-        syn, data, nlen, dt, params.tshift_min, params.tshift_max, params.lpt
+        syn, data, nlen, dt, tshift_min, tshift_max, params.lpt
     )
     if np.sum(syn[:nlen] * syn[:nlen]) == 0.0:
         dlnA = 0.0
@@ -1525,7 +1532,8 @@ def measure_adj(t0_inp: float,dt_inp: float,npt_inp: int,
                 dt_max_scale: float = 3.5,
                 ncyle_in_window: float = 1.5,
                 lpt:int = 15,
-                use_physical_disp: bool = False) -> tuple[MeasureStats,np.ndarray]:
+                use_physical_disp: bool = False,
+                check_excluded: bool = True) -> tuple[MeasureStats,np.ndarray]:
     
     if imeas <=6 and imeas <=3:
         itaper = 2
@@ -1543,6 +1551,7 @@ def measure_adj(t0_inp: float,dt_inp: float,npt_inp: int,
         dlna_min=dlna_min,
         dlna_max=dlna_max,
         cc_min=cc_min,
+        check_excluded=check_excluded,
         dt_sigma_min=dt_sigma_min,
         dlna_sigma_min=dlna_sigma_min,
         ntaper=0,
@@ -1602,6 +1611,10 @@ def measure_adj(t0_inp: float,dt_inp: float,npt_inp: int,
         'BX',
         params,
     )
+
+    if params.exclude:
+        stats = MeasureStats(adj_type=str(imeas), tstart=tstart, tend=tend, exclude=True)
+        return stats, np.zeros(npt_inp)
 
     misfit = 0.
     if imeas <= 2:

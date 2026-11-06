@@ -5,8 +5,15 @@ from .MeasureStats import MeasureStats
 from fwat.measure.utils import bandpass,taper_window
 from scipy.integrate import trapezoid
 from .cc_misfit import cc_measure
+from .params import AdjointParams, expand_params
 
-def measure_adj_exphase(obs,syn,t0,dt,nt,
+def measure_adj_exphase(obs, syn, params: AdjointParams):
+    """Compute an exponential-phase adjoint source from grouped parameters."""
+    return measure_adj_exphase_impl(
+        obs, syn, **expand_params(params, "exphase"))
+
+
+def measure_adj_exphase_impl(obs,syn,t0,dt,nt,
                min_period,max_period,
                tstart,tend,water=0.05,
                taper_ratio = 0.1,
@@ -14,7 +21,8 @@ def measure_adj_exphase(obs,syn,t0,dt,nt,
                tshift_max = 4.5,
                dlna_min = -1.5,
                dlna_max = 1.5,
-               cc_min = 0.8):
+               cc_min = 0.8,
+               check_excluded: bool = True):
     """
     Parameters
     ------------
@@ -64,8 +72,9 @@ def measure_adj_exphase(obs,syn,t0,dt,nt,
     # data selection, same rules as cc_misfit
     tshift,dlna,_,_,cc_coef = cc_measure(d,s,dt,1.,0.5,False)
     misfit_flag = 1.
-    if tshift < tshift_min or tshift > tshift_max or  \
-        cc_coef < cc_min or dlna < dlna_min or dlna > dlna_max:
+    excluded = check_excluded and (tshift < tshift_min or tshift > tshift_max or
+        cc_coef < cc_min or dlna < dlna_min or dlna > dlna_max)
+    if excluded:
         misfit_flag = 0.
 
     syn_a = hilbert(s)
@@ -115,7 +124,8 @@ def measure_adj_exphase(obs,syn,t0,dt,nt,
         tend=tend,
         tr_chi=misfit,
         am_chi=misfit,
-        tshift = tshift
+        tshift = tshift,
+        exclude = excluded
     )
 
     return stats, adjsrc

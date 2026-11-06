@@ -33,5 +33,6 @@
     "/cvmfs/soft.computecanada.ca/easybuild/software/2023/x86-64-v4/Compiler/gcccore/scipy-stack/2026a/lib/python3.13/site-packages/"
     ],
     "python-envs.defaultEnvManager": "ms-python.python:conda",
-    "python-envs.defaultPackageManager": "ms-python.python:conda", // adjust to your source code folder
+    "python-envs.defaultPackageManager": "ms-python.python:conda",
+    "cmake.sourceDirectory": "/home/nqdu/code/python/FWAT-cube2sph/3rd_party/measure_adj", // adjust to your source code folder
 }
