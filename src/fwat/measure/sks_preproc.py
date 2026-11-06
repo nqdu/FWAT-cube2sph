@@ -1,4 +1,5 @@
 from .FwatPreOP import FwatPreOP
+import os
 import numpy as np 
 from mpi4py import MPI
 from fwat.adjoint.MeasureStats import MeasureStats
@@ -148,11 +149,9 @@ class SKS_PreOP(FwatPreOP):
             for ic in range(ncomp):
                 ch = components[ic]
 
-                # load synthetics from npy
                 code = self._get_station_code(i,ic)
-                filename = f"{self.syndir}/OUTPUT_FILES/{code}.sem.npy"
+                filename = os.path.join(self.syndir,f"{code}.sem.npy")
                 data = self.seismogram[filename]
-                #data =  np.load(filename)
 
                 tr.b =  self.t_inj - self.t_ref[i]
                 tr.data = data[:,1] * 1.
@@ -172,7 +171,7 @@ class SKS_PreOP(FwatPreOP):
         from obspy.io.sac import SACTrace
         from .utils import interpolate_syn
         from .utils import bandpass 
-        from fwat.adjoint.cross_conv import measure_adj_cross_conv
+        from fwat.adjoint.caller import run_measurement
         import os 
 
         bandname = self._get_bandname(ib)
@@ -226,8 +225,8 @@ class SKS_PreOP(FwatPreOP):
                 name = self._get_station_code(i,ic_r)
 
                 # read syn data and preprocessing
-                #sdata = np.load(f"{out_dir}/{name}.sem.npy")[:,1]
-                sdata = self.seismogram[f"{out_dir}/{name}.sem.npy"][:,1] * 1.
+                sdata = self.seismogram[
+                    os.path.join(self.syndir,f"{name}.sem.npy")][:,1] * 1.
                 sdata = bandpass(sdata,dt_syn,freqmin,freqmax)
 
                 # read obs data
@@ -285,8 +284,8 @@ class SKS_PreOP(FwatPreOP):
                 name = self._get_station_code(i,ic)
 
                 # read syn data and preprocessing
-                #sdata = np.load(f"{out_dir}/{name}.sem.npy")[:,1]
-                sdata = self.seismogram[f"{out_dir}/{name}.sem.npy"][:,1] * 1.
+                sdata = self.seismogram[
+                    os.path.join(self.syndir,f"{name}.sem.npy")][:,1] * 1.
                 syn_data[ic,:] = bandpass(sdata,dt_syn,freqmin,freqmax)
 
                 # read obs data
@@ -314,15 +313,20 @@ class SKS_PreOP(FwatPreOP):
             syn_data *= 1. / avgamp_syn
 
             # compute misfit and adjoint source
-            stats,adj_r,adj_t,cc1,cc2 = \
-                measure_adj_cross_conv(
-                    obs_data[ic_r,:],
-                    syn_data[ic_r,:],
-                    obs_data[ic_t,:],
-                    syn_data[ic_t,:],
-                    t0_syn,dt_syn,
-                    tstart,tend + 1. / freqmax
-                )
+            params = {
+                'trace': {'t0': t0_syn, 'dt': dt_syn},
+                'window': {'start': tstart, 'end': tend + 1. / freqmax},
+            }
+            result = run_measurement(
+                'cross_conv',
+                {'obs_first': obs_data[ic_r,:], 'syn_first': syn_data[ic_r,:],
+                 'obs_second': obs_data[ic_t,:], 'syn_second': syn_data[ic_t,:]},
+                params)
+            stats = result.stats
+            adj_r = result.adjoints['first']
+            adj_t = result.adjoints['second']
+            cc1 = result.diagnostics['cross_conv_first']
+            cc2 = result.diagnostics['cross_conv_second']
             stats.code = f"{self.netwk[i]}.{self.stnm[i]}.cross-conv"
             stats_list.append(stats)
 
@@ -333,12 +337,16 @@ class SKS_PreOP(FwatPreOP):
             data = np.zeros((npt_syn,2))
             data[:,0] = t0_syn + np.arange(npt_syn) * dt_syn
             data[:,1] = adj_t
-            outname = f"{out_dir}/{bandname}/{self.netwk[i]}.{self.stnm[i]}.{self.chcode}T.adj.sem.npy"
+            outname = os.path.join(
+                self.syndir,bandname,
+                f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}T.adj.sem.npy")
             #np.save(outname,data)
             self.seismogram_adj[outname] = data * 1.
 
             data[:,1] = adj_r
-            outname = f"{out_dir}/{bandname}/{self.netwk[i]}.{self.stnm[i]}.{self.chcode}R.adj.sem.npy"
+            outname = os.path.join(
+                self.syndir,bandname,
+                f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}R.adj.sem.npy")
             #np.save(outname,data)
             self.seismogram_adj[outname] = data * 1.
 
@@ -418,8 +426,8 @@ class SKS_PreOP(FwatPreOP):
                 name = self._get_station_code(i,ic)
 
                 # read syn data and preprocessing
-                #sdata = np.load(f"{out_dir}/{name}.sem.npy")[:,1]
-                sdata = self.seismogram[f"{out_dir}/{name}.sem.npy"][:,1] * 1.
+                sdata = self.seismogram[
+                    os.path.join(self.syndir,f"{name}.sem.npy")][:,1] * 1.
                 sdata = bandpass(sdata,dt_syn,freqmin,freqmax)
                 syn_data[ic,:] = sdata * taper 
 
@@ -504,12 +512,16 @@ class SKS_PreOP(FwatPreOP):
             data = np.zeros((npt_syn,2))
             data[:,0] = t0_syn + np.arange(npt_syn) * dt_syn
             data[:,1] = adjsrc_T
-            outname = f"{out_dir}/{bandname}/{self.netwk[i]}.{self.stnm[i]}.{self.chcode}T.adj.sem.npy"
+            outname = os.path.join(
+                self.syndir,bandname,
+                f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}T.adj.sem.npy")
             #np.save(outname,data)
             self.seismogram_adj[outname] = data * 1.
 
             data[:,1] = adjsrc_R
-            outname = f"{out_dir}/{bandname}/{self.netwk[i]}.{self.stnm[i]}.{self.chcode}R.adj.sem.npy"
+            outname = os.path.join(
+                self.syndir,bandname,
+                f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}R.adj.sem.npy")
             #np.save(outname,data)
             self.seismogram_adj[outname] = data * 1.
 
@@ -537,4 +549,3 @@ class SKS_PreOP(FwatPreOP):
         else:
             print(f"Invalid ADJSRC_TYPE: {self.adjsrc_type}")
             exit(1)
-        

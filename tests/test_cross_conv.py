@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import yaml 
-from fwat.adjoint.cross_conv import measure_adj_cross_conv
+from fwat.adjoint.cross_conv import measure_adj_cross_conv_impl
 from fwat.measure.utils import bandpass,interpolate_syn
 from pathlib import Path
 
@@ -54,7 +54,7 @@ def main():
 
     # compute adjoint source
     stats,adj_z,adj_r,cc1,cc2 =  \
-        measure_adj_cross_conv(
+        measure_adj_cross_conv_impl(
             obs_z,syn_z,
             obs_r,syn_r,
             t0,dt1,
@@ -78,7 +78,7 @@ def main():
         syn_z_p = bandpass(syn_z_p,dt1, freqmin, freqmax)
         syn_z_m = bandpass(syn_z_m,dt1, freqmin, freqmax)
         stats0,_,_,_,_ =  \
-            measure_adj_cross_conv(
+            measure_adj_cross_conv_impl(
                 obs_z,syn_z_p,
                 obs_r,syn_r,
                 t0,dt1,
@@ -86,7 +86,7 @@ def main():
             )
         chi_p = stats0.misfit
         stats1,_,_,_,_ =  \
-            measure_adj_cross_conv(
+            measure_adj_cross_conv_impl(
                 obs_z,syn_z_m,
                 obs_r,syn_r,
                 t0,dt1,
@@ -106,7 +106,7 @@ def main():
         syn_r_p = bandpass(syn_r_p,dt1, freqmin, freqmax)
         syn_r_m = bandpass(syn_r_m,dt1, freqmin, freqmax)
         stats0,_,_,_,_ =  \
-            measure_adj_cross_conv(
+            measure_adj_cross_conv_impl(
                 obs_z,syn_z,
                 obs_r,syn_r_p,
                 t0,dt1,
@@ -114,7 +114,7 @@ def main():
             )
         chi_p = stats0.misfit
         stats1,_,_,_,_ =  \
-            measure_adj_cross_conv(
+            measure_adj_cross_conv_impl(
                 obs_z,syn_z,
                 obs_r,syn_r_m,
                 t0,dt1,

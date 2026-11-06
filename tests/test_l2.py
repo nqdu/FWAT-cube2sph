@@ -1,7 +1,7 @@
 import numpy as np 
 import matplotlib.pyplot as plt 
 from fwat.measure.utils import bandpass,taper_window
-from fwat.adjoint.l2_misfit import measure_adj_l2
+from fwat.adjoint.l2_misfit import measure_adj_l2_impl
 from fwat.measure.measure import measure_adj
 
 def main():
@@ -19,7 +19,7 @@ def main():
     syn = bandpass(syn,dt,1./Tmax,1./Tmin)
     obs = bandpass(obs,dt,1./Tmax,1./Tmin)
 
-    stats,adj = measure_adj_l2(
+    stats,adj = measure_adj_l2_impl(
         obs,syn,t[0],dt,len(t),tstart,tend) 
     # adj = bandpass(adj,dt,1./Tmax,1./Tmin)
 

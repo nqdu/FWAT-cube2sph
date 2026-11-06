@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt 
 from fwat.measure.measure import measure_adj
 from fwat.measure.utils import bandpass,taper_window
-from fwat.adjoint.cc_misfit import measure_adj_cc_dd
+from fwat.adjoint.cc_misfit import measure_adj_cc_dd_impl
 
 def main():
     nt = 1024
@@ -18,7 +18,7 @@ def main():
     tstart = 3.
     tend = 8.
 
-    stats,adj_i,adj_j = measure_adj_cc_dd(
+    stats,adj_i,adj_j = measure_adj_cc_dd_impl(
         obs,syn,obs2,syn2,t[0],dt,len(t),Tmin,Tmax,
         tstart,tend,tstart,tend)
 

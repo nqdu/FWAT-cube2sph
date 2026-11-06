@@ -87,9 +87,8 @@ class Tele_PreOP(FwatPreOP):
             for ic in range(ncomp):
                 ch = components[ic]
 
-                # load synthetics from npy
                 code = self._get_station_code(i,ic)
-                filename = f"{self.syndir}/OUTPUT_FILES/{code}.sem.npy"
+                filename = os.path.join(self.syndir,f"{code}.sem.npy")
                 data =  self.seismogram[filename]
 
                 if self.adjsrc_type == 'l2': # only convolve stf for l2 case
@@ -172,8 +171,8 @@ class Tele_PreOP(FwatPreOP):
 
                 if type_ == 'syn':
                     # read data
-                    #syn_data = np.load(f"{out_dir}/{name}.sem.npy")[:,1]
-                    syn_data = self.seismogram[f"{out_dir}/{name}.sem.npy"][:,1] * 1.
+                    syn_data = self.seismogram[
+                        os.path.join(self.syndir,f"{name}.sem.npy")][:,1] * 1.
 
                     # filter 
                     syn_data = bandpass(syn_data,dt_syn,freqmin,freqmax)
@@ -217,7 +216,7 @@ class Tele_PreOP(FwatPreOP):
         return glob_data
 
     def _cal_adj_source_l2(self,ib:int):
-        from fwat.adjoint.l2_misfit import measure_adj_l2
+        from fwat.adjoint.caller import run_measurement
         from .tele.tele import compute_stf,get_average_amplitude
 
         # get frequency band
@@ -302,12 +301,14 @@ class Tele_PreOP(FwatPreOP):
                 tend = self.t_ref[i] - self.t_inj + win_te
 
                 # measure
-                stats,adjsrc =  \
-                    measure_adj_l2(
-                        glob_obs[i,ic,:],syn_onetrace,
-                        t0_syn,dt_syn,npt_syn,
-                        tstart,tend
-                    )
+                params = {
+                    'trace': {'t0': t0_syn, 'dt': dt_syn, 'nt': npt_syn},
+                    'window': {'start': tstart, 'end': tend},
+                }
+                result = run_measurement(
+                    'l2', {'obs': glob_obs[i,ic,:], 'syn': syn_onetrace}, params)
+                stats = result.stats
+                adjsrc = result.adjoints['trace']
                 
                 # normalize misfit and adjoint source by average amplitude
                 stats.misfit *= 1. / avgamp**2
@@ -329,7 +330,7 @@ class Tele_PreOP(FwatPreOP):
                 data[:,0] = t0_syn + np.arange(npt_syn) * dt_syn
                 data[:,1] = adjsrc
                 name = self._get_station_code(i,ic) + ".adj.sem.npy"
-                self.seismogram_adj[f"{out_dir}/{bandname}/{name}"] = data * 1.
+                self.seismogram_adj[os.path.join(self.syndir,bandname,name)] = data * 1.
                 # np.save(f"{out_dir}/{bandname}/{name}",data)
 
                 # save obs/syn
@@ -349,7 +350,7 @@ class Tele_PreOP(FwatPreOP):
         ib: int
             frequency band index
         """
-        from fwat.adjoint.cc_misfit import measure_adj_cc_dd
+        from fwat.adjoint.caller import run_measurement
         from mpi4py.typing import TargetSpec
 
         # get frequency band
@@ -446,13 +447,22 @@ class Tele_PreOP(FwatPreOP):
                     dd_shift_ij = None 
 
                 # measure adjoint source
-                stats,adj_i,adj_j = \
-                measure_adj_cc_dd(
-                    obs_i,syn_i,obs_j,syn_j,
-                    0,dt_syn,npt_syn,
-                    self.Tmin[ib],self.Tmax[ib],
-                    tstart_i,tend_i,tstart_j,tend_j,dd_shift_ij
-                )
+                params = {
+                    'trace': {'t0': 0, 'dt': dt_syn, 'nt': npt_syn},
+                    'windows': {
+                        'first': {'start': tstart_i, 'end': tend_i},
+                        'second': {'start': tstart_j, 'end': tend_j},
+                    },
+                    'band': {'min_period': self.Tmin[ib], 'max_period': self.Tmax[ib]},
+                    'options': {'tshift_obs_user': dd_shift_ij},
+                }
+                result = run_measurement(
+                    'cc_dd',
+                    {'obs_first': obs_i, 'syn_first': syn_i,
+                     'obs_second': obs_j, 'syn_second': syn_j}, params)
+                stats = result.stats
+                adj_i = result.adjoints['first']
+                adj_j = result.adjoints['second']
                 stats.code = f"{self._get_station_code(i,ic)}-{self._get_station_code(j,ic)}"
                 # stats_list.append(stats)
                 stats_list[icount] = stats
@@ -483,7 +493,7 @@ class Tele_PreOP(FwatPreOP):
                 data[:,0] = t0_syn + np.arange(npt_syn) * dt_syn
                 data[:,1] = adj[i,ic,:]
                 name = self._get_station_code(i,ic) + ".adj.sem.npy"
-                self.seismogram_adj[f"{out_dir}/{bandname}/{name}"] = data * 1.
+                self.seismogram_adj[os.path.join(self.syndir,bandname,name)] = data * 1.
 
                 # save obs and synthetic data
                 name = self._get_station_code(i,ic)
@@ -505,7 +515,7 @@ class Tele_PreOP(FwatPreOP):
         from obspy.io.sac import SACTrace
         from .tele.tele import get_average_amplitude
         from .utils import bandpass
-        from fwat.adjoint.cross_conv import measure_adj_cross_conv
+        from fwat.adjoint.caller import run_measurement
 
         # get frequency band
         bandname = self._get_bandname(ib)
@@ -583,17 +593,21 @@ class Tele_PreOP(FwatPreOP):
             ic_z = self.components.index('Z')
             ic_r = self.components.index('R')
 
-            stats,adj_z,adj_r,cc1,cc2 = \
-                measure_adj_cross_conv(
-                    glob_obs[i, ic_z, :],
-                    glob_syn[i, ic_z, :],
-                    glob_obs[i, ic_r, :],
-                    glob_syn[i, ic_r, :],
-                    t0_syn,
-                    dt_syn,
-                    tstart,
-                    tend,
-                )
+            params = {
+                'trace': {'t0': t0_syn, 'dt': dt_syn},
+                'window': {'start': tstart, 'end': tend},
+            }
+            result = run_measurement(
+                'cross_conv',
+                {'obs_first': glob_obs[i, ic_z, :],
+                 'syn_first': glob_syn[i, ic_z, :],
+                 'obs_second': glob_obs[i, ic_r, :],
+                 'syn_second': glob_syn[i, ic_r, :]}, params)
+            stats = result.stats
+            adj_z = result.adjoints['first']
+            adj_r = result.adjoints['second']
+            cc1 = result.diagnostics['cross_conv_first']
+            cc2 = result.diagnostics['cross_conv_second']
             stats.code = f"{self.netwk[i]}.{self.stnm[i]}.cross-conv"
             stats_list[ir] = stats
         
@@ -615,10 +629,10 @@ class Tele_PreOP(FwatPreOP):
             data[:,0] = t0_syn + np.arange(npt_syn) * dt_syn
             data[:,1] = adj_z
             name = self._get_station_code(i,ic_z) + ".adj.sem.npy"
-            self.seismogram_adj[f"{out_dir}/{bandname}/{name}"] = data * 1.
+            self.seismogram_adj[os.path.join(self.syndir,bandname,name)] = data * 1.
             data[:,1] = adj_r
             name = self._get_station_code(i,ic_r) + ".adj.sem.npy"
-            self.seismogram_adj[f"{out_dir}/{bandname}/{name}"] = data * 1.
+            self.seismogram_adj[os.path.join(self.syndir,bandname,name)] = data * 1.
 
             # save obs and synthetic data
             for ic in range(1): # only one component

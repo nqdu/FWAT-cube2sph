@@ -1,7 +1,7 @@
 import numpy as np 
 import matplotlib.pyplot as plt 
 from fwat.measure.utils import bandpass,taper_window
-from fwat.adjoint.exp_phase_misfit import measure_adj_exphase
+from fwat.adjoint.exp_phase_misfit import measure_adj_exphase_impl
 
 def exphase_misfit(obs,syn,t0,dt,nt,
                min_period,max_period,
@@ -82,7 +82,7 @@ def main():
     tstart = 3.
     tend = 8.
 
-    _,adj = measure_adj_exphase(
+    _,adj = measure_adj_exphase_impl(
         obs,syn,t[0],dt,len(t),Tmin,Tmax,
         tstart,tend)
 

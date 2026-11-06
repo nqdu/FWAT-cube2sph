@@ -1,5 +1,6 @@
 import numpy as np 
 from mpi4py import MPI
+import os
 
 from fwat.measure.FwatPreOP import FwatPreOP
 from ..adjoint.MeasureStats import MeasureStats
@@ -151,10 +152,9 @@ class RF_PreOP(FwatPreOP):
             # get syn_data
             syn_data = np.zeros((2,npt_syn))
             for ic in range(ncomp):
-                # load synthetics from npy
                 code = self._get_station_code(i,ic)
-                filename = f"{self.syndir}/OUTPUT_FILES/{code}.sem.npy"
-                data =  np.load(filename)
+                filename = os.path.join(self.syndir,f"{code}.sem.npy")
+                data = self.seismogram[filename]
                 
                 # copy to syn_data
                 syn_data[ic,:] = data[:,1] * 1.
@@ -270,7 +270,8 @@ class RF_PreOP(FwatPreOP):
             syn_data = np.zeros((2,npt_syn))
             for ic in range(self.ncomp):
                 name = self._get_station_code(i,ic)
-                syn_data[ic,:] = self.seismogram[f"{out_dir}/{name}.sem.npy"][:,1]
+                syn_data[ic,:] = self.seismogram[
+                    os.path.join(self.syndir,f"{name}.sem.npy")][:,1]
                 syn_data[ic,:] *= taper_p # taper synthetic data
             
             # compute rf 
@@ -343,11 +344,15 @@ class RF_PreOP(FwatPreOP):
             data = np.zeros((npt_syn,2))
             data[:,0] = t0_syn + np.arange(npt_syn) * dt_syn
             data[:,1] = adj_z
-            outname = f"{out_dir}/{bandname}/{self.netwk[i]}.{self.stnm[i]}.{self.chcode}Z.adj.sem.npy"
+            outname = os.path.join(
+                self.syndir,bandname,
+                f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}Z.adj.sem.npy")
             self.seismogram_adj[outname] = data.copy()
             #np.save(outname,data)
             data[:,1] = adj_r
-            outname = f"{out_dir}/{bandname}/{self.netwk[i]}.{self.stnm[i]}.{self.chcode}R.adj.sem.npy"
+            outname = os.path.join(
+                self.syndir,bandname,
+                f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}R.adj.sem.npy")
             self.seismogram_adj[outname] = data.copy()
             #np.save(outname,data)
 
