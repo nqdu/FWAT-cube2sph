@@ -1,9 +1,11 @@
 import os
+from pathlib import Path
 
 import numpy as np 
 from mpi4py import MPI
 from fwat.adjoint.MeasureStats import MeasureStats
-from fwat.const import PARAM_FILE
+from fwat.const import PARAM_FILE, LBFGS_FILE
+
 
 def create_shared_communicators(global_comm):
     """
@@ -86,6 +88,10 @@ class FwatPreOP:
         if self.run_opt == 2:
             mdir = mdir + ".ls"
         self.mod = mdir
+        lbfgs = read_params(LBFGS_FILE)
+        self.iter_start = int(lbfgs['iter_start'])
+        self.check_excluded = (int(lbfgs['iter']) == self.iter_start and '.ls' not in self.mod)
+        self._record_exclusions = {}
         self.syndir:str = f"{self.SOLVER}/{mdir}/{evtid}/"
 
         # read FWAT params below
@@ -192,7 +198,7 @@ class FwatPreOP:
         # set parameters
         fn_matrix = f"{self.SRC_REC}/rot_{self.evtid}"
         from_dir = f"{self.syndir}/OUTPUT_FILES/"
-        to_dir = f"{self.syndir}/OUTPUT_FILES/"
+        to_dir = self.syndir
         from_template='${nt}.${sta}.BX${comp}.semd'
         to_template='${nt}.${sta}.BX${comp}.sem.npy'
 
@@ -208,13 +214,28 @@ class FwatPreOP:
 
         # set parameters
         fn_matrix = f"{self.SRC_REC}/rot_{self.evtid}"
-        from_dir = f"{self.syndir}/SEM/"
-        to_dir = f"{self.syndir}/SEM/"
+        from_dir = os.path.join(self.syndir, "SEM")
+        to_dir = from_dir
         from_template='${nt}.${sta}.BX${comp}.adj.sem.npy'
         to_template='${nt}.${sta}.BX${comp}.adj'
 
-        # rotate seismograms from XYZ to ZNE
-        rotate_seismo_adj(rot_list,fn_matrix,from_dir,to_dir,from_template,to_template)
+        # rotate local adjoint sources into solver coordinates
+        rotate_seismo_adj(rot_list,fn_matrix,self.seismogram_adj,
+                          from_dir,to_dir,from_template,to_template)
+
+    def exclusion_file(self, bandname: str) -> Path:
+        return Path(self.MISFIT) / (
+            f"excluded_{self.evtid}_{self.meatype}_{bandname}"
+            f"_from_iter{self.iter_start}.txt"
+        )
+
+    def read_excluded_codes(self, bandname: str) -> dict[str, bool]:
+        path = self.exclusion_file(bandname)
+        self._record_exclusions[bandname] = self.check_excluded and not path.exists()
+        if not path.exists():
+            return {}
+        with path.open() as stream:
+            return {code: True for line in stream if (code := line.strip())}
 
     def _print_measure_info(self,bandname:str,stats_list:list[MeasureStats]):
         """ 
@@ -253,7 +274,9 @@ class FwatPreOP:
                 nmeasure = len(stats_list)
                 for im in range(nmeasure):
                     stats = stats_list[im]
-                    
+                    if stats.exclude:
+                        continue
+
                     # print info
                     print(f"Measuring stats of {stats.code}")
                     print("start and end time of window: %f %f" %(stats.tstart,stats.tend) )
@@ -270,6 +293,14 @@ class FwatPreOP:
                 
                 # close output file
                 fio.close()
+
+                if self._record_exclusions.get(bandname, False):
+                    path = self.exclusion_file(bandname)
+                    with path.open('x' if irank == 0 else 'a') as excluded_file:
+                        for stats in stats_list:
+                            if stats.exclude:
+                                excluded_file.write(f"{stats.code}\n")
+                    self._record_exclusions[bandname] = False
 
             # barrier
             comm.Barrier()
@@ -304,24 +335,24 @@ class FwatPreOP:
                 bandname = self._get_bandname(ib)
                 if self.myrank == 0 and ir == 0:
                     print(f"processing band {bandname}, {ib+1} of {nb} ...")
-                input_dir = f"{self.syndir}/OUTPUT_FILES/{bandname}"
-
                 for ic,ch in enumerate(comps_read):
                     name = f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}{ch}.adj.sem.npy"
-                    if f"{input_dir}/{name}" in self.seismogram_adj:
-                        adj[ic,:] += self.seismogram_adj[f"{input_dir}/{name}"][:,1]
+                    key = os.path.join(self.syndir,bandname,name)
+                    if key in self.seismogram_adj:
+                        adj[ic,:] += self.seismogram_adj[key][:,1]
                 
             # rotation if required
             if need_rotate:
                 adj[0,:],adj[1,:] = rotate_RT_to_EN(adj[0,:],adj[1,:],self.bazd[i])
 
-            # save to SEM/
+            # keep summed traces in memory for the XYZ rotation
             data = np.zeros((self.npt_syn,2))
             data[:,0] = self.t0_syn + self.dt_syn * np.arange(self.npt_syn)
             for ic,ch in enumerate(['E','N','Z']):
                 name = f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}{ch}.adj.sem.npy"
                 data[:,1] = adj[ic,:]
-                np.save(f"{self.syndir}/SEM/{name}",data)
+                key = os.path.join(self.syndir,"SEM",name)
+                self.seismogram_adj[key] = data.copy()
         
         # wait for jobs finish
         MPI.COMM_WORLD.Barrier()
@@ -387,9 +418,6 @@ class FwatPreOP:
             filenames = glob(f"{self.syndir}/OUTPUT_FILES/*.sem.npy")
             for f in filenames:
                 os.remove(f)
-            filenames = glob(f"{self.syndir}/SEM/*.sem.npy")
-            for f in filenames:
-                os.remove(f)
 
     def _rotate_seismogram_to_RT(self,):
         from .utils import cal_dist_baz,rotate_EN_to_RT
@@ -409,7 +437,7 @@ class FwatPreOP:
                 data = np.zeros((self.npt_syn,2))
                 for ic,ch in enumerate(['E','N']):
                     name = f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}{ch}.sem.npy"
-                    filename = f"{self.syndir}/OUTPUT_FILES/{name}"
+                    filename = os.path.join(self.syndir,name)
                     data[:,:] = self.seismogram[filename]
                     temp_syn[ic,:] = data[:,1]
 
@@ -420,12 +448,11 @@ class FwatPreOP:
                 temp_syn[0,:] = vr * 1.
                 temp_syn[1,:] = vt * 1.
 
-                # save to ascii
+                # keep rotated traces in memory
                 for ic,ch in enumerate(['R','T']):
                     name = f"{self.netwk[i]}.{self.stnm[i]}.{self.chcode}{ch}.sem.npy"
-                    filename = f"{self.syndir}/OUTPUT_FILES/{name}"
+                    filename = os.path.join(self.syndir,name)
                     data[:,1] = temp_syn[ic,:] 
-                    #data.tofile(filename)
                     self.seismogram[filename] = data.copy()
         MPI.COMM_WORLD.Barrier()
 
@@ -449,6 +476,8 @@ class FwatPreOP:
         
         # loop each frequency band to compute misfit/adjoint source 
         for ib in range(len(self.Tmax)):
+            self.excluded_codes = self.read_excluded_codes(self._get_bandname(ib))
+            MPI.COMM_WORLD.Barrier()
             self.cal_adj_source(ib)
             MPI.COMM_WORLD.Barrier()
         

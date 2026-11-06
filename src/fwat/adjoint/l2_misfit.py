@@ -1,9 +1,15 @@
 import numpy as np 
 from .MeasureStats import MeasureStats
+from .params import AdjointParams, expand_params
 from fwat.measure.utils import taper_window
 from scipy.integrate import trapezoid
 
-def measure_adj_l2(
+def measure_adj_l2(obs, syn, params: AdjointParams):
+    """Compute an L2 adjoint source from grouped parameters."""
+    return measure_adj_l2_impl(obs, syn, **expand_params(params, "l2"))
+
+
+def measure_adj_l2_impl(
         obs,syn,t0,dt,nt,
         tstart,tend,
         taper_ratio = 0.05

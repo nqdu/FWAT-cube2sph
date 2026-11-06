@@ -4,34 +4,6 @@ from string import Template
 from mpi4py import MPI
 import h5py
 
-def _get_first_dim_npy(filename):
-    """Read the first dimension of a numpy binary file (.npy).
-    This function reads the header of a numpy binary file to determine the size of the first dimension.
-    It is useful for files that are not too large to fit into memory.
-
-    Parameters
-    ----------
-    filename : str
-        The path to the numpy binary file.
-
-    Returns
-    -------
-    int
-        The size of the first dimension of the array stored in the file.
-"""
-    import numpy.lib.format
-
-    with open(filename,"rb") as fobj:
-        version = numpy.lib.format.read_magic(fobj)
-        func_name = 'read_array_header_' + '_'.join(str(v) for v in version)
-        func = getattr(numpy.lib.format, func_name)
-        
-        # get header
-        out = func(fobj)
-
-    return out[0][0]
-
-    
 def _read_rotation_file(filename):
     """
     Read a rotation matrix file and return a dictionary with keys as station names and values as rotation matrices.
@@ -86,7 +58,7 @@ def rotate_seismo_fwd(
     from_dir : str
         Input directory containing the seismograms.h5 in the Cube2sph system.
     to_dir : str
-        Output directory where the rotated seismograms will be saved in the local Geographic system, saved as .npy files.
+        Namespace prefix for keys of the rotated traces returned in memory.
     from_template_str : str
         File name template for input seismograms. Should include placeholders for network, station, and component, e.g., '${nt}.${sta}.BX${comp}.semd'.
     to_template_str : str
@@ -172,7 +144,8 @@ def rotate_seismo_fwd(
 
 def rotate_seismo_adj(
         rot_list:list,
-        fn_matrix:str,from_dir:str,to_dir:str,
+        fn_matrix:str,seismo_adj:dict[str,np.ndarray],
+        from_dir:str,to_dir:str,
         from_template_str:str,to_template_str:str):
     """
     Function to rotate the adjoint sources from the local Geographic system back to the Cube2sph system, MPI parallelized.
@@ -181,21 +154,22 @@ def rotate_seismo_adj(
     ----------
     fn_matrix : str
         Path to the rotation matrix file produced by the write_station_file program.
+    seismo_adj : dict[str, np.ndarray]
+        In-memory local geographic adjoint traces, keyed by their source paths.
+        Each trace has time and amplitude columns.
     from_dir : str
-        Input directory containing the *.adj.npy in the local Geographic system.
+        Directory used to form keys in seismo_adj.
     to_dir : str
         Output directory where the rotated seismograms will be saved in the Cube2sph system, saved as .txt file.
     from_template_str : str
-        File name template for input seismograms. Should include placeholders for network, station, and component, e.g., '${nt}.${sta}.BX${comp}.sem.ascii'.
+        Dictionary key template for input traces, e.g., '${nt}.${sta}.BX${comp}.adj.sem.npy'.
     to_template_str : str
-        File name template for output seismograms. Should include placeholders for network, station, and component, e.g., '${nt}.${sta}.BX${comp}.semd'.
+        File name template for solver output, e.g., '${nt}.${sta}.BX${comp}.adj'.
     
     """
 
     #--MPI-
     comm = MPI.COMM_WORLD
-    myrank = comm.Get_rank()
-    nproc = comm.Get_size()
 
     from_template = Template(from_template_str)
     to_template = Template(to_template_str)
@@ -205,7 +179,6 @@ def rotate_seismo_adj(
     comp_right = rotate[5:8]
     from_comp, to_comp = comp_right, comp_left
 
-    #arr = np.zeros(shape(nsteps, 2), dtype=float)
     # read fn matrix
     rot_dict = _read_rotation_file(fn_matrix)
     keys = rot_list
@@ -214,47 +187,35 @@ def rotate_seismo_adj(
     for i_sta in range(0, nrec_local):
         nt,sta = keys[i_sta].split('.')
         nu = rot_dict[keys[i_sta]]
-        missing_file = False
-        nstep = -1
+        input_names = []
         for i_comp in range(0, 3):
             if (from_comp[i_comp] == '0'):
                 continue 
-            dname = from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp])
-            fn = os.path.join(from_dir, 
-                    from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp]))
-            if (not os.path.isfile(fn)):
-                #print(fn)
-                #print(f"{dname} does not exist but required by rotation, skipping this station")
-                #os.system(f"wc -l {fn}")
-                missing_file = True
-                break
-            if nstep < 0:
-                nstep = _get_first_dim_npy(fn)
-        
-        if (missing_file):
+            input_names.append(os.path.join(
+                from_dir,
+                from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp])))
+
+        if any(fn not in seismo_adj for fn in input_names):
             continue
+        nstep = seismo_adj[input_names[0]].shape[0]
         seis = np.zeros(shape=(nstep, 3), dtype=float)
-        arr = np.zeros(shape=(nstep, 2), dtype=float)
-        for i_comp in range(0, 3):
-            if (from_comp[i_comp] == '0'):
-                continue
-            fn = os.path.join(from_dir, 
-                from_template.substitute(nt=nt, sta=sta, comp=from_comp[i_comp]))
-            arr = np.load(fn)
+        for i_comp, fn in enumerate(input_names):
+            arr = seismo_adj[fn]
+            if arr.shape != (nstep, 2):
+                raise ValueError(f"Invalid adjoint trace shape for {fn}: {arr.shape}")
             seis[:,i_comp] = arr[:,1]
         
         seis = np.matmul(seis, nu)
+
+        # Use the time column from the last input, as in the file-based path.
+        arr = seismo_adj[input_names[-1]].copy()
 
         for i_comp in range(0, 3):
             if (to_comp[i_comp] == '0'):
                 continue
             fn = os.path.join(to_dir, 
                     to_template.substitute(nt=nt, sta=sta, comp=to_comp[i_comp]))
-            #print(fn)
             arr[:,1] = seis[:,i_comp]
-            #print(f"writing to ${fn}")
-            #arr.tofile(fn)
-            #np.savetxt(fname=fn, X=arr, fmt='%11.6f%19.7E')
             with open(fn, 'w') as fio:
                 fio.write('\n'.join([f"{row[0]:11.6f} {row[1]:19.7E}" for row in arr]))
 

@@ -5,6 +5,7 @@ from fwat.measure.utils import dif1
 from scipy.integrate import trapezoid
 from scipy.signal import correlate
 from .MeasureStats import MeasureStats
+from .params import AdjointParams, expand_params
 
 @jit(nopython=True)
 def _cal_cc_correction(s: np.ndarray, ishift: int, dlna: float):
@@ -214,7 +215,12 @@ def _cc_shift_dd(d1: np.ndarray, s1: np.ndarray, d2: np.ndarray, s2: np.ndarray,
 
     return tshift_dd,tshift_obs,tshift_syn,dlna_obs,dlna_syn,sigma_dt,sigma_dlna
 
-def measure_adj_cc(obs,syn,t0,dt,nt,
+def measure_adj_cc(obs, syn, params: AdjointParams):
+    """Compute a cross-correlation adjoint source from grouped parameters."""
+    return measure_adj_cc_impl(obs, syn, **expand_params(params, "cc"))
+
+
+def measure_adj_cc_impl(obs,syn,t0,dt,nt,
                min_period,max_period,
                tstart,tend,
                return_type = 'dt',
@@ -226,7 +232,8 @@ def measure_adj_cc(obs,syn,t0,dt,nt,
                cc_min = 0.8,
                weight_by_uncertainty = True,
                dt_sigma_min = 1.,
-               dlna_sigma_min = 0.5):
+               dlna_sigma_min = 0.5,
+               check_excluded: bool = True):
     """
     Measure the cross-correlation adjoint source
 
@@ -290,8 +297,9 @@ def measure_adj_cc(obs,syn,t0,dt,nt,
     # data selection
     misfit_flag = 1.
     tshift_bak = tshift * 1.
-    if tshift < tshift_min or tshift > tshift_max or  \
-        cc_coef < cc_min or dlna < dlna_min or dlna > dlna_max:
+    excluded = check_excluded and (tshift < tshift_min or tshift > tshift_max or
+        cc_coef < cc_min or dlna < dlna_min or dlna > dlna_max)
+    if excluded:
         tshift = 0.
         dlna = 0. 
         sigma_dt = 1.
@@ -334,12 +342,19 @@ def measure_adj_cc(obs,syn,t0,dt,nt,
         tend = tend,
         tr_chi = tr_chi,
         am_chi = am_chi,
-        tshift = tshift_bak
+        tshift = tshift_bak,
+        exclude = excluded
     )
 
     return stats,adjsrc
 
-def measure_adj_cc_dd(
+def measure_adj_cc_dd(obs1, syn1, obs2, syn2, params: AdjointParams):
+    """Compute a double-difference adjoint source from grouped parameters."""
+    return measure_adj_cc_dd_impl(
+        obs1, syn1, obs2, syn2, **expand_params(params, "cc_dd"))
+
+
+def measure_adj_cc_dd_impl(
         obs1:np.ndarray,syn1:np.ndarray,
         obs2:np.ndarray,syn2:np.ndarray,
         t0:float,dt:float,nt:int,

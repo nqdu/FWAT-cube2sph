@@ -5,8 +5,19 @@ from scipy.integrate import trapezoid
 
 from fwat.measure.utils import taper_window
 from fwat.adjoint.MeasureStats import MeasureStats
+from .params import AdjointParams, expand_params
 
 def measure_adj_cross_conv(
+    obs_v: np.ndarray, syn_v: np.ndarray,
+    obs_h: np.ndarray, syn_h: np.ndarray,
+    params: AdjointParams,
+):
+    """Compute a cross-convolution adjoint source from grouped parameters."""
+    return measure_adj_cross_conv_impl(
+        obs_v, syn_v, obs_h, syn_h, **expand_params(params, "cross_conv"))
+
+
+def measure_adj_cross_conv_impl(
     obs_v:np.ndarray,syn_v:np.ndarray,
     obs_h:np.ndarray,syn_h:np.ndarray,
     t0:float,dt:float,

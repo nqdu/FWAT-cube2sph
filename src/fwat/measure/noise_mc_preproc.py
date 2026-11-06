@@ -1,13 +1,15 @@
 import numpy as np 
 from mpi4py import MPI 
 import os 
-from fwat.const import PARAM_FILE
+from fwat.const import PARAM_FILE, LBFGS_FILE
 from obspy.io.sac import SACTrace
 from fwat.measure.utils import cumtrapz1,dif1,bandpass,  \
                                 interpolate_syn,alloc_mpi_jobs
 from fwat.adjoint.MeasureStats import MeasureStats
+from fwat.adjoint.caller import run_measurement
 
-from .FwatPreOP import create_shared_array,create_shared_communicators
+from .FwatPreOP import (FwatPreOP, create_shared_array,
+                        create_shared_communicators)
 
 def _get_snr(data:np.ndarray,win_b:int,win_e:int):
     """
@@ -46,6 +48,20 @@ def _get_snr(data:np.ndarray,win_b:int,win_e:int):
         snr = amp / std_in_noise
 
     return snr
+
+
+def _snr_excluded(quality: dict) -> bool:
+    """Apply the noise-specific SNR data quality check."""
+    snr = quality['snr']
+    snr_threshold = quality['snr_min']
+    check_excluded = quality['check_excluded']
+    if (snr is None) != (snr_threshold is None):
+        raise ValueError("snr and snr_threshold must be supplied together")
+    if not check_excluded or snr is None:
+        return False
+    values = np.atleast_1d(snr)
+    return bool(np.any(~np.isfinite(values)) or
+                np.any(values < snr_threshold))
 
 def _get_rotate_matrix(azd,bazd,rotate_src=True,rotate_sta = True):
     from numpy import sin,cos
@@ -100,7 +116,7 @@ def _get_default_values(key:str) -> float:
     else:
         raise ValueError(f"Key '{key}' not found in default values dictionary.")
 
-class NoiseMC_PreOP():
+class NoiseMC_PreOP(FwatPreOP):
     def __init__(self, measure_type:str, iter:int, evtid:str, run_opt:int):
         # import packages
         from .utils import read_params
@@ -143,6 +159,10 @@ class NoiseMC_PreOP():
         if self.run_opt == 2:
             mdir = mdir + ".ls"
         self.mod = mdir
+        lbfgs = read_params(LBFGS_FILE)
+        self.iter_start = int(lbfgs['iter_start'])
+        self.check_excluded = (int(lbfgs['iter']) == self.iter_start and '.ls' not in self.mod)
+        self._record_exclusions = {}
 
         # get all synthetic directories
         self._get_mc_channel()
@@ -269,7 +289,7 @@ class NoiseMC_PreOP():
         for ic in range(len(self.scomp_syn)):
             fn_matrix = f"{self.SRC_REC}/rot_{self.evtid}"
             from_dir = f"{self.syndirs[ic]}/OUTPUT_FILES/"
-            to_dir = f"{self.syndirs[ic]}/OUTPUT_FILES/"
+            to_dir = self.syndirs[ic]
             from_template='${nt}.${sta}.BX${comp}.semd'
             to_template='${nt}.${sta}.BX${comp}.sem.npy'
 
@@ -287,13 +307,14 @@ class NoiseMC_PreOP():
         # loop each synthetic directory
         for ic in range(len(self.scomp_syn)):
             fn_matrix = f"{self.SRC_REC}/rot_{self.evtid}"
-            from_dir = f"{self.syndirs[ic]}/SEM/"
-            to_dir = f"{self.syndirs[ic]}/SEM/"
+            from_dir = os.path.join(self.syndirs[ic], "SEM")
+            to_dir = from_dir
             from_template='${nt}.${sta}.BX${comp}.adj.sem.npy'
             to_template='${nt}.${sta}.BX${comp}.adj'
 
-            # rotate seismograms from XYZ to ZNE
-            rotate_seismo_adj(rot_list, fn_matrix, from_dir, to_dir, from_template, to_template)
+            # rotate local adjoint sources into solver coordinates
+            rotate_seismo_adj(rot_list, fn_matrix, self.seismogram_adj,
+                              from_dir, to_dir, from_template, to_template)
 
     def _get_bandname(self,ib:int):
         return 'T%03g_T%03g' %(self.Tmin[ib],self.Tmax[ib])
@@ -324,7 +345,7 @@ class NoiseMC_PreOP():
                 data = np.zeros((self.npt_syn,2))
                 for ic,ch in enumerate(['E','N']):
                     name = f"{keys[i]}.{self.chcode}{ch}.sem.npy"
-                    filename = f"{self.syndirs[ie]}/OUTPUT_FILES/{name}"
+                    filename = os.path.join(self.syndirs[ie],name)
                     data[:,:] = self.seismogram[filename]
                     temp_syn[ic,:] = data[:,1]
 
@@ -336,14 +357,12 @@ class NoiseMC_PreOP():
                 temp_syn[0,:] = vr * 1.
                 temp_syn[1,:] = vt * 1.
 
-                # save to ascii
+                # keep rotated traces in memory
                 for ic,ch in enumerate(['R','T']):
                     name = f"{keys[i]}.{self.chcode}{ch}.sem.npy"
-                    filename = f"{self.syndirs[ie]}/OUTPUT_FILES/{name}"
+                    filename = os.path.join(self.syndirs[ie],name)
                     data[:,1] = temp_syn[ic,:] 
-                    #data.tofile(filename)
                     self.seismogram[filename] = data.copy()
-                    #np.save(filename,data)
 
         # sync
         MPI.COMM_WORLD.Barrier()
@@ -355,7 +374,8 @@ class NoiseMC_PreOP():
         for i_s,chs in enumerate(['E','N','Z']):
             syndir = f"{self.SOLVER}/{self.mod}/{self.evtid}_{chs}/"
             for i_r,chr in enumerate(['E','N','Z']):
-                filename = f"{syndir}/OUTPUT_FILES/{self.sta_names[i]}.{self.chcode}{chr}.sem.npy"
+                filename = os.path.join(
+                    syndir,f"{self.sta_names[i]}.{self.chcode}{chr}.sem.npy")
                 if filename not in self.seismogram:
                     continue
                 data[i_s,i_r,:] = self.seismogram[filename][:,1] * 1.
@@ -377,10 +397,20 @@ class NoiseMC_PreOP():
     
     def _cal_adj_by_name(self,name,dat_inp,syn_inp,
                          t0_inp,dt_inp,npt_cut,
-                         ib:int,tstart:float,tend:float):
-        
+                         ib:int,tstart:float,tend:float,
+                         code: str, excluded_codes: dict[str, bool],
+                         check_excluded: bool, snr=None,
+                         snr_threshold=None):
+        noise_quality = {
+            'snr': snr, 'snr_min': snr_threshold,
+            'check_excluded': check_excluded,
+        }
+        if code in excluded_codes or _snr_excluded(noise_quality):
+            stats = MeasureStats(adj_type=self.adjsrc_type, tstart=tstart,
+                                 tend=tend, code=code, exclude=True)
+            return stats, np.zeros_like(dat_inp)
 
-        # get parameters 
+        # get parameters
         tshift = _get_default_values('tshift')
         cc_coef = _get_default_values('cc_min')
         dlna = _get_default_values('dlna')
@@ -397,58 +427,59 @@ class NoiseMC_PreOP():
             cc_min1 = self.pdict['CC_MIN'][ib]
             if cc_min1 > 0:
                 cc_coef = cc_min1 * 1.
-        
-        if self.adjsrc_type == 'exp_phase':
-            from fwat.adjoint.exp_phase_misfit import measure_adj_exphase
-            return measure_adj_exphase(
-                        dat_inp,syn_inp,
-                        t0_inp,dt_inp,npt_cut,
-                        self.Tmin[ib],self.Tmax[ib],
-                        tstart,tend,
-                        tshift_min=-tshift,tshift_max=tshift,
-                        dlna_min=-dlna,dlna_max=dlna,
-                        cc_min=cc_coef)
-        elif self.adjsrc_type == 'cc_time':
-            from fwat.adjoint.cc_misfit import measure_adj_cc
 
-            return measure_adj_cc(
-                        dat_inp,syn_inp,
-                        t0_inp,dt_inp,npt_cut,
-                        self.Tmin[ib],self.Tmax[ib],
-                        tstart,tend,
-                        tshift_min=-tshift,tshift_max=tshift,
-                        dlna_min=-dlna,dlna_max=dlna,
-                        cc_min=cc_coef)
-        else:
-            from .measure import measure_adj
+        params = {
+            'trace': {'t0': t0_inp, 'dt': dt_inp, 'nt': npt_cut},
+            'window': {'start': tstart, 'end': tend},
+            'band': {'min_period': self.Tmin[ib], 'max_period': self.Tmax[ib]},
+            'quality': {
+                'tshift_min': -tshift, 'tshift_max': tshift,
+                'dlna_min': -dlna, 'dlna_max': dlna,
+                'cc_min': cc_coef, 'check_excluded': check_excluded,
+            },
+        }
+        if self.adjsrc_type not in ('exp_phase', 'cc_time'):
             imeas = int(self.adjsrc_type)
-            verbose = (self.myrank == 0) and (name == self.sta_names[0])
-            return measure_adj(
-                        t0_inp,dt_inp,npt_cut,
-                        t0_inp,dt_inp,npt_cut,
-                        tstart,tend,imeas,
-                        self.Tmax[ib]*1.01,
-                        self.Tmin[ib]*0.99,
-                        verbose,dat_inp,
-                        syn_inp,
-                        tshift_max=tshift,
-                        tshift_min=-tshift,
-                        dlna_max=dlna,
-                        dlna_min=-dlna,
-                        cc_min=cc_coef)
+            params['options'] = {
+                'verbose': (self.myrank == 0) and (name == self.sta_names[0]),
+                'itaper': 2 if imeas == 5 else 1,
+            }
+        result = run_measurement(
+            self.adjsrc_type, {'obs': dat_inp, 'syn': syn_inp}, params)
+        return result.stats, result.adjoints['trace']
     
     def _cal_adj_by_name_dd(self,dat_inp_i,dat_inp_j,
                             syn_inp_i,syn_inp_j,
                             t0_inp,dt_inp,npt_cut,
                             ib:int,tstart_i:float,tend_i:float,
-                            tstart_j:float,tend_j:float):
-        from fwat.adjoint.cc_misfit import measure_adj_cc_dd
-        return measure_adj_cc_dd(
-                    dat_inp_i,syn_inp_i,
-                    dat_inp_j,syn_inp_j,
-                    t0_inp,dt_inp,npt_cut,
-                    self.Tmin[ib],self.Tmax[ib],
-                    tstart_i,tend_i,tstart_j,tend_j)
+                            tstart_j:float,tend_j:float,
+                            snr_i:float,snr_j:float,
+                            snr_threshold:float,
+                            code:str,excluded_codes:dict[str,bool],
+                            check_excluded:bool):
+        noise_quality = {
+            'snr': (snr_i, snr_j), 'snr_min': snr_threshold,
+            'check_excluded': check_excluded,
+        }
+        if code in excluded_codes or _snr_excluded(noise_quality):
+            stats = MeasureStats(
+                adj_type='cc_dd', tstart=min(tstart_i,tstart_j),
+                tend=max(tend_i,tend_j), code=code, exclude=True)
+            return stats, np.zeros_like(syn_inp_i), np.zeros_like(syn_inp_j)
+        params = {
+            'trace': {'t0': t0_inp, 'dt': dt_inp, 'nt': npt_cut},
+            'windows': {
+                'first': {'start': tstart_i, 'end': tend_i},
+                'second': {'start': tstart_j, 'end': tend_j},
+            },
+            'band': {'min_period': self.Tmin[ib], 'max_period': self.Tmax[ib]},
+        }
+        result = run_measurement(
+            'cc_dd',
+            {'obs_first': dat_inp_i, 'syn_first': syn_inp_i,
+             'obs_second': dat_inp_j, 'syn_second': syn_inp_j},
+            params)
+        return result.stats, result.adjoints['first'], result.adjoints['second']
         
     def save_forward(self):
         # get some vars
@@ -569,6 +600,8 @@ class NoiseMC_PreOP():
 
         # band name
         bandname = self._get_bandname(ib)
+        excluded_codes = self.read_excluded_codes(bandname)
+        check_excluded = self._record_exclusions[bandname]
         freqmin = 1. / self.Tmax[ib]
         freqmax = 1. / self.Tmin[ib]
 
@@ -672,25 +705,19 @@ class NoiseMC_PreOP():
                 #     print("Debugging station TA.F36A.BXZ ...")
                 #     np.save("./debug_obs.npy",dat_inp)
                 #     np.save("./debug_syn.npy",syn_inp)
+                stats_code = f"{self.evtid}_{chs} {self.sta_names[i]}.{self.chcode}{chr}"
                 stats,adjsrc =  \
                     self._cal_adj_by_name(
                         self.sta_names[i],dat_inp,syn_inp,
                         t0_inp,dt_inp,npt_cut,
-                        ib,tstart,tend
+                        ib,tstart,tend,stats_code,excluded_codes,check_excluded,
+                        snr,snr_threshold
                     )
                 adjsrc = interpolate_syn(adjsrc,t0_inp,dt_inp,npt_cut,
                                             t0_syn,dt_syn,npt_syn)
-
-                # make sure the snr > snr_threshold
-                if snr < snr_threshold:
-                    adjsrc[:] = 0.
-                    stats.misfit = 0.
-                    stats.tr_chi = 0.
-                    stats.am_chi = 0.
-                    stats.tshift = 0.
                 
                 # append stats
-                stats.code = f"{self.evtid}_{chs} {self.sta_names[i]}.{self.chcode}{chr}"
+                stats.code = stats_code
                 stats_list.append(stats)
 
                 # save adjoint source to adj_src_all
@@ -713,7 +740,8 @@ class NoiseMC_PreOP():
                 i_s = rcomp.index(self.scomp_syn[ic])
                 for i_r in range(3):
                     code = f"{self.sta_names[i]}.{self.chcode}{rcomp[i_r]}"
-                    filename = f"{self.syndirs[ic]}/OUTPUT_FILES/{bandname}/{code}.adj.sem.npy"
+                    filename = os.path.join(
+                        self.syndirs[ic],bandname,f"{code}.adj.sem.npy")
                     data[:,1] = adj_src_all[i_s,i_r,:]
                     self.seismogram_adj[filename] = data.copy()
                     #np.save(filename,data)
@@ -754,6 +782,8 @@ class NoiseMC_PreOP():
 
         # band name
         bandname = self._get_bandname(ib)
+        excluded_codes = self.read_excluded_codes(bandname)
+        check_excluded = self._record_exclusions[bandname]
         freqmin = 1. / self.Tmax[ib]
         freqmax = 1. / self.Tmin[ib]
 
@@ -922,6 +952,12 @@ class NoiseMC_PreOP():
                 if amp_j == 0.: amp_j = 1.
                 dat_inp_j *= np.max(np.abs(syn_inp_j[win_b_j:win_e_j])) / amp_j
 
+                snr_i = float(_get_snr(dat_inp_i,win_b_i,win_e_i))
+                snr_j = float(_get_snr(dat_inp_j,win_b_j,win_e_j))
+                stats_code = (f"{self.evtid}_{chs} "
+                              f"{self.sta_names[i]}.{self.chcode}{chr}-"
+                              f"{self.sta_names[j]}.{self.chcode}{chr}")
+
                 # compute adjoint source for i and j
                 stats,adjsrc_i,adjsrc_j =  \
                     self._cal_adj_by_name_dd(
@@ -929,26 +965,17 @@ class NoiseMC_PreOP():
                         syn_inp_i,syn_inp_j,
                         t0_inp,dt_inp,npt_cut,
                         ib,tstart_i,tend_i,
-                        tstart_j,tend_j
+                        tstart_j,tend_j,
+                        snr_i,snr_j,snr_threshold,
+                        stats_code,excluded_codes,check_excluded
                     )
                 adjsrc_i = interpolate_syn(adjsrc_i,t0_inp,dt_inp,npt_cut,
                                         t0_syn,dt_syn,npt_syn)
                 adjsrc_j = interpolate_syn(adjsrc_j,t0_inp,dt_inp,npt_cut,
                                         t0_syn,dt_syn,npt_syn)
 
-                # check snr
-                snr_i = _get_snr(dat_inp_i,win_b_i,win_e_i)
-                snr_j = _get_snr(dat_inp_j,win_b_j,win_e_j)
-                if snr_i < snr_threshold or snr_j < snr_threshold:
-                    adjsrc_i[:] = 0.
-                    adjsrc_j[:] = 0.
-                    stats.misfit = 0.
-                    stats.tr_chi = 0.
-                    stats.am_chi = 0.
-                    stats.tshift = 0.
-                
                 # append stats
-                stats.code = f"{self.evtid}_{chs} {self.sta_names[i]}.{self.chcode}{chr}-{self.sta_names[j]}.{self.chcode}{chr}"
+                stats.code = stats_code
                 stats_list.append(stats)
 
                 adj_src_i[i_s,i_r,:] = adjsrc_i.copy()
@@ -989,7 +1016,8 @@ class NoiseMC_PreOP():
                 i_s = rcomp.index(self.scomp_syn[ic])
                 for i_r in range(3):
                     code = f"{self.sta_names[i]}.{self.chcode}{rcomp[i_r]}"
-                    filename = f"{self.syndirs[ic]}/OUTPUT_FILES/{bandname}/{code}.adj.sem.npy"
+                    filename = os.path.join(
+                        self.syndirs[ic],bandname,f"{code}.adj.sem.npy")
                     data[:,1] = adj_src_all[i,i_s,i_r,:]
                     self.seismogram_adj[filename] = data.copy()
 
@@ -1051,6 +1079,8 @@ class NoiseMC_PreOP():
                 nmeasure = len(stats_list)
                 for im in range(nmeasure):
                     stats = stats_list[im]
+                    if stats.exclude:
+                        continue
 
                     # print info
                     print(f"Measuring stats of {stats.code}")
@@ -1070,12 +1100,19 @@ class NoiseMC_PreOP():
                 # close output file
                 fio.close()
 
+                if self._record_exclusions.get(bandname, False):
+                    path = self.exclusion_file(bandname)
+                    with path.open('x' if irank == 0 else 'a') as excluded_file:
+                        for stats in stats_list:
+                            if stats.exclude:
+                                excluded_file.write(f"{stats.code}\n")
+                    self._record_exclusions[bandname] = False
+
             # barrier
             MPI.COMM_WORLD.Barrier()
     
     def sum_adj_source(self):
         import os 
-        import glob 
         from fwat.measure.utils import alloc_mpi_jobs
 
         nb = len(self.Tmax)
@@ -1105,18 +1142,20 @@ class NoiseMC_PreOP():
                 for ib in range(nb):
                     bandname = self._get_bandname(ib) 
                     for ic in range(3):
-                        #data = np.load(f"{syndir}/OUTPUT_FILES/{bandname}/{name}.{self.chcode}{comps_read[ic]}.adj.sem.npy")
-                        key = f"{syndir}/OUTPUT_FILES/{bandname}/{name}.{self.chcode}{comps_read[ic]}.adj.sem.npy"
+                        key = os.path.join(
+                            syndir,bandname,
+                            f"{name}.{self.chcode}{comps_read[ic]}.adj.sem.npy")
                         adj[ic,:] += self.seismogram_adj[key][:,1]
                 
-                # save to SEM/
+                # keep summed traces in memory for the XYZ rotation
                 data = np.zeros((self.npt_syn,2)) 
                 data[:,0] = self.t0_syn + self.dt_syn * np.arange(self.npt_syn)
 
                 for ic,ch in enumerate(['E','N','Z']):
                     name1 = f"{name}.{self.chcode}{ch}.adj.sem.npy"
                     data[:,1] = adj[ic,:]
-                    np.save(f"{syndir}/SEM/{name1}",data)
+                    key = os.path.join(syndir,"SEM",name1)
+                    self.seismogram_adj[key] = data.copy()
         
         # wait for jobs finish
         MPI.COMM_WORLD.Barrier()
@@ -1200,9 +1239,6 @@ class NoiseMC_PreOP():
                 for f in filenames:
                     os.remove(f)
                 filenames = glob(f"{syndir}/OUTPUT_FILES/*.sem.npy")
-                for f in filenames:
-                    os.remove(f)
-                filenames = glob(f"{syndir}/SEM/*.sem.npy")
                 for f in filenames:
                     os.remove(f)
 
